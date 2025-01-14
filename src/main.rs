@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
 use raylib::prelude::*;
 // use rand::prelude::*;
@@ -96,11 +96,27 @@ pub mod stroke {
         Outside,
     }
 
+    pub enum WidthProfile {
+        Constant(f32),
+        Variable(BTreeMap<f32, f32>),
+    }
+
     pub struct Stroke {
         pub blend: Blending,
         pub pattern: Pattern,
-        pub thick: f32,
+        pub thick: WidthProfile,
         pub align: Align,
+    }
+
+    impl Default for Stroke {
+        fn default() -> Self {
+            Self {
+                blend: Blending::default(),
+                pattern: Pattern::Solid(Color::BLACK),
+                thick: WidthProfile::Constant(1.0),
+                align: Align::Middle,
+            }
+        }
     }
 }
 use stroke::Stroke;
@@ -125,6 +141,15 @@ pub mod fill {
         pub blend: Blending,
         pub pattern: Pattern,
     }
+
+    impl Default for Fill {
+        fn default() -> Self {
+            Self {
+                blend: Blending::default(),
+                pattern: Pattern::Solid(Color::WHITE),
+            }
+        }
+    }
 }
 use fill::Fill;
 
@@ -137,10 +162,21 @@ pub struct Appearance {
     pub items: Vec<StyleItem>,
 }
 
-impl Appearance {
-    pub fn new() -> Self {
+impl Default for Appearance {
+    fn default() -> Self {
         Self {
-            items: Vec::new(),
+            items: vec![
+                StyleItem::Fill(Fill::default()),
+                StyleItem::Stroke(Stroke::default()),
+            ],
+        }
+    }
+}
+
+impl Appearance {
+    pub fn new(items: Vec<StyleItem>) -> Self {
+        Self {
+            items,
         }
     }
 }
@@ -155,7 +191,7 @@ impl VectorPath {
     pub fn new() -> Self {
         Self {
             points: Vec::new(),
-            appearance: Appearance::new(),
+            appearance: Appearance::default(),
         }
     }
 
@@ -203,38 +239,38 @@ impl Bitmap {
 }
 
 pub enum LayerItem {
-    Group(Vec<Layer>),
+    Group(Rc<Layer>),
     Path(Rc<RefCell<VectorPath>>),
-    Rectangle(Rectangle),
-    Circle { center: Vector2, radius: f32, },
     Bitmap(Bitmap),
 }
 
 pub struct Layer {
     pub name: String,
     pub is_hidden: bool,
+    pub is_locked: bool,
     pub blend: Blending,
-    pub items: Vec<LayerItem>,
+    pub bounds: Rectangle,
+    pub items: Vec<Rc<RefCell<LayerItem>>>,
 }
 
 impl Layer {
-    pub fn new(name: String, items: Vec<LayerItem>) -> Self {
+    pub fn new(name: String) -> Self {
         Self {
             name,
             is_hidden: false,
+            is_locked: false,
             blend: Blending::default(),
-            items,
+            bounds: Rectangle::default(),
+            items: Vec::new(),
         }
     }
 
     pub fn draw(&self, d: &mut impl RaylibDraw) {
         if !self.is_hidden {
             for item in &self.items {
-                match item {
-                    LayerItem::Group(group) => for layer in group { layer.draw(d) },
+                match &*item.borrow() {
+                    LayerItem::Group(group) => group.draw(d),
                     LayerItem::Path(path) => path.borrow().draw(d),
-                    LayerItem::Rectangle(rec) => d.draw_rectangle_rec(rec, Color::WHITE),
-                    LayerItem::Circle { center, radius, } => d.draw_circle_v(center, *radius, Color::WHITE),
                     LayerItem::Bitmap(bitmap) => bitmap.draw(d),
                 }
             }
@@ -272,17 +308,22 @@ impl Document {
                 zoom: 1.0,
             },
             paper_color: Color::GRAY,
-            layers: vec![Layer::new("layer 0".to_string(), vec![LayerItem::Path(Rc::new(RefCell::new(VectorPath::new())))])],
+            layers: vec![Layer::new("layer 0".to_string())],
             art_boards: vec![ArtBoard::new("artboard 0".to_string(), rrect(0.0, 0.0, width, height))],
         }
     }
 }
 
 pub enum Tool {
-    DirectSelection,
+    DirectSelection {
+        selection: Vec<Rc<RefCell<LayerItem>>>,
+    },
     Pen {
-        /// The layer that drawing will be applied to. Must be a valid index in `layers`.
-        current_path: Rc<RefCell<VectorPath>>,
+        /// If [`Some`], continue seleted.
+        /// If [`None`], find a hovered path or create a new path upon clicking.
+        current_path: Option<Rc<RefCell<VectorPath>>>,
+
+        /// [`Some`] while dragging, [`None`] otherwise.
         current_anchor: Option<Vector2>,
     },
 }
@@ -303,13 +344,7 @@ fn main() {
     let mut document = Document::new("untitled".to_string(), 256.0, 256.0);
 
     let mut mouse_screen_pos_prev = rl.get_mouse_position();
-    let mut current_tool = Tool::Pen {
-        current_path: match &document.layers[0].items[0] {
-            LayerItem::Path(path) => path.clone(),
-            _ => panic!(),
-        },
-        current_anchor: None,
-    };
+    let mut current_tool = Tool::DirectSelection { selection: Vec::new(), };
 
     while !rl.window_should_close() {
         let mouse_screen_pos = rl.get_mouse_position();
@@ -333,30 +368,55 @@ fn main() {
         }
 
         if rl.is_key_pressed(KeyboardKey::KEY_V) {
-            current_tool = Tool::DirectSelection;
+            current_tool = Tool::DirectSelection {
+                selection: Vec::new(),
+            };
         } else if rl.is_key_pressed(KeyboardKey::KEY_P) {
             current_tool = Tool::Pen {
-                current_path: todo!(),
+                current_path: match current_tool {
+                    Tool::DirectSelection { selection } if selection.len() == 1 => {
+                        match &*selection[0].borrow_mut() {
+                            LayerItem::Path(path) => Some(path.clone()),
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                },
                 current_anchor: None,
             };
         }
 
         match &mut current_tool {
-            Tool::DirectSelection => {
+            Tool::DirectSelection { selection: _ } => {
                 // todo
             }
 
             Tool::Pen { current_path, current_anchor } => {
-                let mut path = current_path.borrow_mut();
                 if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
+                    if current_path.is_none() {
+                        // create a new path
+                        let path = VectorPath::new();
+                        let path = Rc::new(RefCell::new(path));
+                        document.layers.push({
+                            let mut layer = Layer::new(format!("layer {}", document.layers.len()));
+                            layer.items.push(Rc::new(RefCell::new(LayerItem::Path(path.clone()))));
+                            layer
+                        });
+                        *current_path = Some(path);
+                    }
                     *current_anchor = Some(mouse_world_pos);
                 } else if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
-                    if let Some(anchor) = current_anchor.take() {
-                        path.points.push((
-                            anchor * 2.0 - mouse_world_pos, // x - (a - x) = 2x - a
-                            anchor,
-                            mouse_world_pos,
-                        ));
+                    if let Some(current_path) = current_path.as_mut() {
+                        let mut path = current_path.borrow_mut();
+                        if let Some(anchor) = current_anchor.take() {
+                            path.points.push((
+                                anchor * 2.0 - mouse_world_pos, // x - (a - x) = 2x - a
+                                anchor,
+                                mouse_world_pos,
+                            ));
+                        }
+                    } else {
+                        println!("warning: `current_path` should have been set when mouse was pressed");
                     }
                 }
             }
@@ -377,7 +437,7 @@ fn main() {
                 for layer in &document.layers {
                     layer.draw(&mut d);
                 }
-                if let Tool::Pen { current_path, current_anchor } = &current_tool {
+                if let Tool::Pen { current_path: Some(current_path), current_anchor } = &current_tool {
                     let c_out = mouse_world_pos;
                     let path = current_path.borrow();
                     match current_anchor {
