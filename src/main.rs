@@ -239,7 +239,7 @@ impl Document {
             title,
             camera: Camera2D {
                 offset: Vector2::zero(),
-                target: Vector2::new(width * 0.5, height * 0.5),
+                target: Vector2::zero(),
                 rotation: 0.0,
                 zoom: 1.0,
             },
@@ -253,6 +253,7 @@ impl Document {
 fn main() {
     let (mut rl, thread) = init()
         .title("Amity Vector Art")
+        .size(1280, 720)
         .resizable()
         .build();
 
@@ -262,9 +263,30 @@ fn main() {
 
     let background_color: Color = Color::new(32,32,32,255);
 
-    let document = Document::new("untitled".to_string(), 256.0, 256.0);
+    let mut document = Document::new("untitled".to_string(), 256.0, 256.0);
+
+    let mut mouse_screen_pos_prev = rl.get_mouse_position();
 
     while !rl.window_should_close() {
+        let mouse_screen_pos = rl.get_mouse_position();
+        let mouse_screen_delta = mouse_screen_pos - mouse_screen_pos_prev;
+        // let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, document.camera);
+
+        if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_MIDDLE) {
+            document.camera.target -= mouse_screen_delta / document.camera.zoom;
+        }
+
+        document.camera.target += mouse_screen_delta;
+        document.camera.offset += mouse_screen_delta * document.camera.zoom;
+
+        if rl.is_key_down(KeyboardKey::KEY_LEFT_ALT) {
+            let scroll = rl.get_mouse_wheel_move();
+            if scroll > 0.0 && document.camera.zoom < 8.0 {
+                document.camera.zoom *= 2.0;
+            } else if scroll < 0.0 && document.camera.zoom > 0.125 {
+                document.camera.zoom *= 0.5;
+            }
+        }
 
         {
             let mut d = rl.begin_drawing(&thread);
@@ -284,9 +306,12 @@ fn main() {
 
                 // Artboards foreground
                 for board in &document.art_boards {
+                    d.draw_text(&board.name, board.rect.x as i32, board.rect.y as i32 - 10, 10, Color::WHITE);
                     d.draw_rectangle_lines_ex(board.rect, 1.0, Color::BLACK);
                 }
             }
         }
+
+        mouse_screen_pos_prev = mouse_screen_pos;
     }
 }
