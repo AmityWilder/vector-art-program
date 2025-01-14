@@ -276,8 +276,8 @@ fn main() {
             document.camera.target -= mouse_screen_delta / document.camera.zoom;
         }
 
-        document.camera.target += mouse_screen_delta;
-        document.camera.offset += mouse_screen_delta * document.camera.zoom;
+        document.camera.target += mouse_screen_delta / document.camera.zoom;
+        document.camera.offset += mouse_screen_delta;
 
         if rl.is_key_down(KeyboardKey::KEY_LEFT_ALT) {
             let scroll = rl.get_mouse_wheel_move();
@@ -309,6 +309,9 @@ fn main() {
                     d.draw_text(&board.name, board.rect.x as i32, board.rect.y as i32 - 10, 10, Color::WHITE);
                     d.draw_rectangle_lines_ex(board.rect, 1.0, Color::BLACK);
                 }
+
+                // d.draw_circle_v(document.camera.target, 5.0, Color::MAGENTA);
+                // d.draw_line_v(document.camera.target, document.camera.target - document.camera.offset, Color::MAGENTA);
             }
         }
 
