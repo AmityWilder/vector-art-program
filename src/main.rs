@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use raylib::prelude::*;
 // use rand::prelude::*;
 
@@ -135,15 +137,41 @@ pub struct Appearance {
     pub items: Vec<StyleItem>,
 }
 
+impl Appearance {
+    pub fn new() -> Self {
+        Self {
+            items: Vec::new(),
+        }
+    }
+}
+
 pub struct VectorPath {
-    /// vc cvc ... cvc cv
-    pub points: Vec<Vector2>,
+    /// p1, c2, c3, p4, c5, c6...
+    pub points: Vec<(Vector2, Vector2, Vector2)>,
     pub appearance: Appearance,
 }
 
 impl VectorPath {
+    pub fn new() -> Self {
+        Self {
+            points: Vec::new(),
+            appearance: Appearance::new(),
+        }
+    }
+
     pub fn draw(&self, d: &mut impl RaylibDraw) {
-        todo!()
+        for window in self.points.windows(2) {
+            if let [(_c1_in, p1, c1_out), (c2_in, p2, _c2_out)] = window {
+                d.draw_spline_segment_bezier_cubic(*p1, *c1_out, *c2_in, *p2, 1.0, Color::BLUEVIOLET);
+            }
+        }
+        for (c_in, p, c_out) in &self.points {
+            d.draw_line_v(c_in, p, Color::BLUEVIOLET);
+            d.draw_line_v(p, c_out, Color::BLUEVIOLET);
+            d.draw_circle_v(c_in, 3.0, Color::BLUEVIOLET);
+            d.draw_circle_v(c_out, 3.0, Color::BLUEVIOLET);
+            d.draw_circle_v(p, 4.0, Color::BLUEVIOLET);
+        }
     }
 }
 
@@ -176,7 +204,7 @@ impl Bitmap {
 
 pub enum LayerItem {
     Group(Vec<Layer>),
-    Path(VectorPath),
+    Path(Rc<RefCell<VectorPath>>),
     Rectangle(Rectangle),
     Circle { center: Vector2, radius: f32, },
     Bitmap(Bitmap),
@@ -190,12 +218,12 @@ pub struct Layer {
 }
 
 impl Layer {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: String, items: Vec<LayerItem>) -> Self {
         Self {
             name,
             is_hidden: false,
             blend: Blending::default(),
-            items: Vec::new(),
+            items,
         }
     }
 
@@ -204,7 +232,7 @@ impl Layer {
             for item in &self.items {
                 match item {
                     LayerItem::Group(group) => for layer in group { layer.draw(d) },
-                    LayerItem::Path(path) => path.draw(d),
+                    LayerItem::Path(path) => path.borrow().draw(d),
                     LayerItem::Rectangle(rec) => d.draw_rectangle_rec(rec, Color::WHITE),
                     LayerItem::Circle { center, radius, } => d.draw_circle_v(center, *radius, Color::WHITE),
                     LayerItem::Bitmap(bitmap) => bitmap.draw(d),
@@ -244,10 +272,19 @@ impl Document {
                 zoom: 1.0,
             },
             paper_color: Color::GRAY,
-            layers: vec![Layer::new("layer 0".to_string())],
+            layers: vec![Layer::new("layer 0".to_string(), vec![LayerItem::Path(Rc::new(RefCell::new(VectorPath::new())))])],
             art_boards: vec![ArtBoard::new("artboard 0".to_string(), rrect(0.0, 0.0, width, height))],
         }
     }
+}
+
+pub enum Tool {
+    DirectSelection,
+    Pen {
+        /// The layer that drawing will be applied to. Must be a valid index in `layers`.
+        current_path: Rc<RefCell<VectorPath>>,
+        current_anchor: Option<Vector2>,
+    },
 }
 
 fn main() {
@@ -266,11 +303,18 @@ fn main() {
     let mut document = Document::new("untitled".to_string(), 256.0, 256.0);
 
     let mut mouse_screen_pos_prev = rl.get_mouse_position();
+    let mut current_tool = Tool::Pen {
+        current_path: match &document.layers[0].items[0] {
+            LayerItem::Path(path) => path.clone(),
+            _ => panic!(),
+        },
+        current_anchor: None,
+    };
 
     while !rl.window_should_close() {
         let mouse_screen_pos = rl.get_mouse_position();
         let mouse_screen_delta = mouse_screen_pos - mouse_screen_pos_prev;
-        // let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, document.camera);
+        let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, document.camera);
 
         if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_MIDDLE) {
             document.camera.target -= mouse_screen_delta / document.camera.zoom;
@@ -288,6 +332,36 @@ fn main() {
             }
         }
 
+        if rl.is_key_pressed(KeyboardKey::KEY_V) {
+            current_tool = Tool::DirectSelection;
+        } else if rl.is_key_pressed(KeyboardKey::KEY_P) {
+            current_tool = Tool::Pen {
+                current_path: todo!(),
+                current_anchor: None,
+            };
+        }
+
+        match &mut current_tool {
+            Tool::DirectSelection => {
+                // todo
+            }
+
+            Tool::Pen { current_path, current_anchor } => {
+                let mut path = current_path.borrow_mut();
+                if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
+                    *current_anchor = Some(mouse_world_pos);
+                } else if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
+                    if let Some(anchor) = current_anchor.take() {
+                        path.points.push((
+                            anchor * 2.0 - mouse_world_pos, // x - (a - x) = 2x - a
+                            anchor,
+                            mouse_world_pos,
+                        ));
+                    }
+                }
+            }
+        }
+
         {
             let mut d = rl.begin_drawing(&thread);
             d.clear_background(background_color);
@@ -302,6 +376,39 @@ fn main() {
 
                 for layer in &document.layers {
                     layer.draw(&mut d);
+                }
+                if let Tool::Pen { current_path, current_anchor } = &current_tool {
+                    let c_out = mouse_world_pos;
+                    let path = current_path.borrow();
+                    match current_anchor {
+                        &Some(p) => {
+                            let c_in = p * 2.0 - c_out;
+                            if let Some((_, p_last, c_out_last)) = path.points.last() {
+                                d.draw_spline_segment_bezier_cubic(
+                                    *p_last,
+                                    *c_out_last,
+                                    c_in,
+                                    p,
+                                    1.0, Color::BLUEVIOLET);
+                            }
+                            d.draw_line_v(p, c_out, Color::BLUEVIOLET);
+                            d.draw_line_v(p, p * 2.0 - c_out, Color::BLUEVIOLET);
+                            d.draw_circle_v(c_in, 3.0, Color::BLUEVIOLET);
+                            d.draw_circle_v(p, 5.0, Color::BLUEVIOLET);
+                            d.draw_circle_v(c_out, 3.0, Color::BLUEVIOLET);
+                        }
+                        None => {
+                            if let Some((_, p_last, c_out_last)) = path.points.last() {
+                                d.draw_spline_segment_bezier_cubic(
+                                    *p_last,
+                                    *c_out_last,
+                                    c_out,
+                                    c_out,
+                                    1.0, Color::BLUEVIOLET);
+                            }
+                            d.draw_circle_v(c_out, 3.0, Color::BLUEVIOLET);
+                        }
+                    }
                 }
 
                 // Artboards foreground
