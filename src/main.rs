@@ -1,13 +1,6 @@
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 use raylib::prelude::*;
-// use rand::prelude::*;
-
-// pub trait RenderHeight {
-//     fn get_render_height(&self) -> i32 {
-//         unsafe { ffi::GetRenderHeight() }
-//     }
-// }
-// impl RenderHeight for RaylibHandle {}
+use rand::{distributions::Uniform, prelude::*};
 
 fn mix(c0: &Color, c1: &Color, amount: f32) -> Color {
     Color {
@@ -202,18 +195,18 @@ impl VectorPath {
         }
     }
 
-    pub fn draw(&self, d: &mut impl RaylibDraw) {
+    pub fn draw(&self, d: &mut impl RaylibDraw, color: Color) {
         for window in self.points.windows(2) {
             if let [(_c1_in, p1, c1_out), (c2_in, p2, _c2_out)] = window {
-                d.draw_spline_segment_bezier_cubic(*p1, *c1_out, *c2_in, *p2, 1.0, Color::BLUEVIOLET);
+                d.draw_spline_segment_bezier_cubic(*p1, *c1_out, *c2_in, *p2, 1.0, color);
             }
         }
         for (c_in, p, c_out) in &self.points {
-            d.draw_line_v(c_in, p, Color::BLUEVIOLET);
-            d.draw_line_v(p, c_out, Color::BLUEVIOLET);
-            d.draw_circle_v(c_in, 3.0, Color::BLUEVIOLET);
-            d.draw_circle_v(c_out, 3.0, Color::BLUEVIOLET);
-            d.draw_circle_v(p, 4.0, Color::BLUEVIOLET);
+            d.draw_line_v(c_in, p, color);
+            d.draw_line_v(p, c_out, color);
+            d.draw_circle_v(c_in, 3.0, color);
+            d.draw_circle_v(c_out, 3.0, color);
+            d.draw_circle_v(p, 4.0, color);
         }
     }
 }
@@ -252,20 +245,32 @@ pub enum LayerItem {
 }
 
 pub struct Layer {
+    /// Name of the layer in the layers panel
     pub name: String,
+    /// Color of paths
+    pub color: Color,
+    /// Skip in rendering
     pub is_hidden: bool,
+    /// Disallow selection and editing
     pub is_locked: bool,
+    /// Show items in layer tree
+    pub is_expanded: bool,
+    /// Items move with layer
+    pub is_group: bool,
     pub blend: Blending,
     pub bounds: Rectangle,
     pub items: Vec<Rc<RefCell<LayerItem>>>,
 }
 
 impl Layer {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: String, color: Color) -> Self {
         Self {
             name,
+            color,
             is_hidden: false,
             is_locked: false,
+            is_expanded: false,
+            is_group: false,
             blend: Blending::default(),
             bounds: Rectangle::default(),
             items: Vec::new(),
@@ -277,8 +282,56 @@ impl Layer {
             for item in &self.items {
                 match &*item.borrow() {
                     LayerItem::Group(group) => group.draw(d),
-                    LayerItem::Path(path) => path.borrow().draw(d),
+                    LayerItem::Path(path) => path.borrow().draw(d, self.color),
                     LayerItem::Bitmap(bitmap) => bitmap.draw(d),
+                }
+            }
+        }
+    }
+
+    pub fn draw_layer_tree(&self, d: &mut impl RaylibDraw, y: &mut f32, x: f32, width: f32) {
+        const GAP: f32 = 2.0;
+        const INDENT: f32 = 6.0;
+        const THUMBNAIL_SIZE: f32 = 32.0;
+        const THUMBNAIL_INSET: f32 = 6.0;
+        const LAYER_HEIGHT: f32 = 2.0 * THUMBNAIL_INSET + THUMBNAIL_SIZE;
+        const LAYER_COLOR_WIDTH: f32 = 4.0;
+
+        let mut rec = Rectangle::new(x, *y, width, LAYER_HEIGHT);
+
+        // slot
+        d.draw_rectangle_rec(rec, Color::new(32,32,32,255));
+
+        // layer color
+        rec.width = LAYER_COLOR_WIDTH;
+        d.draw_rectangle_rec(rec, self.color);
+
+        // thumbnail
+        rec.x += LAYER_COLOR_WIDTH + THUMBNAIL_INSET;
+        rec.y += THUMBNAIL_INSET;
+        (rec.width, rec.height) = (THUMBNAIL_SIZE, THUMBNAIL_SIZE);
+        d.draw_rectangle_rec(rec, Color::GRAY);
+
+        // name
+        rec.x += THUMBNAIL_SIZE + THUMBNAIL_INSET;
+        d.draw_text(&self.name, rec.x as i32, rec.y as i32, 10, Color::new(200,200,200,255));
+
+        *y += LAYER_HEIGHT + GAP;
+
+        if self.is_expanded {
+            for item in self.items.iter().rev() {
+                match &*item.borrow() {
+                    LayerItem::Group(group) => {
+                        group.draw_layer_tree(d, y, x + INDENT, width - INDENT);
+                    }
+                    LayerItem::Path(_path) => {
+                        // todo
+                        *y += LAYER_HEIGHT + GAP;
+                    }
+                    LayerItem::Bitmap(_bitmap) => {
+                        // todo
+                        *y += LAYER_HEIGHT + GAP;
+                    }
                 }
             }
         }
@@ -315,7 +368,7 @@ impl Document {
                 zoom: 1.0,
             },
             paper_color: Color::GRAY,
-            layers: vec![Layer::new("layer 0".to_string())],
+            layers: vec![Layer::new("layer 0".to_string(), Color::BLUEVIOLET)],
             art_boards: vec![ArtBoard::new("artboard 0".to_string(), rrect(0.0, 0.0, width, height))],
         }
     }
@@ -344,11 +397,16 @@ fn main() {
 
     rl.set_target_fps(60);
 
-    // let mut rng = thread_rng();
+    let mut rng = thread_rng();
+    let uniform_u8 = Uniform::<u8>::new_inclusive(0, 255);
 
     let background_color: Color = Color::new(32,32,32,255);
 
     let mut document = Document::new("untitled".to_string(), 256.0, 256.0);
+    document.camera.target = Vector2::new(
+        0.5 * (document.art_boards[0].rect.width  - rl.get_screen_width()  as f32),
+        0.5 * (document.art_boards[0].rect.height - rl.get_screen_height() as f32),
+    );
 
     let mut mouse_screen_pos_prev = rl.get_mouse_position();
     let mut current_tool = Tool::DirectSelection { selection: Vec::new(), };
@@ -373,12 +431,18 @@ fn main() {
         document.camera.target += mouse_screen_delta / document.camera.zoom;
         document.camera.offset += mouse_screen_delta;
 
-        if rl.is_key_down(KeyboardKey::KEY_LEFT_ALT) {
+        {
             let scroll = rl.get_mouse_wheel_move();
-            if scroll > 0.0 && document.camera.zoom < 8.0 {
-                document.camera.zoom *= 2.0;
-            } else if scroll < 0.0 && document.camera.zoom > 0.125 {
-                document.camera.zoom *= 0.5;
+            if rl.is_key_down(KeyboardKey::KEY_LEFT_ALT) {
+                if scroll > 0.0 && document.camera.zoom < 8.0 {
+                    document.camera.zoom *= 2.0;
+                } else if scroll < 0.0 && document.camera.zoom > 0.125 {
+                    document.camera.zoom *= 0.5;
+                }
+            } else if rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) {
+                document.camera.target.x -= scroll * 20.0 / document.camera.zoom;
+            } else {
+                document.camera.target.y -= scroll * 20.0 / document.camera.zoom;
             }
         }
 
@@ -413,7 +477,15 @@ fn main() {
                         let path = VectorPath::new();
                         let path = Rc::new(RefCell::new(path));
                         document.layers.push({
-                            let mut layer = Layer::new(format!("layer {}", document.layers.len()));
+                            let mut layer = Layer::new(
+                                format!("layer {}", document.layers.len()),
+                                Color::new(
+                                    uniform_u8.sample(&mut rng),
+                                    uniform_u8.sample(&mut rng),
+                                    uniform_u8.sample(&mut rng),
+                                    255,
+                                ),
+                            );
                             layer.items.push(Rc::new(RefCell::new(LayerItem::Path(path.clone()))));
                             layer
                         });
@@ -452,6 +524,7 @@ fn main() {
                 for layer in &document.layers {
                     layer.draw(&mut d);
                 }
+
                 if let Tool::Pen { current_path: Some(current_path), current_anchor } = &current_tool {
                     let c_out = mouse_world_pos;
                     let path = current_path.borrow();
@@ -479,7 +552,9 @@ fn main() {
                                     *c_out_last,
                                     c_out,
                                     c_out,
-                                    1.0, Color::BLUEVIOLET);
+                                    1.0,
+                                    Color::BLUEVIOLET,
+                                );
                             }
                             d.draw_circle_v(c_out, 3.0, Color::BLUEVIOLET);
                         }
@@ -489,21 +564,23 @@ fn main() {
                 // Artboards foreground
                 for board in &document.art_boards {
                     d.draw_text(&board.name, board.rect.x as i32, board.rect.y as i32 - 10, 10, Color::WHITE);
-                    d.draw_rectangle_lines_ex(board.rect, 1.0, Color::BLACK);
+                    d.draw_rectangle_lines(board.rect.x as i32, board.rect.y as i32, board.rect.width as i32, board.rect.height as i32, Color::BLACK);
                 }
-
-                // d.draw_circle_v(document.camera.target, 5.0, Color::MAGENTA);
-                // d.draw_line_v(document.camera.target, document.camera.target - document.camera.offset, Color::MAGENTA);
             }
 
             // Draw layers panel
-            d.draw_rectangle_rec(layers_panel, Color::new(24,24,24,255));
-            const INSET: f32 = 10.0;
-            const LAYER_HEIGHT: f32 = 32.0;
-            let mut y = INSET;
-            for layer in &document.layers {
-                d.draw_rectangle_rec(Rectangle::new(layers_panel.x + INSET, layers_panel.y + y, layers_panel.width - INSET * 2.0, LAYER_HEIGHT), Color::GRAY);
-                y += LAYER_HEIGHT + INSET;
+            {
+                d.draw_rectangle_rec(layers_panel, Color::new(24,24,24,255));
+
+                const INSET: f32 = 2.0;
+
+                let mut y = layers_panel.y + INSET;
+                let x = layers_panel.x + INSET;
+                let width = layers_panel.width - INSET * 2.0;
+
+                for layer in document.layers.iter().rev() {
+                    layer.draw_layer_tree(&mut d, &mut y, x, width);
+                }
             }
         }
 
