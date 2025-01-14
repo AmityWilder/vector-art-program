@@ -1,7 +1,13 @@
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
-
 use raylib::prelude::*;
 // use rand::prelude::*;
+
+// pub trait RenderHeight {
+//     fn get_render_height(&self) -> i32 {
+//         unsafe { ffi::GetRenderHeight() }
+//     }
+// }
+// impl RenderHeight for RaylibHandle {}
 
 fn mix(c0: &Color, c1: &Color, amount: f32) -> Color {
     Color {
@@ -119,6 +125,7 @@ pub mod stroke {
         }
     }
 }
+use raylib::prelude::RaylibDraw;
 use stroke::Stroke;
 
 pub mod fill {
@@ -345,11 +352,19 @@ fn main() {
 
     let mut mouse_screen_pos_prev = rl.get_mouse_position();
     let mut current_tool = Tool::DirectSelection { selection: Vec::new(), };
+    let mut layers_panel = Rectangle::new(0.0, 0.0, 256.0, 0.0);
+    layers_panel.x = rl.get_screen_width() as f32 - layers_panel.width;
+    layers_panel.height = rl.get_screen_height() as f32;
 
     while !rl.window_should_close() {
         let mouse_screen_pos = rl.get_mouse_position();
         let mouse_screen_delta = mouse_screen_pos - mouse_screen_pos_prev;
         let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, document.camera);
+
+        if rl.is_window_resized() {
+            layers_panel.x = rl.get_screen_width() as f32 - layers_panel.width;
+            layers_panel.height = rl.get_screen_height() as f32;
+        }
 
         if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_MIDDLE) {
             document.camera.target -= mouse_screen_delta / document.camera.zoom;
@@ -479,6 +494,16 @@ fn main() {
 
                 // d.draw_circle_v(document.camera.target, 5.0, Color::MAGENTA);
                 // d.draw_line_v(document.camera.target, document.camera.target - document.camera.offset, Color::MAGENTA);
+            }
+
+            // Draw layers panel
+            d.draw_rectangle_rec(layers_panel, Color::new(24,24,24,255));
+            const INSET: f32 = 10.0;
+            const LAYER_HEIGHT: f32 = 32.0;
+            let mut y = INSET;
+            for layer in &document.layers {
+                d.draw_rectangle_rec(Rectangle::new(layers_panel.x + INSET, layers_panel.y + y, layers_panel.width - INSET * 2.0, LAYER_HEIGHT), Color::GRAY);
+                y += LAYER_HEIGHT + INSET;
             }
         }
 
