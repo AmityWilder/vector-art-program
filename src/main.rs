@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use rand::prelude::*;
+// use rand::prelude::*;
 
 fn mix(c0: &Color, c1: &Color, amount: f32) -> Color {
     Color {
@@ -13,6 +13,15 @@ fn mix(c0: &Color, c1: &Color, amount: f32) -> Color {
 pub struct Blending {
     pub opacity: f32,
     pub mode: BlendMode,
+}
+
+impl Default for Blending {
+    fn default() -> Self {
+        Self {
+            opacity: 1.0,
+            mode: BlendMode::BLEND_ALPHA,
+        }
+    }
 }
 
 pub mod gradient {
@@ -148,6 +157,18 @@ pub struct Bitmap {
 }
 
 impl Bitmap {
+    pub fn new(texture: Texture2D, position: Vector2) -> Self {
+        let (width, height) = (texture.width as f32, texture.height as f32);
+        Self {
+            texture,
+            source_rec: Rectangle::new(0.0, 0.0, width, height),
+            dest_rec: Rectangle::new(position.x, position.y, width, height),
+            origin: Vector2::new(width * 0.5, height * 0.5),
+            rotation: 0.0,
+            tint: Color::WHITE,
+        }
+    }
+
     pub fn draw(&self, d: &mut impl RaylibDraw) {
         d.draw_texture_pro(&self.texture, self.source_rec, self.dest_rec, self.origin, self.rotation, self.tint);
     }
@@ -162,12 +183,22 @@ pub enum LayerItem {
 }
 
 pub struct Layer {
+    pub name: String,
     pub is_hidden: bool,
     pub blend: Blending,
     pub items: Vec<LayerItem>,
 }
 
 impl Layer {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            is_hidden: false,
+            blend: Blending::default(),
+            items: Vec::new(),
+        }
+    }
+
     pub fn draw(&self, d: &mut impl RaylibDraw) {
         if !self.is_hidden {
             for item in &self.items {
@@ -188,6 +219,37 @@ pub struct ArtBoard {
     pub rect: Rectangle,
 }
 
+impl ArtBoard {
+    pub fn new(name: String, rect: Rectangle) -> Self {
+        Self { name, rect }
+    }
+}
+
+pub struct Document {
+    pub title: String,
+    pub camera: Camera2D,
+    pub paper_color: Color,
+    pub layers: Vec<Layer>,
+    pub art_boards: Vec<ArtBoard>,
+}
+
+impl Document {
+    pub fn new(title: String, width: f32, height: f32) -> Self {
+        Self {
+            title,
+            camera: Camera2D {
+                offset: Vector2::zero(),
+                target: Vector2::new(width * 0.5, height * 0.5),
+                rotation: 0.0,
+                zoom: 1.0,
+            },
+            paper_color: Color::GRAY,
+            layers: vec![Layer::new("layer 0".to_string())],
+            art_boards: vec![ArtBoard::new("artboard 0".to_string(), rrect(0.0, 0.0, width, height))],
+        }
+    }
+}
+
 fn main() {
     let (mut rl, thread) = init()
         .title("Amity Vector Art")
@@ -196,13 +258,11 @@ fn main() {
 
     rl.set_target_fps(60);
 
-    let mut rng = thread_rng();
+    // let mut rng = thread_rng();
 
     let background_color: Color = Color::new(32,32,32,255);
-    let paper_color: Color = Color::GRAY;
 
-    let mut layers: Vec<Layer> = Vec::new();
-    let mut art_boards: Vec<ArtBoard> = Vec::new();
+    let document = Document::new("untitled".to_string(), 256.0, 256.0);
 
     while !rl.window_should_close() {
 
@@ -210,18 +270,22 @@ fn main() {
             let mut d = rl.begin_drawing(&thread);
             d.clear_background(background_color);
 
-            // Artboards background
-            for board in &art_boards {
-                d.draw_rectangle_rec(board.rect, paper_color);
-            }
+            {
+                let mut d = d.begin_mode2D(document.camera);
 
-            for layer in &layers {
-                layer.draw(&mut d);
-            }
+                // Artboards background
+                for board in &document.art_boards {
+                    d.draw_rectangle_rec(board.rect, document.paper_color);
+                }
 
-            // Artboards foreground
-            for board in &art_boards {
-                d.draw_rectangle_lines_ex(board.rect, 1.0, Color::BLACK);
+                for layer in &document.layers {
+                    layer.draw(&mut d);
+                }
+
+                // Artboards foreground
+                for board in &document.art_boards {
+                    d.draw_rectangle_lines_ex(board.rect, 1.0, Color::BLACK);
+                }
             }
         }
     }
