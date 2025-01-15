@@ -4,7 +4,7 @@ use raylib::prelude::*;
 pub mod layer;
 pub mod artboard;
 
-use self::{layer::{Layer, LayerPanelTreeItemData}, artboard::ArtBoard};
+use self::{layer::{Layer, LayerPanelTreeItem, LayerPanelTreeItemEx}, artboard::ArtBoard};
 
 pub struct Document {
     pub title: String,
@@ -45,7 +45,7 @@ impl Document {
         }
     }
 
-    pub fn for_each_layer_tree_item<T>(&mut self, panel: &Rectangle, mut f: impl FnMut(LayerPanelTreeItemData) -> Option<T>) -> Option<T> {
+    pub fn for_each_layer_tree_item<T>(&mut self, panel: &Rectangle, mut f: impl FnMut(LayerPanelTreeItem) -> Option<T>) -> Option<T> {
         const INSET: f32 = 2.0;
 
         let mut y = panel.y + INSET;
@@ -64,56 +64,36 @@ impl Document {
         let mut d = d.begin_scissor_mode(panel.x as i32, panel.y as i32, panel.width as i32, panel.height as i32);
         d.draw_rectangle_rec(*panel, Color::new(24,24,24,255));
         self.for_each_layer_tree_item(panel, |data| -> Option<()> {
-            match data {
-                LayerPanelTreeItemData::Layer {
-                    slot,
-                    color_rec,
-                    thumbnail_rec,
-                    name_rec,
-                    expand_collapse_rec,
-                    layer,
-                } => {
-                    d.draw_rectangle_rec(slot, Color::new(32,32,32,255));
-                    d.draw_rectangle_rec(color_rec, layer.color);
-                    d.draw_rectangle_rec(thumbnail_rec, Color::GRAY);
-                    d.draw_text(&layer.name, name_rec.x as i32, name_rec.y as i32, 10, Color::new(200,200,200,255));
+            let LayerPanelTreeItem { slot, color_rec, thumbnail_rec, name_rec, expand_collapse_rec, ex } = data;
+            let (is_expandable, layer) = match ex {
+                LayerPanelTreeItemEx::Layer { layer }
+                    => (true, &*layer),
 
-                    // expand icon
-                    {
-                        let [p0, p1, p2] = if layer.is_expanded {
-                            [
-                                Vector2::new(expand_collapse_rec.x, expand_collapse_rec.y),
-                                Vector2::new(expand_collapse_rec.x + 5.0, expand_collapse_rec.y + 6.0),
-                                Vector2::new(expand_collapse_rec.x + expand_collapse_rec.height, expand_collapse_rec.y),
-                            ]
-                        } else {
-                            [
-                                Vector2::new(expand_collapse_rec.x, expand_collapse_rec.y),
-                                Vector2::new(expand_collapse_rec.x, expand_collapse_rec.y + expand_collapse_rec.height),
-                                Vector2::new(expand_collapse_rec.x + 6.0, expand_collapse_rec.y + 5.0),
-                            ]
-                        };
-                        d.draw_triangle(p0, p1, p2, Color::new(200,200,200,255));
-                    }
-                }
+                | LayerPanelTreeItemEx::Path { layer, .. }
+                | LayerPanelTreeItemEx::Bitmap { layer, .. }
+                    => (false, &*layer),
+            };
+            d.draw_rectangle_rec(slot, Color::new(32,32,32,255));
+            d.draw_rectangle_rec(color_rec, layer.color);
+            d.draw_rectangle_rec(thumbnail_rec, Color::GRAY);
+            d.draw_text(&layer.name, name_rec.x as i32, name_rec.y as i32, 10, Color::new(200,200,200,255));
 
-                LayerPanelTreeItemData::Path {
-                    slot,
-                    thumbnail_rec,
-                    path: _,
-                } => {
-                    d.draw_rectangle_rec(slot, Color::new(32,32,32,255));
-                    d.draw_rectangle_rec(thumbnail_rec, Color::GRAY);
-                }
-
-                LayerPanelTreeItemData::Bitmap {
-                    slot,
-                    thumbnail_rec,
-                    bitmap: _,
-                } => {
-                    d.draw_rectangle_rec(slot, Color::new(32,32,32,255));
-                    d.draw_rectangle_rec(thumbnail_rec, Color::GRAY);
-                }
+            // expand icon
+            if is_expandable {
+                let [p0, p1, p2] = if layer.is_expanded {
+                    [
+                        Vector2::new(expand_collapse_rec.x, expand_collapse_rec.y),
+                        Vector2::new(expand_collapse_rec.x + 5.0, expand_collapse_rec.y + 6.0),
+                        Vector2::new(expand_collapse_rec.x + expand_collapse_rec.height, expand_collapse_rec.y),
+                    ]
+                } else {
+                    [
+                        Vector2::new(expand_collapse_rec.x, expand_collapse_rec.y),
+                        Vector2::new(expand_collapse_rec.x, expand_collapse_rec.y + expand_collapse_rec.height),
+                        Vector2::new(expand_collapse_rec.x + 6.0, expand_collapse_rec.y + 5.0),
+                    ]
+                };
+                d.draw_triangle(p0, p1, p2, Color::new(200,200,200,255));
             }
 
             None

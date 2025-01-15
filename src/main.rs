@@ -1,4 +1,4 @@
-use layer::{Layer, LayerPanelTreeItemData};
+use layer::{Layer, LayerPanelTreeItem, LayerPanelTreeItemEx};
 use raylib::prelude::*;
 use rand::{distributions::Uniform, prelude::*};
 
@@ -68,13 +68,13 @@ fn main() {
             if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
                 document.for_each_layer_tree_item(&layers_panel, |data| -> Option<()> {
                     match data {
-                        LayerPanelTreeItemData::Layer {
+                        LayerPanelTreeItem {
                             slot,
                             color_rec: _,
                             thumbnail_rec: _,
                             name_rec,
                             expand_collapse_rec,
-                            layer,
+                            ex: LayerPanelTreeItemEx::Layer { layer },
                         } if slot.check_collision_point_rec(mouse_screen_pos) => {
                             if expand_collapse_rec.check_collision_point_rec(mouse_screen_pos) {
                                 layer.is_expanded = !layer.is_expanded;
@@ -114,16 +114,20 @@ fn main() {
                 }
 
                 for layer in &document.layers {
-                    layer.borrow().draw(&mut d);
+                    layer.borrow().draw_rendered(&mut d);
                 }
-
-                current_tool.draw(&mut d, &document, mouse_world_pos);
 
                 // Artboards foreground
                 for board in &document.art_boards {
                     d.draw_text(&board.name, board.rect.x as i32, board.rect.y as i32 - 10, 10, Color::WHITE);
                     d.draw_rectangle_lines(board.rect.x as i32, board.rect.y as i32, board.rect.width as i32, board.rect.height as i32, Color::BLACK);
                 }
+
+                for layer in &document.layers {
+                    layer.borrow().draw_selected(&mut d);
+                }
+
+                current_tool.draw(&mut d, &document, mouse_world_pos);
             }
 
             // Draw layers panel
