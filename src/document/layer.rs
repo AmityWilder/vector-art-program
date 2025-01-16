@@ -12,14 +12,16 @@ pub const LAYER_COLOR_WIDTH: f32 = 4.0;
 pub const TEXT_FONT_SIZE: f32 = 10.0;
 pub const EXPAND_COLLAPSE_SIZE: f32 = 10.0;
 
+pub struct Group {
+    pub group: Vec<Rc<RefCell<Layer>>>,
+    pub is_expanded: bool,
+    pub expand_button_rec: Rectangle,
+}
+
 pub enum LayerContent {
-    Group {
-        group: Vec<Rc<RefCell<Layer>>>,
-        is_expanded: bool,
-        expand_button_rec: Rectangle,
-    },
-    Path(VectorPath),
-    Bitmap(Bitmap),
+    Group(Group),
+    Path(Rc<RefCell<VectorPath>>),
+    Bitmap(Rc<RefCell<Bitmap>>),
 }
 
 pub struct Layer {
@@ -45,6 +47,25 @@ pub struct Layer {
 }
 
 impl Layer {
+    pub fn new(name: String, color: Color, content: LayerContent) -> Self {
+        Self {
+            slot_rec: Rectangle::default(),
+            thumbnail_rec: Rectangle::default(),
+            name,
+            name_rec: Rectangle::default(),
+            color,
+            color_rec: Rectangle::default(),
+            is_hidden: false,
+            hide_button_rec: Rectangle::default(),
+            is_locked: false,
+            lock_button_rec: Rectangle::default(),
+            is_group: false,
+            blend: Blending::default(),
+            artwork_bounds: Rectangle::default(),
+            content,
+        }
+    }
+
     pub fn update_ui_recs(&mut self, container: &Rectangle, top: f32, indent: usize) {
         let indent_size = indent as f32 * INDENT;
         let left = container.x + indent_size;
@@ -68,7 +89,7 @@ impl Layer {
             rec
         };
         match &mut self.content {
-            LayerContent::Group { expand_button_rec, .. } => {
+            LayerContent::Group(Group { expand_button_rec, .. }) => {
                 *expand_button_rec = {
                     rec.y += TEXT_FONT_SIZE + 2.0;
                     rec.width  = EXPAND_COLLAPSE_SIZE;
@@ -79,34 +100,13 @@ impl Layer {
             _ => (),
         }
     }
-}
-
-impl Layer {
-    pub fn new(name: String, color: Color, content: LayerContent) -> Self {
-        Self {
-            slot_rec: Rectangle::default(),
-            thumbnail_rec: Rectangle::default(),
-            name,
-            name_rec: Rectangle::default(),
-            color,
-            color_rec: Rectangle::default(),
-            is_hidden: false,
-            hide_button_rec: Rectangle::default(),
-            is_locked: false,
-            lock_button_rec: Rectangle::default(),
-            is_group: false,
-            blend: Blending::default(),
-            artwork_bounds: Rectangle::default(),
-            content,
-        }
-    }
 
     pub fn draw_rendered(&self, d: &mut impl RaylibDraw) {
         if !self.is_hidden {
             match &self.content {
-                LayerContent::Group { group, .. } => for layer in group { layer.borrow().draw_rendered(d) },
-                LayerContent::Path(path) => path.draw(d, self.color),
-                LayerContent::Bitmap(bitmap) => bitmap.draw(d),
+                LayerContent::Group(Group { group, .. }) => for layer in group { layer.borrow().draw_rendered(d) },
+                LayerContent::Path(path) => path.borrow().draw(d, self.color),
+                LayerContent::Bitmap(bitmap) => bitmap.borrow().draw(d),
             }
         }
     }
@@ -114,9 +114,9 @@ impl Layer {
     pub fn draw_selected(&self, d: &mut impl RaylibDraw) {
         if !self.is_hidden {
             match &self.content {
-                LayerContent::Group { group, .. } => for layer in group { layer.borrow().draw_selected(d) },
-                LayerContent::Path(path) => path.draw(d, self.color),
-                LayerContent::Bitmap(bitmap) => bitmap.draw(d),
+                LayerContent::Group(Group { group, .. }) => for layer in group { layer.borrow().draw_selected(d) },
+                LayerContent::Path(path) => path.borrow().draw(d, self.color),
+                LayerContent::Bitmap(bitmap) => bitmap.borrow().draw(d),
             }
         }
     }

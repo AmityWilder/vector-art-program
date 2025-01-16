@@ -1,13 +1,25 @@
 use std::{cell::RefCell, rc::Rc};
-use layer::LayerContent;
+use layer::{Group, LayerContent};
 use raylib::prelude::*;
 
 pub mod layer;
 pub mod artboard;
 
 use crate::ui::panel::Panel;
-
 use self::{layer::Layer, artboard::ArtBoard};
+
+const DEFAULT_LAYER_COLORS: [Color; 10] = [
+    Color::BLUEVIOLET,
+    Color::OLIVE,
+    Color::ORANGERED,
+    Color::LAVENDER,
+    Color::CYAN,
+    Color::FORESTGREEN,
+    Color::FUCHSIA,
+    Color::MAROON,
+    Color::SEAGREEN,
+    Color::SLATEBLUE,
+];
 
 pub struct Document {
     pub title: String,
@@ -16,9 +28,22 @@ pub struct Document {
     pub layers: Vec<Rc<RefCell<Layer>>>,
     pub art_boards: Vec<ArtBoard>,
     pub current_layer: Option<Rc<RefCell<Layer>>>,
+    layer_color_acc: usize,
+    layer_name_acc: usize,
 }
 
 impl Document {
+    fn next_auto_color(&mut self) -> Color {
+        let idx = self.layer_color_acc;
+        self.layer_color_acc = if idx + 1 >= DEFAULT_LAYER_COLORS.len() { 0 } else { idx + 1 };
+        DEFAULT_LAYER_COLORS[idx]
+    }
+    fn next_auto_name(&mut self) -> String {
+        let idx = self.layer_name_acc;
+        self.layer_name_acc = idx.wrapping_add(1);
+        format!("layer {idx}")
+    }
+
     pub fn new(title: String, width: f32, height: f32) -> Self {
         Self {
             title,
@@ -32,7 +57,21 @@ impl Document {
             layers: Vec::new(),
             art_boards: vec![ArtBoard::new("artboard 0".to_string(), rrect(0.0, 0.0, width, height))],
             current_layer: None,
+            layer_color_acc: 0,
+            layer_name_acc: 0,
         }
+    }
+
+    pub fn create_layer(&mut self, name: Option<String>, color: Option<Color>, content: LayerContent) -> Rc<RefCell<Layer>> {
+        let name = name.unwrap_or_else(|| self.next_auto_name());
+        let color = color.unwrap_or_else(|| self.next_auto_color());
+        let layer = Rc::new(RefCell::new(Layer::new(name, color, content)));
+        self.layers.push(layer.clone());
+        layer
+    }
+
+    pub fn group_layers(&mut self) {
+        todo!("layer grouping")
     }
 
     pub fn pan(&mut self, v: Vector2) {
@@ -53,7 +92,7 @@ impl Document {
             for layer in layers.iter().rev() {
                 let layer = layer.borrow();
                 f(&layer, depth);
-                if let LayerContent::Group { group, is_expanded: true, .. } = &layer.content {
+                if let LayerContent::Group(Group { group, is_expanded: true, .. }) = &layer.content {
                     let result = recursive(group, depth + 1, f);
                     if result.is_some() { return result; }
                 }
@@ -69,7 +108,7 @@ impl Document {
             for layer in layers.iter().rev() {
                 let mut layer = layer.borrow_mut();
                 f(&mut layer, depth);
-                if let LayerContent::Group { group, is_expanded: true, .. } = &mut layer.content {
+                if let LayerContent::Group(Group { group, is_expanded: true, .. }) = &mut layer.content {
                     let result = recursive(group, depth + 1, f);
                     if result.is_some() { return result; }
                 }
@@ -100,7 +139,7 @@ impl Document {
             d.draw_rectangle_rec(layer.thumbnail_rec, Color::GRAY);
             d.draw_text(&layer.name, layer.name_rec.x as i32, layer.name_rec.y as i32, 10, Color::new(200,200,200,255));
             // expand icon
-            if let LayerContent::Group { is_expanded, expand_button_rec, .. } = &layer.content {
+            if let LayerContent::Group(Group { is_expanded, expand_button_rec, .. }) = &layer.content {
                 let p0 = Vector2::new(expand_button_rec.x, expand_button_rec.y);
                 let [p1, p2] = if *is_expanded {
                     [

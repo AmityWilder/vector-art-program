@@ -1,6 +1,6 @@
-use layer::{Layer, LayerContent};
+use layer::{Group, LayerContent};
 use raylib::prelude::*;
-use rand::{distributions::Uniform, prelude::*};
+// use rand::prelude::*;
 use ui::panel::{Panel, Rect2, UIBox};
 
 pub mod stack;
@@ -28,7 +28,7 @@ impl LayersPanel {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             document.foreach_layer_tree_item_mut(|layer, _depth| -> Option<()> {
                 if layer.slot_rec.check_collision_point_rec(mouse_screen_pos) {
-                    if let LayerContent::Group { is_expanded, expand_button_rec, .. } = &mut layer.content {
+                    if let LayerContent::Group(Group { is_expanded, expand_button_rec, .. }) = &mut layer.content {
                         if expand_button_rec.check_collision_point_rec(mouse_screen_pos) {
                             *is_expanded = !*is_expanded;
                             return Some(());
@@ -48,8 +48,7 @@ impl LayersPanel {
 fn main() {
     let background_color: Color = Color::new(32,32,32,255);
 
-    let mut rng = thread_rng();
-    let uniform_u8 = Uniform::<u8>::new_inclusive(0, 255);
+    // let mut rng = thread_rng();
 
     let (mut rl, thread) = init()
         .title("Amity Vector Art")
@@ -94,6 +93,7 @@ fn main() {
             window_rect.ymax = rl.get_screen_height() as f32;
             layers_panel.panel.update_rec(&window_rect);
         }
+        document.update_layer_tree_recs(&layers_panel.panel.rec_cache.into()); // todo: make this occur less frequently
 
         document.pan(
             if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_MIDDLE) { mouse_screen_delta } else { Vector2::zero() } +
