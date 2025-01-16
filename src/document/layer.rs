@@ -18,6 +18,16 @@ pub struct Group {
     pub expand_button_rec: Rectangle,
 }
 
+impl Group {
+    pub fn new(group: Vec<Rc<RefCell<Layer>>>) -> Self {
+        Self {
+            group,
+            is_expanded: false,
+            expand_button_rec: Rectangle::default(),
+        }
+    }
+}
+
 pub enum LayerContent {
     Group(Group),
     Path(Rc<RefCell<VectorPath>>),

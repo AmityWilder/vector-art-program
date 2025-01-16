@@ -1,4 +1,6 @@
-use layer::{Group, LayerContent};
+use std::{cell::RefCell, rc::Rc};
+
+use layer::{Group, Layer, LayerContent};
 use raylib::prelude::*;
 // use rand::prelude::*;
 use ui::panel::{Panel, Rect2, UIBox};
@@ -70,6 +72,9 @@ fn main() {
         0.5 * (document.art_boards[0].rect.width  - rl.get_screen_width()  as f32),
         0.5 * (document.art_boards[0].rect.height - rl.get_screen_height() as f32),
     );
+    document.create_layer(None, None, LayerContent::Group(Group::new(vec![
+        Rc::new(RefCell::new(Layer::new("test".to_string(), Color::MAGENTA, LayerContent::Path(Rc::new(RefCell::new(VectorPath::new()))))))
+    ])));
 
     let mut current_tool = Tool::default();
     let mut layers_panel = LayersPanel::new(
@@ -82,6 +87,7 @@ fn main() {
             Color::new(24,24,24,255),
         ),
     );
+    document.update_layer_tree_recs(&layers_panel.panel.rec_cache.into());
 
     while !rl.window_should_close() {
         let mouse_screen_pos = rl.get_mouse_position();
@@ -93,7 +99,6 @@ fn main() {
             window_rect.ymax = rl.get_screen_height() as f32;
             layers_panel.panel.update_rec(&window_rect);
         }
-        document.update_layer_tree_recs(&layers_panel.panel.rec_cache.into()); // todo: make this occur less frequently
 
         document.pan(
             if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_MIDDLE) { mouse_screen_delta } else { Vector2::zero() } +
@@ -118,6 +123,8 @@ fn main() {
         } else {
             current_tool.tick(&mut rl, &mut document, mouse_world_pos);
         }
+
+        document.update_layer_tree_recs(&layers_panel.panel.rec_cache.into());
 
         {
             let mut d = rl.begin_drawing(&thread);

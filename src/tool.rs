@@ -114,8 +114,19 @@ impl Default for Tool {
 
 impl Tool {
     pub fn switch_to_direct_selection(&mut self) {
+        match self {
+            Tool::DirectSelection(direct_selection) => (),
+            Tool::Pen(pen) => {
+                *self = Self::DirectSelection(DirectSelection {
+                    selection: pen.target,
+                })
+            },
+        }
         *self = Self::DirectSelection(DirectSelection {
-            selection: Vec::new(),
+            selection: match self {
+                Tool::DirectSelection(direct_selection) => direct_selection,
+                Tool::Pen(pen) => todo!(),
+            },
         })
     }
 

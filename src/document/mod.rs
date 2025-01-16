@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::{Rc, Weak}};
 use layer::{Group, LayerContent};
 use raylib::prelude::*;
 
@@ -27,7 +27,8 @@ pub struct Document {
     pub paper_color: Color,
     pub layers: Vec<Rc<RefCell<Layer>>>,
     pub art_boards: Vec<ArtBoard>,
-    pub current_layer: Option<Rc<RefCell<Layer>>>,
+    pub selection: Vec<(Weak<RefCell<Layer>>, Vec<LayerContent>)>,
+    pub current_layer: Option<Weak<RefCell<Layer>>>,
     layer_color_acc: usize,
     layer_name_acc: usize,
 }
