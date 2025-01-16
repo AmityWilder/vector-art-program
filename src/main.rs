@@ -1,8 +1,9 @@
-use layer::{Layer, LayerPanelTreeItem, LayerPanelTreeItemEx};
+use layer::{Layer, LayerContent};
 use raylib::prelude::*;
 use rand::{distributions::Uniform, prelude::*};
 use ui::panel::{Panel, Rect2, UIBox};
 
+pub mod stack;
 pub mod appearance;
 pub mod vector_path;
 pub mod bitmap;
@@ -11,6 +12,38 @@ pub mod tool;
 pub mod ui;
 
 use self::{vector_path::*, bitmap::*, document::*, tool::*};
+
+pub struct LayersPanel {
+    pub panel: Panel,
+}
+
+impl LayersPanel {
+    pub const fn new(panel: Panel) -> Self {
+        Self {
+            panel,
+        }
+    }
+
+    pub fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_screen_pos: Vector2) {
+        if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
+            document.foreach_layer_tree_item_mut(|layer, _depth| -> Option<()> {
+                if layer.slot_rec.check_collision_point_rec(mouse_screen_pos) {
+                    if let LayerContent::Group { is_expanded, expand_button_rec, .. } = &mut layer.content {
+                        if expand_button_rec.check_collision_point_rec(mouse_screen_pos) {
+                            *is_expanded = !*is_expanded;
+                            return Some(());
+                        }
+                    }
+                }
+                None
+            });
+        }
+    }
+
+    pub fn draw(&self, d: &mut impl RaylibDraw, document: &Document) {
+        document.draw_layer_tree(d, &self.panel);
+    }
+}
 
 fn main() {
     let background_color: Color = Color::new(32,32,32,255);
@@ -40,13 +73,15 @@ fn main() {
     );
 
     let mut current_tool = Tool::default();
-    let mut layers_panel = Panel::new(
-        &window_rect,
-        UIBox::init()
-            .width(256.0)
-            .from_right(0.0)
-            .build(),
-        background_color,
+    let mut layers_panel = LayersPanel::new(
+        Panel::new(
+            &window_rect,
+            UIBox::init()
+                .width(256.0)
+                .from_right(0.0)
+                .build(),
+            Color::new(24,24,24,255),
+        ),
     );
 
     while !rl.window_should_close() {
@@ -57,7 +92,7 @@ fn main() {
         if rl.is_window_resized() {
             window_rect.xmax = rl.get_screen_width () as f32;
             window_rect.ymax = rl.get_screen_height() as f32;
-            layers_panel.update_rec(&window_rect);
+            layers_panel.panel.update_rec(&window_rect);
         }
 
         document.pan(
@@ -78,45 +113,10 @@ fn main() {
             current_tool.switch_to_pen();
         }
 
-        if layers_panel.is_overlapping_point(mouse_screen_pos) {
-            if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-                document.for_each_layer_tree_item(&layers_panel.rec_cache.into(), |data| -> Option<()> {
-                    let LayerPanelTreeItem {
-                        slot,
-                        color_rec: _,
-                        thumbnail_rec,
-                        name_rec,
-                        expand_collapse_rec,
-                        ex,
-                    } = data;
-                    match ex {
-                        LayerPanelTreeItemEx::Layer { layer } if slot.check_collision_point_rec(mouse_screen_pos) => {
-                            if expand_collapse_rec.check_collision_point_rec(mouse_screen_pos) {
-                                println!("clicked expand-collapse toggle");
-                                layer.is_expanded = !layer.is_expanded;
-                            } else if name_rec.check_collision_point_rec(mouse_screen_pos) {
-                                println!("clicked name");
-                            } else if thumbnail_rec.check_collision_point_rec(mouse_screen_pos) {
-                                println!("clicked thumbnail");
-                            } else {
-                                println!("clicked slot");
-                            }
-                            Some(())
-                        }
-                        _ => None,
-                    }
-                });
-            }
+        if layers_panel.panel.is_overlapping_point(mouse_screen_pos) {
+            layers_panel.tick(&mut rl, &mut document, mouse_screen_pos);
         } else {
-            current_tool.tick(&mut rl, &mut document, mouse_world_pos, |document| Layer::new(
-                format!("layer {}", document.layers.len()),
-                Color::new(
-                    uniform_u8.sample(&mut rng),
-                    uniform_u8.sample(&mut rng),
-                    uniform_u8.sample(&mut rng),
-                    255,
-                ),
-            ));
+            current_tool.tick(&mut rl, &mut document, mouse_world_pos);
         }
 
         {
@@ -149,7 +149,7 @@ fn main() {
             }
 
             // Draw layers panel
-            document.draw_layer_tree(&mut d, &layers_panel.rec_cache.into());
+            layers_panel.draw(&mut d, &document);
         }
     }
 }

@@ -1,10 +1,13 @@
 use std::{cell::RefCell, rc::Rc};
+use layer::LayerContent;
 use raylib::prelude::*;
 
 pub mod layer;
 pub mod artboard;
 
-use self::{layer::{Layer, LayerPanelTreeItem, LayerPanelTreeItemEx}, artboard::ArtBoard};
+use crate::ui::panel::Panel;
+
+use self::{layer::Layer, artboard::ArtBoard};
 
 pub struct Document {
     pub title: String,
@@ -45,57 +48,85 @@ impl Document {
         }
     }
 
-    pub fn for_each_layer_tree_item<T>(&mut self, panel: &Rectangle, mut f: impl FnMut(LayerPanelTreeItem) -> Option<T>) -> Option<T> {
-        const INSET: f32 = 2.0;
-
-        let mut y = panel.y + INSET;
-        let x = panel.x + INSET;
-        let width = panel.width - INSET * 2.0;
-
-        for layer in self.layers.iter_mut().rev() {
-            let result = layer.borrow_mut().for_each_layer_tree_item_internal(panel, &mut y, x, width, &mut f);
-            if result.is_some() { return result; }
+    pub fn foreach_layer_tree_item<T>(&self, mut f: impl FnMut(&Layer, usize) -> Option<T>) -> Option<T> {
+        fn recursive<T>(layers: &Vec<Rc<RefCell<Layer>>>, depth: usize, f: &mut impl FnMut(&Layer, usize) -> Option<T>) -> Option<T> {
+            for layer in layers.iter().rev() {
+                let layer = layer.borrow();
+                f(&layer, depth);
+                if let LayerContent::Group { group, is_expanded: true, .. } = &layer.content {
+                    let result = recursive(group, depth + 1, f);
+                    if result.is_some() { return result; }
+                }
+            }
+            None
         }
 
-        None
+        recursive(&self.layers, 0, &mut f)
     }
 
-    pub fn draw_layer_tree(&mut self, d: &mut impl RaylibDraw, panel: &Rectangle) {
-        let mut d = d.begin_scissor_mode(panel.x as i32, panel.y as i32, panel.width as i32, panel.height as i32);
-        d.draw_rectangle_rec(*panel, Color::new(24,24,24,255));
-        self.for_each_layer_tree_item(panel, |data| -> Option<()> {
-            let LayerPanelTreeItem { slot, color_rec, thumbnail_rec, name_rec, expand_collapse_rec, ex } = data;
-            let (is_expandable, layer) = match ex {
-                LayerPanelTreeItemEx::Layer { layer }
-                    => (true, &*layer),
+    pub fn foreach_layer_tree_item_mut<T>(&mut self, mut f: impl FnMut(&mut Layer, usize) -> Option<T>) -> Option<T> {
+        fn recursive<T>(layers: &mut Vec<Rc<RefCell<Layer>>>, depth: usize, f: &mut impl FnMut(&mut Layer, usize) -> Option<T>) -> Option<T> {
+            for layer in layers.iter().rev() {
+                let mut layer = layer.borrow_mut();
+                f(&mut layer, depth);
+                if let LayerContent::Group { group, is_expanded: true, .. } = &mut layer.content {
+                    let result = recursive(group, depth + 1, f);
+                    if result.is_some() { return result; }
+                }
+            }
+            None
+        }
 
-                | LayerPanelTreeItemEx::Path { layer, .. }
-                | LayerPanelTreeItemEx::Bitmap { layer, .. }
-                    => (false, &*layer),
-            };
-            d.draw_rectangle_rec(slot, Color::new(32,32,32,255));
-            d.draw_rectangle_rec(color_rec, layer.color);
-            d.draw_rectangle_rec(thumbnail_rec, Color::GRAY);
-            d.draw_text(&layer.name, name_rec.x as i32, name_rec.y as i32, 10, Color::new(200,200,200,255));
+        recursive(&mut self.layers, 0, &mut f)
+    }
 
+    pub fn update_layer_tree_recs(&mut self, container: &Rectangle) {
+        let mut top = container.y + layer::INSET;
+        self.foreach_layer_tree_item_mut(|layer, depth| -> Option<()> {
+            layer.update_ui_recs(container, top, depth);
+            top += layer::LAYER_HEIGHT + layer::GAP;
+            None
+        });
+    }
+
+    /// Assumes `update_layer_tree_recs` is up to date
+    pub fn draw_layer_tree(&self, d: &mut impl RaylibDraw, panel: &Panel) {
+        let panel_rec: Rectangle = panel.rec_cache.into();
+        let mut d = d.begin_scissor_mode(panel_rec.x as i32, panel_rec.y as i32, panel_rec.width as i32, panel_rec.height as i32);
+        d.draw_rectangle_rec(panel_rec, panel.background);
+        self.foreach_layer_tree_item(|layer, _depth| -> Option<()> {
+            d.draw_rectangle_rec(layer.slot_rec, Color::new(32,32,32,255));
+            d.draw_rectangle_rec(layer.color_rec, layer.color);
+            d.draw_rectangle_rec(layer.thumbnail_rec, Color::GRAY);
+            d.draw_text(&layer.name, layer.name_rec.x as i32, layer.name_rec.y as i32, 10, Color::new(200,200,200,255));
             // expand icon
-            if is_expandable {
-                let [p0, p1, p2] = if layer.is_expanded {
+            if let LayerContent::Group { is_expanded, expand_button_rec, .. } = &layer.content {
+                let p0 = Vector2::new(expand_button_rec.x, expand_button_rec.y);
+                let [p1, p2] = if *is_expanded {
                     [
-                        Vector2::new(expand_collapse_rec.x, expand_collapse_rec.y),
-                        Vector2::new(expand_collapse_rec.x + 5.0, expand_collapse_rec.y + 6.0),
-                        Vector2::new(expand_collapse_rec.x + expand_collapse_rec.height, expand_collapse_rec.y),
+                        Vector2::new(
+                            expand_button_rec.x + 5.0,
+                            expand_button_rec.y + 6.0,
+                        ),
+                        Vector2::new(
+                            expand_button_rec.x + expand_button_rec.height,
+                            expand_button_rec.y,
+                        ),
                     ]
                 } else {
                     [
-                        Vector2::new(expand_collapse_rec.x, expand_collapse_rec.y),
-                        Vector2::new(expand_collapse_rec.x, expand_collapse_rec.y + expand_collapse_rec.height),
-                        Vector2::new(expand_collapse_rec.x + 6.0, expand_collapse_rec.y + 5.0),
+                        Vector2::new(
+                            expand_button_rec.x,
+                            expand_button_rec.y + expand_button_rec.height,
+                        ),
+                        Vector2::new(
+                            expand_button_rec.x + 6.0,
+                            expand_button_rec.y + 5.0,
+                        ),
                     ]
                 };
                 d.draw_triangle(p0, p1, p2, Color::new(200,200,200,255));
             }
-
             None
         });
     }

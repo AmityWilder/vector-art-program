@@ -1,9 +1,10 @@
 use std::{cell::RefCell, rc::Rc};
+use rand::{distributions::Uniform, prelude::*};
 use raylib::prelude::*;
-use crate::{Document, layer::{Layer, LayerItem}, VectorPath};
+use crate::{layer::{Layer, LayerContent}, Document, VectorPath};
 
 pub struct DirectSelection {
-    pub selection: Vec<Rc<RefCell<LayerItem>>>,
+    pub selection: Vec<Rc<RefCell<Layer>>>,
 }
 
 impl DirectSelection {
@@ -17,7 +18,8 @@ impl DirectSelection {
 pub struct Pen {
     /// If [`Some`], continue seleted.
     /// If [`None`], find a hovered path or create a new path upon clicking.
-    pub current_path: Option<Rc<RefCell<VectorPath>>>,
+    /// Must be a `VectorPath` layer
+    pub current_path: Option<Rc<RefCell<Layer>>>,
 
     /// [`Some`] while dragging, [`None`] otherwise.
     pub current_anchor: Option<Vector2>,
@@ -46,7 +48,7 @@ impl Tool {
             current_path: match self {
                 Tool::DirectSelection(DirectSelection { selection }) if selection.len() == 1 => {
                     match &*selection[0].borrow_mut() {
-                        LayerItem::Path(path) => Some(path.clone()),
+                        LayerContent::Path(path) => Some(path.clone()),
                         _ => None,
                     }
                 }
@@ -56,7 +58,8 @@ impl Tool {
         })
     }
 
-    pub fn tick<'a>(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2, mut create_layer: impl 'a + FnMut(&mut Document) -> Layer) {
+    pub fn tick<'a>(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2, rng: &mut ThreadRng) {
+        let uniform_u8 = Uniform::new_inclusive(0u8, 255u8);
         match self {
             Tool::DirectSelection(_) => {
                 // todo
@@ -66,11 +69,16 @@ impl Tool {
                 if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
                     if current_path.is_none() {
                         // create a new path
-                        let path = VectorPath::new();
-                        let path = Rc::new(RefCell::new(path));
-                        let mut layer = create_layer(document);
-                        layer.items.push(Rc::new(RefCell::new(LayerItem::Path(path.clone()))));
-                        let layer = Rc::new(RefCell::new(layer));
+                        let layer = Rc::new(RefCell::new(Layer::new(
+                            format!("layer {}", document.layers.len()),
+                            Color::new(
+                                uniform_u8.sample(rng),
+                                uniform_u8.sample(rng),
+                                uniform_u8.sample(rng),
+                                255,
+                            ),
+                            LayerContent::Path(VectorPath::new()),
+                        )));
                         document.current_layer = Some(layer.clone());
                         document.layers.push(layer);
                         *current_path = Some(path);
