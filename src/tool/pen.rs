@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use crate::{layer::{Layer, LayerType, StrongLayer}, Document};
+use crate::{layer::{Layer, LayerType, StrongLayer}, vector_path::path_point::PathPoint, Document};
 
 use super::ToolType;
 
@@ -42,11 +42,7 @@ impl ToolType for Pen {
             if let Some(anchor) = self.current_anchor.take() {
                 let mut target = self.target.as_ref().expect("`target` should have been set when mouse was pressed").borrow_mut();
                 if let Layer::Path(path) = &mut *target {
-                    path.points.push((
-                        anchor * 2.0 - mouse_world_pos, // x - (a - x) = 2x - a
-                        anchor,
-                        mouse_world_pos,
-                    ));
+                    path.points.push(PathPoint::new_smooth(anchor, mouse_world_pos));
                 }
             } else {
                 println!("warning: pen was released without having been pressed");
@@ -63,7 +59,7 @@ impl ToolType for Pen {
                 match self.current_anchor {
                     Some(p) => {
                         let c_in = p * 2.0 - c_out;
-                        if let Some((_, p_last, c_out_last)) = path.points.last() {
+                        if let Some(PathPoint { c_in: _, p: p_last, c_out: c_out_last }) = path.points.last() {
                             d.draw_spline_segment_bezier_cubic(
                                 *p_last,
                                 *c_out_last,
@@ -80,7 +76,7 @@ impl ToolType for Pen {
                         d.draw_circle_v(c_out, 3.0, layer_color);
                     }
                     None => {
-                        if let Some((_, p_last, c_out_last)) = path.points.last() {
+                        if let Some(PathPoint { c_in: _, p: p_last, c_out: c_out_last }) = path.points.last() {
                             d.draw_spline_segment_bezier_cubic(
                                 *p_last,
                                 *c_out_last,

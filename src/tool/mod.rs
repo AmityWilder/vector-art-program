@@ -24,7 +24,7 @@ impl Default for Tool {
 
 impl Tool {
     pub fn switch_to_direct_selection(&mut self) {
-        *self = Self::DirectSelection(DirectSelection);
+        *self = Self::DirectSelection(DirectSelection::new());
     }
 
     pub fn switch_to_pen(&mut self) {

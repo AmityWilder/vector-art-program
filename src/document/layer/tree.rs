@@ -1,9 +1,10 @@
-use std::ops::{Deref, DerefMut};
-
+use std::{collections::VecDeque, ops::{Deref, DerefMut}};
 use raylib::prelude::*;
-use crate::layer::{group::Group, Layer, GAP};
-use super::{LayerType, StrongLayer};
+use crate::layer::{group::Group, Layer, LayerType, GAP};
+use super::StrongLayer;
 
+/// Front is background (bottom in layer panel) \
+/// Back is foreground (top in layer panel)
 pub struct LayerTree(Vec<StrongLayer>);
 
 impl Deref for LayerTree {
@@ -20,43 +21,68 @@ impl DerefMut for LayerTree {
     }
 }
 
+#[derive(Default, Clone, Copy)]
+pub enum LayerTreeDir {
+    /// Start at the foreground and traverse to the background
+    ForeToBack,
+
+    /// Start at the background and traverse to the foreground
+    #[default]
+    BackToFore,
+}
+
+#[allow(non_upper_case_globals)]
+impl LayerTreeDir {
+    /// Start at the top in the layer panel and traverse to the bottom
+    pub const TopToBot: Self = Self::ForeToBack;
+
+    /// Start at the bottom in the layer panel and traverse to the top
+    pub const BotToTop: Self = Self::BackToFore;
+}
+
+pub struct LayerTreeIter<P: Fn(&Group) -> bool> {
+    queue: VecDeque<(StrongLayer, usize)>,
+    dir: LayerTreeDir,
+    should_recurs: P,
+}
+
+impl LayerTree {
+    pub fn tree_iter<P: Fn(&Group) -> bool>(&self, dir: LayerTreeDir, should_recurs: P) -> LayerTreeIter<P> {
+        let mut queue = VecDeque::with_capacity(self.0.len());
+        match dir {
+            LayerTreeDir::ForeToBack => for item in self.0.iter().rev() { queue.push_back((item.clone(), 0)) },
+            LayerTreeDir::BackToFore => for item in self.0.iter()       { queue.push_back((item.clone(), 0)) },
+        }
+        LayerTreeIter {
+            queue,
+            dir,
+            should_recurs,
+        }
+    }
+}
+
+impl<P: Fn(&Group) -> bool> Iterator for LayerTreeIter<P> {
+    type Item = (StrongLayer, usize);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.queue
+            .pop_front()
+            .map(|(layer, depth)| {
+                if let Layer::Group(group) = &*layer.borrow() {
+                    if (self.should_recurs)(group) {
+                        match self.dir {
+                            LayerTreeDir::ForeToBack => for item in group.items.iter()       { self.queue.push_front((item.clone(), depth + 1)); },
+                            LayerTreeDir::BackToFore => for item in group.items.iter().rev() { self.queue.push_front((item.clone(), depth + 1)); }
+                        }
+                    }
+                }
+                (layer, depth)
+            })
+    }
+}
+
 impl LayerTree {
     pub const fn new() -> Self {
         Self(Vec::new())
-    }
-
-    /// Each item that is visible in the layer panel
-    pub fn foreach_layer_tree_item<'a, T>(&self, mut f: impl 'a + FnMut(&Layer, usize) -> Option<T>) -> Option<T> {
-        fn recursive<T>(layers: &LayerTree, depth: usize, f: &mut impl FnMut(&Layer, usize) -> Option<T>) -> Option<T> {
-            for layer in layers.0.iter().rev() {
-                let layer = layer.borrow();
-                f(&layer, depth);
-                if let Layer::Group(Group { group, is_expanded: true, .. }) = &*layer {
-                    let result = recursive(group, depth + 1, f);
-                    if result.is_some() { return result; }
-                }
-            }
-            None
-        }
-
-        recursive(self, 0, &mut f)
-    }
-
-    /// Each item that is visible in the layer panel
-    pub fn foreach_layer_tree_item_mut<'a, T>(&mut self, mut f: impl 'a + FnMut(&mut Layer, usize) -> Option<T>) -> Option<T> {
-        fn recursive<T>(layers: &mut LayerTree, depth: usize, f: &mut impl FnMut(&mut Layer, usize) -> Option<T>) -> Option<T> {
-            for layer in layers.0.iter().rev() {
-                let mut layer = layer.borrow_mut();
-                f(&mut layer, depth);
-                if let Layer::Group(Group { group, is_expanded: true, .. }) = &mut *layer {
-                    let result = recursive(group, depth + 1, f);
-                    if result.is_some() { return result; }
-                }
-            }
-            None
-        }
-
-        recursive(self, 0, &mut f)
     }
 
     pub fn update_ui_recs(&mut self, container: &Rectangle, mut top: f32) {
@@ -69,7 +95,8 @@ impl LayerTree {
             TEXT_FONT_SIZE,
             EXPAND_COLLAPSE_SIZE,
         };
-        self.foreach_layer_tree_item_mut(|layer, depth| -> Option<()> {
+        for (layer, depth) in self.tree_iter(LayerTreeDir::TopToBot, |group| group.is_expanded) {
+            let mut layer = layer.borrow_mut();
             let settings = layer.settings_mut();
             let indent_size = depth as f32 * INDENT;
             let left = container.x + indent_size;
@@ -93,18 +120,14 @@ impl LayerTree {
                 rec
             };
             top += LAYER_HEIGHT + GAP;
-            match &mut *layer {
-                Layer::Group(Group { expand_button_rec, .. }) => {
-                    *expand_button_rec = {
-                        rec.y += TEXT_FONT_SIZE + 2.0;
-                        rec.width  = EXPAND_COLLAPSE_SIZE;
-                        rec.height = EXPAND_COLLAPSE_SIZE;
-                        rec
-                    };
-                }
-                _ => (),
+            if let Layer::Group(Group { expand_button_rec, .. }) = &mut *layer {
+                *expand_button_rec = {
+                    rec.y += TEXT_FONT_SIZE + 2.0;
+                    rec.width  = EXPAND_COLLAPSE_SIZE;
+                    rec.height = EXPAND_COLLAPSE_SIZE;
+                    rec
+                };
             }
-            None
-        });
+        }
     }
 }

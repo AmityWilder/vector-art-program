@@ -1,4 +1,4 @@
-use layer::{group::Group, Layer, LayerType};
+use layer::{group::Group, tree::LayerTreeDir, Layer, LayerType};
 use raylib::prelude::*;
 // use rand::prelude::*;
 use ui::panel::{Panel, Rect2, UIBox};
@@ -26,17 +26,20 @@ impl LayersPanel {
 
     pub fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_screen_pos: Vector2) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-            document.layers.foreach_layer_tree_item_mut(|layer, _depth| -> Option<()> {
-                if layer.settings().slot_rec.check_collision_point_rec(mouse_screen_pos) {
-                    if let Layer::Group(Group { is_expanded, expand_button_rec, .. }) = layer {
-                        if expand_button_rec.check_collision_point_rec(mouse_screen_pos) {
-                            *is_expanded = !*is_expanded;
-                            return Some(());
+            document.layers
+                .tree_iter(LayerTreeDir::ForeToBack, |group| group.is_expanded)
+                .find_map(|(layer, _depth)| {
+                    let mut layer = layer.borrow_mut();
+                    if layer.settings().slot_rec.check_collision_point_rec(mouse_screen_pos) {
+                        if let Layer::Group(Group { is_expanded, expand_button_rec, .. }) = &mut *layer {
+                            if expand_button_rec.check_collision_point_rec(mouse_screen_pos) {
+                                *is_expanded = !*is_expanded;
+                                return Some(());
+                            }
                         }
                     }
-                }
-                None
-            });
+                    None
+                });
         }
     }
 
@@ -71,7 +74,7 @@ fn main() {
         0.5 * (document.artboards[0].rect.width  - rl.get_screen_width()  as f32),
         0.5 * (document.artboards[0].rect.height - rl.get_screen_height() as f32),
     );
-    _ = document.create_group(None, None);
+    // _ = document.create_group(None, None);
 
     let mut current_tool = Tool::default();
     let mut layers_panel = LayersPanel::new(

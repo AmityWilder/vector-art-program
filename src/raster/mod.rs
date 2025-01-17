@@ -3,8 +3,8 @@ use raylib::prelude::*;
 use crate::layer::{LayerSettings, LayerType};
 
 pub struct Raster {
-    settings: LayerSettings,
-    texture: Option<RenderTexture2D>,
+    pub settings: LayerSettings,
+    pub texture: Option<RenderTexture2D>,
 }
 
 impl Raster {

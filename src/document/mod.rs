@@ -1,5 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
-use layer::{group::Group, tree::LayerTree, Layer, LayerSettings, LayerType, StrongLayer, WeakLayer};
+use layer::{group::Group, tree::{LayerTree, LayerTreeDir}, Layer, LayerSettings, LayerType, StrongLayer, WeakLayer};
 use raylib::prelude::*;
 
 pub mod layer;
@@ -72,7 +72,7 @@ impl Document {
     }
 
     pub fn create_artboard(&mut self, name: Option<String>, xy: Option<(f32, f32)>, width: f32, height: f32) {
-        let name = name.unwrap_or_else(|| self.auto_layer_name());
+        let name = name.unwrap_or_else(|| self.auto_artboard_name());
         let (x, y) = xy.unwrap_or_else(|| self.artboards.last().map_or((0.0, 0.0), |b| (b.rect.x + b.rect.width, b.rect.y + b.rect.height)));
         self.artboards.push(ArtBoard {
             name,
@@ -126,13 +126,14 @@ impl Document {
         let panel_rec: Rectangle = panel.rec_cache.into();
         let mut d = d.begin_scissor_mode(panel_rec.x as i32, panel_rec.y as i32, panel_rec.width as i32, panel_rec.height as i32);
         d.draw_rectangle_rec(panel_rec, panel.background);
-        self.layers.foreach_layer_tree_item(|layer, _depth| -> Option<()> {
+        for (layer, _depth) in self.layers.tree_iter(LayerTreeDir::TopToBot, |group| group.is_expanded) {
+            let layer = layer.borrow();
             d.draw_rectangle_rec(layer.settings().slot_rec, Color::new(32,32,32,255));
             d.draw_rectangle_rec(layer.settings().color_rec, layer.settings().color);
             d.draw_rectangle_rec(layer.settings().thumbnail_rec, Color::GRAY);
             d.draw_text(&layer.settings().name, layer.settings().name_rec.x as i32, layer.settings().name_rec.y as i32, 10, Color::new(200,200,200,255));
             // expand icon
-            if let Layer::Group(Group { is_expanded, expand_button_rec, .. }) = &layer {
+            if let Layer::Group(Group { is_expanded, expand_button_rec, .. }) = &*layer {
                 let p0 = Vector2::new(expand_button_rec.x, expand_button_rec.y);
                 let [p1, p2] = if *is_expanded {
                     [
@@ -159,7 +160,6 @@ impl Document {
                 };
                 d.draw_triangle(p0, p1, p2, Color::new(200,200,200,255));
             }
-            None
-        });
+        }
     }
 }
