@@ -1,14 +1,15 @@
 use raylib::prelude::*;
-use crate::{layer::{tree::LayerIterDir, Layer, StrongLayer}, Document};
+use crate::{layer::{tree::LayerIterDir, Layer, StrongLayer}, vector_path::path_point::PathPoint, Document};
 use super::ToolType;
 
 pub struct GroupHover {
     pub group_layer: StrongLayer,
 }
 
-pub enum CtrlPoint {
-    In,
-    Out,
+pub enum PointPart {
+    CtrlIn,
+    Point,
+    CtrlOut,
 }
 
 pub enum PathHoverRegion {
@@ -16,10 +17,7 @@ pub enum PathHoverRegion {
     Edge,
     Vert {
         point: usize,
-    },
-    Ctrl {
-        point: usize,
-        side: CtrlPoint,
+        part: PointPart,
     },
 }
 
@@ -74,11 +72,8 @@ impl Hover {
     pub const fn path_edge(path_layer: StrongLayer) -> Self {
         Self::Path(PathHover { path_layer, region: PathHoverRegion::Edge })
     }
-    pub const fn path_vert(path_layer: StrongLayer, point: usize) -> Self {
-        Self::Path(PathHover { path_layer, region: PathHoverRegion::Vert { point } })
-    }
-    pub const fn path_ctrl(path_layer: StrongLayer, point: usize, side: CtrlPoint) -> Self {
-        Self::Path(PathHover { path_layer, region: PathHoverRegion::Ctrl { point, side } })
+    pub const fn path_vert(path_layer: StrongLayer, point: usize, part: PointPart) -> Self {
+        Self::Path(PathHover { path_layer, region: PathHoverRegion::Vert { point, part } })
     }
 
     pub const fn raster_object(raster_layer: StrongLayer) -> Self {
@@ -103,7 +98,8 @@ impl DirectSelection {
     }
 }
 
-pub const HOVER_RADIUS_SQR: f32 = 5.0 * 5.0;
+pub const HOVER_RADIUS: f32 = 5.0;
+pub const HOVER_RADIUS_SQR: f32 = HOVER_RADIUS * HOVER_RADIUS;
 
 impl ToolType for DirectSelection {
     fn tick(&mut self, _rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2) {
@@ -122,12 +118,16 @@ impl ToolType for DirectSelection {
                             .enumerate()
                             .find_map(|(i, point)| {
                                 if (point.p - mouse_world_pos).length_sqr() <= HOVER_RADIUS_SQR {
-                                    Some(Hover::path_vert(layer_rc.clone(), i))
+                                    Some(Hover::path_vert(layer_rc.clone(), i, PointPart::Point))
                                 } else if (point.c_in - mouse_world_pos).length_sqr() <= HOVER_RADIUS_SQR {
-                                    Some(Hover::path_ctrl(layer_rc.clone(), i, CtrlPoint::In))
+                                    Some(Hover::path_vert(layer_rc.clone(), i, PointPart::CtrlIn))
                                 } else if (point.c_out - mouse_world_pos).length_sqr() <= HOVER_RADIUS_SQR {
-                                    Some(Hover::path_ctrl(layer_rc.clone(), i, CtrlPoint::Out))
+                                    Some(Hover::path_vert(layer_rc.clone(), i, PointPart::CtrlOut))
                                 } else { None }
+                            })
+                            .or_else(|| {
+                                // todo: fill/edge
+                                None
                             })
                     }
                     Layer::Raster(_raster) => {
@@ -138,35 +138,50 @@ impl ToolType for DirectSelection {
             });
     }
 
-    fn draw(&self, _d: &mut impl RaylibDraw, _document: &Document, _mouse_world_pos: Vector2) {
-        // if let Some(hover) = &self.hovered {
-        //     match hover {
-        //         Hover::Group(GroupHover { group_layer }) => todo!(),
-        //         Hover::Path(PathHover { path_layer, region }) => match region {
-        //             PathHoverRegion::Fill => todo!(),
-        //             PathHoverRegion::Edge => todo!(),
-        //             PathHoverRegion::Vert { point } => todo!(),
-        //             PathHoverRegion::Ctrl { point, side } => match side {
-        //                 CtrlPoint::In => todo!(),
-        //                 CtrlPoint::Out => todo!(),
-        //             },
-        //         }
-        //         Hover::Raster(RasterHover { raster_layer, region }) => match region {
-        //             RasterHoverRegion::Object => todo!(),
-        //             RasterHoverRegion::Side { side } => match side {
-        //                 Side::Top => todo!(),
-        //                 Side::Right => todo!(),
-        //                 Side::Bottom => todo!(),
-        //                 Side::Left => todo!(),
-        //             }
-        //             RasterHoverRegion::Corner { corner } => match corner {
-        //                 Corner::TR => todo!(),
-        //                 Corner::BR => todo!(),
-        //                 Corner::BL => todo!(),
-        //                 Corner::TL => todo!(),
-        //             }
-        //         }
-        //     }
-        // }
+    fn draw(&self, d: &mut impl RaylibDraw, _document: &Document, _mouse_world_pos: Vector2) {
+        if let Some(hover) = &self.hovered {
+            match hover {
+                Hover::Group(GroupHover { group_layer }) => {
+                    let Layer::Group(_group) = &*group_layer.borrow() else { panic!("GroupHover must reference a Group layer") };
+                    todo!()
+                }
+                Hover::Path(PathHover { path_layer, region }) => {
+                    let Layer::Path(path) = &*path_layer.borrow() else { panic!("PathHover must reference a Path layer") };
+                    match region {
+                        PathHoverRegion::Fill => todo!(),
+
+                        PathHoverRegion::Edge => todo!(),
+
+                        PathHoverRegion::Vert { point, part } => d.draw_circle_v(
+                            (|pp: &PathPoint| match part {
+                                PointPart::CtrlIn  => pp.c_in,
+                                PointPart::Point   => pp.p,
+                                PointPart::CtrlOut => pp.c_out,
+                            })(&path.points[*point]),
+                            HOVER_RADIUS,
+                            Color::DODGERBLUE,
+                        ),
+                    }
+                }
+                Hover::Raster(RasterHover { raster_layer, region }) => {
+                    let Layer::Raster(_raster) = &*raster_layer.borrow() else { panic!("RasterHover must reference a Raster layer") };
+                    match region {
+                        RasterHoverRegion::Object => todo!(),
+                        RasterHoverRegion::Side { side } => match side {
+                            Side::Top => todo!(),
+                            Side::Right => todo!(),
+                            Side::Bottom => todo!(),
+                            Side::Left => todo!(),
+                        }
+                        RasterHoverRegion::Corner { corner } => match corner {
+                            Corner::TR => todo!(),
+                            Corner::BR => todo!(),
+                            Corner::BL => todo!(),
+                            Corner::TL => todo!(),
+                        }
+                    }
+                }
+            }
+        }
     }
 }
