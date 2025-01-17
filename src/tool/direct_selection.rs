@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use crate::{layer::{tree::LayerTreeDir, Layer, StrongLayer}, Document};
+use crate::{layer::{tree::LayerIterDir, Layer, StrongLayer}, Document};
 use super::ToolType;
 
 pub struct GroupHover {
@@ -109,7 +109,7 @@ impl ToolType for DirectSelection {
     fn tick(&mut self, _rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2) {
         self.hovered = document.layers
             .tree_iter(
-                LayerTreeDir::ForeToBack,
+                LayerIterDir::ForeToBack,
                 |group| !group.settings.is_hidden && !group.settings.is_locked)
             .find_map(|(layer_rc, _depth)| -> Option<Hover> {
                 match &mut *layer_rc.borrow_mut() {

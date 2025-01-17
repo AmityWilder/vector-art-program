@@ -1,5 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
-use layer::{group::Group, tree::{LayerTree, LayerTreeDir}, Layer, LayerSettings, LayerType, StrongLayer, WeakLayer};
+use layer::{group::Group, tree::{LayerTree, LayerIterDir}, Layer, LayerSettings, LayerType, StrongLayer, WeakLayer};
 use raylib::prelude::*;
 
 pub mod layer;
@@ -126,7 +126,7 @@ impl Document {
         let panel_rec: Rectangle = panel.rec_cache.into();
         let mut d = d.begin_scissor_mode(panel_rec.x as i32, panel_rec.y as i32, panel_rec.width as i32, panel_rec.height as i32);
         d.draw_rectangle_rec(panel_rec, panel.background);
-        for (layer, _depth) in self.layers.tree_iter(LayerTreeDir::TopToBot, |group| group.is_expanded) {
+        for (layer, _depth) in self.layers.tree_iter(LayerIterDir::TopToBot, |group| group.is_expanded) {
             let layer = layer.borrow();
             d.draw_rectangle_rec(layer.settings().slot_rec, Color::new(32,32,32,255));
             d.draw_rectangle_rec(layer.settings().color_rec, layer.settings().color);

@@ -1,4 +1,4 @@
-use layer::{group::Group, tree::LayerTreeDir, Layer, LayerType};
+use layer::{group::Group, tree::LayerIterDir, Layer, LayerType};
 use raylib::prelude::*;
 // use rand::prelude::*;
 use ui::panel::{Panel, Rect2, UIBox};
@@ -27,7 +27,7 @@ impl LayersPanel {
     pub fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_screen_pos: Vector2) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             document.layers
-                .tree_iter(LayerTreeDir::ForeToBack, |group| group.is_expanded)
+                .tree_iter(LayerIterDir::ForeToBack, |group| group.is_expanded)
                 .find_map(|(layer, _depth)| {
                     let mut layer = layer.borrow_mut();
                     if layer.settings().slot_rec.check_collision_point_rec(mouse_screen_pos) {

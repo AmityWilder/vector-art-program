@@ -5,6 +5,8 @@ use super::StrongLayer;
 
 /// Front is background (bottom in layer panel) \
 /// Back is foreground (top in layer panel)
+///
+/// Use `tree_iter()` to iterate recursively, `iter()` will only iterate over the current depth.
 pub struct LayerTree(Vec<StrongLayer>);
 
 impl Deref for LayerTree {
@@ -22,7 +24,7 @@ impl DerefMut for LayerTree {
 }
 
 #[derive(Default, Clone, Copy)]
-pub enum LayerTreeDir {
+pub enum LayerIterDir {
     /// Start at the foreground and traverse to the background
     ForeToBack,
 
@@ -32,33 +34,18 @@ pub enum LayerTreeDir {
 }
 
 #[allow(non_upper_case_globals)]
-impl LayerTreeDir {
-    /// Start at the top in the layer panel and traverse to the bottom
+impl LayerIterDir {
+    /// Start at the topmost layer in the layer panel and traverse to the bottom
     pub const TopToBot: Self = Self::ForeToBack;
 
-    /// Start at the bottom in the layer panel and traverse to the top
+    /// Start at the bottommost layer in the layer panel and traverse to the top
     pub const BotToTop: Self = Self::BackToFore;
 }
 
 pub struct LayerTreeIter<P: Fn(&Group) -> bool> {
     queue: VecDeque<(StrongLayer, usize)>,
-    dir: LayerTreeDir,
+    dir: LayerIterDir,
     should_recurs: P,
-}
-
-impl LayerTree {
-    pub fn tree_iter<P: Fn(&Group) -> bool>(&self, dir: LayerTreeDir, should_recurs: P) -> LayerTreeIter<P> {
-        let mut queue = VecDeque::with_capacity(self.0.len());
-        match dir {
-            LayerTreeDir::ForeToBack => for item in self.0.iter().rev() { queue.push_back((item.clone(), 0)) },
-            LayerTreeDir::BackToFore => for item in self.0.iter()       { queue.push_back((item.clone(), 0)) },
-        }
-        LayerTreeIter {
-            queue,
-            dir,
-            should_recurs,
-        }
-    }
 }
 
 impl<P: Fn(&Group) -> bool> Iterator for LayerTreeIter<P> {
@@ -69,9 +56,12 @@ impl<P: Fn(&Group) -> bool> Iterator for LayerTreeIter<P> {
             .map(|(layer, depth)| {
                 if let Layer::Group(group) = &*layer.borrow() {
                     if (self.should_recurs)(group) {
+                        self.queue.reserve(group.items.0.len());
+                        let new_depth = depth + 1;
+                        let items = group.items.0.iter().map(|item| (item.clone(), new_depth));
                         match self.dir {
-                            LayerTreeDir::ForeToBack => for item in group.items.iter()       { self.queue.push_front((item.clone(), depth + 1)); },
-                            LayerTreeDir::BackToFore => for item in group.items.iter().rev() { self.queue.push_front((item.clone(), depth + 1)); }
+                            LayerIterDir::ForeToBack => for item in items       { self.queue.push_front(item); },
+                            LayerIterDir::BackToFore => for item in items.rev() { self.queue.push_front(item); }
                         }
                     }
                 }
@@ -85,6 +75,78 @@ impl LayerTree {
         Self(Vec::new())
     }
 
+    /// Use a DFS algorithm to traverse the layer tree.
+    ///
+    /// ---
+    ///
+    /// `should_recurse` determines whether a branch's children should be visited or skipped.
+    ///
+    /// ---
+    ///
+    /// `dir` determines what order the layers are visited in: front to back or back to front.
+    ///
+    /// Parent is visited before child regardless of direction.
+    ///
+    /// e.g.
+    ///
+    /// [`LayerIterDir::BackToFore`]:
+    /// - 0
+    ///   - 0.0
+    ///   - 0.1
+    ///   - 0.2
+    /// - 1
+    /// - 2
+    ///   - 2.1
+    /// - 3
+    /// - 4
+    /// - 5
+    ///   - 5.0
+    ///     - 5.0.0
+    ///   - 5.1
+    ///   - 5.2
+    ///     - 5.2.0
+    ///     - 5.2.1
+    ///
+    /// [`LayerIterDir::ForeToBack`]:
+    /// - 5
+    ///   - 5.2
+    ///     - 5.2.1
+    ///     - 5.2.0
+    ///   - 5.1
+    ///   - 5.0
+    ///     - 5.0.0
+    /// - 4
+    /// - 3
+    /// - 2
+    ///   - 2.1
+    /// - 1
+    /// - 0
+    ///   - 0.2
+    ///   - 0.1
+    ///   - 0.0
+    ///
+    /// Notice that in both cases, 5 is visited before 5.0 and 5.0 is visited before 5.0.0. \
+    /// But in one, 5.0 comes before 5.1; while in the other, 5.1 comes before 5.0.
+    ///
+    /// ---
+    ///
+    /// Iterator returns elements in a tuple of
+    /// ```no_run
+    /// (layer: StrongLayer, depth: usize)
+    /// ```
+    pub fn tree_iter<P: Fn(&Group) -> bool>(&self, dir: LayerIterDir, should_recurs: P) -> LayerTreeIter<P> {
+        let items = self.0.iter().map(|item| (item.clone(), 0));
+        let queue = match dir {
+            LayerIterDir::ForeToBack => VecDeque::from_iter(items.rev()),
+            LayerIterDir::BackToFore => VecDeque::from_iter(items),
+        };
+        LayerTreeIter {
+            queue,
+            dir,
+            should_recurs,
+        }
+    }
+
     pub fn update_ui_recs(&mut self, container: &Rectangle, mut top: f32) {
         use super::{
             INDENT,
@@ -95,7 +157,7 @@ impl LayerTree {
             TEXT_FONT_SIZE,
             EXPAND_COLLAPSE_SIZE,
         };
-        for (layer, depth) in self.tree_iter(LayerTreeDir::TopToBot, |group| group.is_expanded) {
+        for (layer, depth) in self.tree_iter(LayerIterDir::TopToBot, |group| group.is_expanded) {
             let mut layer = layer.borrow_mut();
             let settings = layer.settings_mut();
             let indent_size = depth as f32 * INDENT;
