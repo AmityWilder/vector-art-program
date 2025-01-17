@@ -4,7 +4,7 @@ pub mod gradient;
 pub mod stroke;
 pub mod fill;
 
-use crate::appearance::Appearance;
+use crate::{appearance::Appearance, layer::{LayerSettings, LayerType}};
 
 fn mix(c0: &Color, c1: &Color, amount: f32) -> Color {
     Color {
@@ -16,20 +16,37 @@ fn mix(c0: &Color, c1: &Color, amount: f32) -> Color {
 }
 
 pub struct VectorPath {
+    pub settings: LayerSettings,
     /// p1, c2, c3, p4, c5, c6...
     pub points: Vec<(Vector2, Vector2, Vector2)>,
     pub appearance: Appearance,
 }
 
 impl VectorPath {
-    pub fn new() -> Self {
+    pub fn new(settings: LayerSettings) -> Self {
         Self {
+            settings,
             points: Vec::new(),
             appearance: Appearance::default(),
         }
     }
+}
 
-    pub fn draw(&self, d: &mut impl RaylibDraw, color: Color) {
+impl LayerType for VectorPath {
+    fn settings(&self) -> &LayerSettings {
+        &self.settings
+    }
+
+    fn settings_mut(&mut self) -> &mut LayerSettings {
+        &mut self.settings
+    }
+
+    fn draw_rendered(&self, _d: &mut impl RaylibDraw) {
+        // todo
+    }
+
+    fn draw_selected(&self, d: &mut impl RaylibDraw) {
+        let color = self.settings.color;
         for window in self.points.windows(2) {
             if let [(_c1_in, p1, c1_out), (c2_in, p2, _c2_out)] = window {
                 d.draw_spline_segment_bezier_cubic(*p1, *c1_out, *c2_in, *p2, 1.0, color);

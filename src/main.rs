@@ -1,19 +1,17 @@
-use std::{cell::RefCell, rc::Rc};
-
-use layer::{Group, Layer, LayerContent};
+use layer::{group::Group, Layer, LayerType};
 use raylib::prelude::*;
 // use rand::prelude::*;
 use ui::panel::{Panel, Rect2, UIBox};
 
+pub mod vector_path;
+pub mod raster;
 pub mod stack;
 pub mod appearance;
-pub mod vector_path;
-pub mod bitmap;
 pub mod document;
 pub mod tool;
 pub mod ui;
 
-use self::{vector_path::*, bitmap::*, document::*, tool::*};
+use self::{document::*, tool::*};
 
 pub struct LayersPanel {
     pub panel: Panel,
@@ -28,9 +26,9 @@ impl LayersPanel {
 
     pub fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_screen_pos: Vector2) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-            document.foreach_layer_tree_item_mut(|layer, _depth| -> Option<()> {
-                if layer.slot_rec.check_collision_point_rec(mouse_screen_pos) {
-                    if let LayerContent::Group(Group { is_expanded, expand_button_rec, .. }) = &mut layer.content {
+            document.layers.foreach_layer_tree_item_mut(|layer, _depth| -> Option<()> {
+                if layer.settings().slot_rec.check_collision_point_rec(mouse_screen_pos) {
+                    if let Layer::Group(Group { is_expanded, expand_button_rec, .. }) = layer {
                         if expand_button_rec.check_collision_point_rec(mouse_screen_pos) {
                             *is_expanded = !*is_expanded;
                             return Some(());
@@ -67,14 +65,13 @@ fn main() {
         ymax: rl.get_screen_height() as f32,
     };
 
-    let mut document = Document::new("untitled".to_string(), 256.0, 256.0);
+    let mut document = Document::new();
+    document.create_artboard(None, None, 256.0, 256.0);
     document.camera.target = Vector2::new(
-        0.5 * (document.art_boards[0].rect.width  - rl.get_screen_width()  as f32),
-        0.5 * (document.art_boards[0].rect.height - rl.get_screen_height() as f32),
+        0.5 * (document.artboards[0].rect.width  - rl.get_screen_width()  as f32),
+        0.5 * (document.artboards[0].rect.height - rl.get_screen_height() as f32),
     );
-    document.create_layer(None, None, LayerContent::Group(Group::new(vec![
-        Rc::new(RefCell::new(Layer::new("test".to_string(), Color::MAGENTA, LayerContent::Path(Rc::new(RefCell::new(VectorPath::new()))))))
-    ])));
+    _ = document.create_group(None, None);
 
     let mut current_tool = Tool::default();
     let mut layers_panel = LayersPanel::new(
@@ -134,21 +131,21 @@ fn main() {
                 let mut d = d.begin_mode2D(document.camera);
 
                 // Artboards background
-                for board in &document.art_boards {
+                for board in &document.artboards {
                     d.draw_rectangle_rec(board.rect, document.paper_color);
                 }
 
-                for layer in &document.layers {
+                for layer in document.layers.iter() {
                     layer.borrow().draw_rendered(&mut d);
                 }
 
                 // Artboards foreground
-                for board in &document.art_boards {
+                for board in &document.artboards {
                     d.draw_text(&board.name, board.rect.x as i32, board.rect.y as i32 - 10, 10, Color::WHITE);
                     d.draw_rectangle_lines(board.rect.x as i32, board.rect.y as i32, board.rect.width as i32, board.rect.height as i32, Color::BLACK);
                 }
 
-                for layer in &document.layers {
+                for layer in document.layers.iter() {
                     layer.borrow().draw_selected(&mut d);
                 }
 

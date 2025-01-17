@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use crate::{fill::Fill, stroke::Stroke};
+use crate::vector_path::{fill::Fill, stroke::Stroke};
 
 pub struct Blending {
     pub opacity: f32,
