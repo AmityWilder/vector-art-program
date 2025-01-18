@@ -291,7 +291,7 @@ impl ToolType for DirectSelection {
     }
 
     fn draw(&self, d: &mut impl RaylibDraw, _document: &Document, _mouse_world_pos: Vector2) {
-        if let Some(HoverOrDrag { hover, is_dragging: _ }) = &self.hovered {
+        if let Some(HoverOrDrag { hover, is_dragging }) = &self.hovered {
             match hover {
                 Hover::Group(GroupHover { group_layer }) => {
                     let Layer::Group(_group) = &*group_layer.borrow() else { panic!("GroupHover must reference a Group layer") };
@@ -309,42 +309,36 @@ impl ToolType for DirectSelection {
                             const P_COLOR: Color = Color::DODGERBLUE;
                             const C_OUT_COLOR: Color = Color::ORANGE;
                             let pp = &path.points[*point];
-                            match part {
-                                PointPart::Point => {
-                                    d.draw_circle_v(pp.p, HOVER_RADIUS, P_COLOR);
-                                }
-
-                                PointPart::CtrlIn => match pp.c_in {
-                                    CtrlPoint::Exact(c_in) => {
-                                        if let CtrlPoint::Exact(c_out) = pp.c_out {
-                                            let c_in_smooth = c_out.reflected_over(pp.p);
-                                            d.draw_circle_lines(c_in_smooth.x as i32, c_in_smooth.y as i32, SNAP_VERT_RADIUS, C_OUT_COLOR);
+                            if matches!(part, PointPart::Point) {
+                                d.draw_circle_v(pp.p, HOVER_RADIUS, P_COLOR);
+                            } else {
+                                let (c_self, c_opp, color) = match part {
+                                    PointPart::CtrlIn  => (&pp.c_in, &pp.c_out, C_IN_COLOR),
+                                    PointPart::CtrlOut => (&pp.c_out, &pp.c_in, C_OUT_COLOR),
+                                    PointPart::Point => unreachable!(),
+                                };
+                                match c_self {
+                                    &CtrlPoint::Exact(mut c_self) => {
+                                        if *is_dragging {
+                                            // preview snap
+                                            if c_self.distance_sqr_to(pp.p) <= SNAP_VERT_RADIUS_SQR {
+                                                c_self = pp.p;
+                                            } else if let CtrlPoint::Exact(c_opp) = c_opp {
+                                                let c_self_smooth = c_opp.reflected_over(pp.p);
+                                                if c_self.distance_sqr_to(c_self_smooth) <= SNAP_VERT_RADIUS_SQR {
+                                                    c_self = c_self_smooth;
+                                                }
+                                                d.draw_line_v(pp.p, c_self_smooth, color.alpha(0.5));
+                                                d.draw_circle_v(c_self_smooth, SNAP_VERT_RADIUS, color.alpha(0.5));
+                                            }
                                         }
-                                        d.draw_circle_v(c_in, HOVER_RADIUS, C_IN_COLOR);
+                                        d.draw_circle_v(c_self, if !is_dragging { HOVER_RADIUS } else { SNAP_VERT_RADIUS }, color);
                                     }
 
                                     CtrlPoint::Smooth => {
-                                        let CtrlPoint::Exact(c_out) = pp.c_out else { panic!("should not hover smooth opposite of non-exact") };
-                                        let c_in_smooth = c_out.reflected_over(pp.p);
-                                        d.draw_circle_v(c_in_smooth, HOVER_RADIUS, C_IN_COLOR);
-                                    }
-
-                                    CtrlPoint::Corner => panic!("should not hover corner"),
-                                }
-
-                                PointPart::CtrlOut => match pp.c_out {
-                                    CtrlPoint::Exact(c_out) => {
-                                        if let CtrlPoint::Exact(c_in) = pp.c_in {
-                                            let c_out_smooth = c_in.reflected_over(pp.p);
-                                            d.draw_circle_lines(c_out_smooth.x as i32, c_out_smooth.y as i32, SNAP_VERT_RADIUS, C_IN_COLOR);
-                                        }
-                                        d.draw_circle_v(c_out, HOVER_RADIUS, C_OUT_COLOR);
-                                    }
-
-                                    CtrlPoint::Smooth => {
-                                        let CtrlPoint::Exact(c_in) = pp.c_in else { panic!("should not hover smooth opposite of non-exact") };
-                                        let c_out_smooth = c_in.reflected_over(pp.p);
-                                        d.draw_circle_v(c_out_smooth, HOVER_RADIUS, C_OUT_COLOR);
+                                        let CtrlPoint::Exact(c_opp) = c_opp else { panic!("should not hover smooth opposite of non-exact") };
+                                        let c_self_smooth = c_opp.reflected_over(pp.p);
+                                        d.draw_circle_v(c_self_smooth, if !is_dragging { HOVER_RADIUS } else { SNAP_VERT_RADIUS }, color);
                                     }
 
                                     CtrlPoint::Corner => panic!("should not hover corner"),

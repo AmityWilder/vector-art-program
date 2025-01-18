@@ -42,8 +42,14 @@ impl LayerType for VectorPath {
         &mut self.settings
     }
 
-    fn draw_rendered(&self, _d: &mut impl RaylibDraw) {
-        // todo
+    fn draw_rendered(&self, d: &mut impl RaylibDraw) {
+        for window in self.points.windows(2) {
+            let [pp1, pp2] = window else { unreachable!("window of 2 should have 2 elements") };
+            let (p1, p2) = (pp1.p, pp2.p);
+            let c1_out = pp1.c_out.calculate(&p1, &pp1.c_in);
+            let c2_in = pp2.c_in.calculate(&p2, &pp2.c_out);
+            d.draw_spline_segment_bezier_cubic(p1, c1_out, c2_in, p2, 3.0, Color::BLACK);
+        }
     }
 
     fn draw_selected(&self, d: &mut impl RaylibDraw) {
@@ -57,27 +63,18 @@ impl LayerType for VectorPath {
         }
         for pp in &self.points {
             let (c_in, p, c_out) = pp.calculated();
-            match pp.c_in {
-                CtrlPoint::Exact(c_in) => {
-                    d.draw_line_v(p, c_in, color);
-                    d.draw_circle_v(c_in, 3.0, color);
+            for (c_self, c_self_ex) in [(&pp.c_in, c_in), (&pp.c_out, c_out)] {
+                match c_self {
+                    CtrlPoint::Exact(_) => {
+                        d.draw_line_v(p, c_self_ex, color);
+                        d.draw_circle_v(c_self_ex, 3.0, color);
+                    }
+                    CtrlPoint::Smooth => {
+                        d.draw_line_v(p, c_self_ex, color.alpha(0.5));
+                        d.draw_circle_v(c_self_ex, 1.5, color);
+                    }
+                    CtrlPoint::Corner => (),
                 }
-                CtrlPoint::Smooth => {
-                    d.draw_line_v(p, c_in, color.alpha(0.5));
-                    d.draw_circle_lines(c_in.x as i32, c_in.y as i32, 3.0, color);
-                }
-                CtrlPoint::Corner => (),
-            }
-            match pp.c_out {
-                CtrlPoint::Exact(c_out) => {
-                    d.draw_line_v(p, c_out, color);
-                    d.draw_circle_v(c_out, 3.0, color);
-                }
-                CtrlPoint::Smooth => {
-                    d.draw_line_v(p, c_out, color.alpha(0.5));
-                    d.draw_circle_lines(c_out.x as i32, c_out.y as i32, 3.0, color);
-                }
-                CtrlPoint::Corner => (),
             }
             d.draw_circle_v(p, 4.0, color);
         }
