@@ -44,6 +44,7 @@ impl LayerType for VectorPath {
 
     fn draw_rendered(&self, d: &mut impl RaylibDraw) {
         let thickness = 10.0;
+        let radius = thickness * 0.5;
         let color = Color::BLACK;
         for window in self.points.windows(2) {
             let [pp1, pp2] = window else { unreachable!("window of 2 should have 2 elements") };
@@ -52,11 +53,8 @@ impl LayerType for VectorPath {
             let c2_in = pp2.c_in.calculate(&p2, &pp2.c_out);
             d.draw_spline_segment_bezier_cubic(p1, c1_out, c2_in, p2, thickness, color);
         }
-        if let Some(first) = self.points.first() {
-            d.draw_circle_v(first.p, thickness * 0.5, color);
-        }
-        if let Some(last) = self.points.last() {
-            d.draw_circle_v(last.p, thickness * 0.5, color);
+        for point in &self.points {
+            d.draw_circle_v(point.p, radius, color);
         }
     }
 
