@@ -160,7 +160,7 @@ fn main() {
 
                 // Artboards background
                 for board in &document.artboards {
-                    d.draw_rectangle_rec(board.rect, document.paper_color);
+                    d.draw_rectangle_rec(board.rect, if !is_trim_view { document.paper_color } else { background_color });
                 }
             }
 
@@ -210,25 +210,33 @@ fn main() {
             }
 
             {
-                let mut d = d.begin_mode2D(document.camera);
-
                 // Artboards foreground
                 for board in &document.artboards {
-                    d.draw_text(&board.name, board.rect.x as i32, board.rect.y as i32 - 10, 10, Color::WHITE);
-                    let left = board.rect.x;
-                    let top = board.rect.y;
-                    let right = board.rect.x + board.rect.width;
-                    let bottom = board.rect.y + board.rect.height;
+                    let   left_world = board.rect.x;
+                    let    top_world = board.rect.y;
+                    let  right_world = board.rect.x + board.rect.width;
+                    let bottom_world = board.rect.y + board.rect.height;
+                    let Vector2 { x:  left_screen, y:    top_screen } = d.get_world_to_screen2D(Vector2::new( left_world,    top_world), &document.camera);
+                    let Vector2 { x: right_screen, y: bottom_screen } = d.get_world_to_screen2D(Vector2::new(right_world, bottom_world), &document.camera);
+                    d.draw_text(&board.name, left_screen as i32, top_screen as i32 - 10, 10, Color::WHITE);
                     d.draw_line_strip(&[
-                        Vector2::new( left, top),
-                        Vector2::new(right, top),
-                        Vector2::new(right, bottom),
-                        Vector2::new( left, bottom),
+                        Vector2::new( left_screen,    top_screen),
+                        Vector2::new(right_screen,    top_screen),
+                        Vector2::new(right_screen, bottom_screen),
+                        Vector2::new( left_screen, bottom_screen),
+                        Vector2::new( left_screen,    top_screen),
                     ], Color::BLACK);
                 }
 
-                for layer in document.layers.iter() {
-                    layer.borrow().draw_selected(&mut d);
+                // todo: make all ui elements draw without 2D mode
+                let mut d = d.begin_mode2D(document.camera);
+
+                // todo: use draw_selected only on selection
+                match current_tool {
+                    Tool::DirectSelection(_) => for layer in document.layers.iter() {
+                        layer.borrow().draw_selected(&mut d);
+                    }
+                    _ => (),
                 }
 
                 current_tool.draw(&mut d, &document, mouse_world_pos);
