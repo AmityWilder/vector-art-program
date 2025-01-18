@@ -109,16 +109,28 @@ fn main() {
                 .expect("failed to load new render texture");
         }
 
-        document.pan(
-            if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_MIDDLE) { mouse_screen_delta } else { Vector2::zero() } +
-            if rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) { Vector2::new(1.0, 0.0) } else { Vector2::new(0.0, 1.0) } * rl.get_mouse_wheel_move() * 20.0,
-        );
+        {
+            let is_zooming = rl.is_key_down(KeyboardKey::KEY_LEFT_ALT);
 
-        document.camera.target += mouse_screen_delta / document.camera.zoom;
-        document.camera.offset += mouse_screen_delta;
+            let mut pan = Vector2::zero();
+            if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_MIDDLE) {
+                pan += mouse_screen_delta;
+            }
+            if !is_zooming {
+                pan += (if rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) {
+                    Vector2::new(1.0, 0.0)
+                } else {
+                    Vector2::new(0.0, 1.0)
+                }) * rl.get_mouse_wheel_move() * 20.0
+            }
+            document.pan(pan);
 
-        if rl.is_key_down(KeyboardKey::KEY_LEFT_ALT) {
-            document.zoom(rl.get_mouse_wheel_move());
+            document.camera.target += mouse_screen_delta / document.camera.zoom;
+            document.camera.offset += mouse_screen_delta;
+
+            if is_zooming {
+                document.zoom(rl.get_mouse_wheel_move());
+            }
         }
 
         if rl.is_key_pressed(KeyboardKey::KEY_V) {
@@ -203,7 +215,16 @@ fn main() {
                 // Artboards foreground
                 for board in &document.artboards {
                     d.draw_text(&board.name, board.rect.x as i32, board.rect.y as i32 - 10, 10, Color::WHITE);
-                    d.draw_rectangle_lines(board.rect.x as i32, board.rect.y as i32, board.rect.width as i32, board.rect.height as i32, Color::BLACK);
+                    let left = board.rect.x;
+                    let top = board.rect.y;
+                    let right = board.rect.x + board.rect.width;
+                    let bottom = board.rect.y + board.rect.height;
+                    d.draw_line_strip(&[
+                        Vector2::new( left, top),
+                        Vector2::new(right, top),
+                        Vector2::new(right, bottom),
+                        Vector2::new( left, bottom),
+                    ], Color::BLACK);
                 }
 
                 for layer in document.layers.iter() {
