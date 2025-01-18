@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use crate::{layer::{Layer, LayerType, StrongLayer}, vector_path::path_point::PathPoint, Document};
+use crate::{layer::{Layer, LayerType, StrongLayer}, vector_path::path_point::{CtrlPoint, PathPoint}, Document};
 
 use super::ToolType;
 
@@ -42,7 +42,9 @@ impl ToolType for Pen {
             if let Some(anchor) = self.current_anchor.take() {
                 let mut target = self.target.as_ref().expect("`target` should have been set when mouse was pressed").borrow_mut();
                 if let Layer::Path(path) = &mut *target {
-                    path.points.push(PathPoint::new_smooth(anchor, mouse_world_pos));
+                    let mut pp = PathPoint::new(CtrlPoint::Smooth, anchor, CtrlPoint::Exact(mouse_world_pos));
+                    pp.clean_corners(0.001 * 0.001);
+                    path.points.push(pp);
                 }
             } else {
                 println!("warning: pen was released without having been pressed");
@@ -59,10 +61,10 @@ impl ToolType for Pen {
                 match self.current_anchor {
                     Some(p) => {
                         let c_in = p * 2.0 - c_out;
-                        if let Some(PathPoint { c_in: _, p: p_last, c_out: c_out_last }) = path.points.last() {
+                        if let Some(PathPoint { c_in: c_in_last, p: p_last, c_out: c_out_last }) = path.points.last() {
                             d.draw_spline_segment_bezier_cubic(
                                 *p_last,
-                                *c_out_last,
+                                c_out_last.calculate(p_last, c_in_last),
                                 c_in,
                                 p,
                                 1.0,
@@ -76,10 +78,10 @@ impl ToolType for Pen {
                         d.draw_circle_v(c_out, 3.0, layer_color);
                     }
                     None => {
-                        if let Some(PathPoint { c_in: _, p: p_last, c_out: c_out_last }) = path.points.last() {
+                        if let Some(PathPoint { c_in: c_in_last, p: p_last, c_out: c_out_last }) = path.points.last() {
                             d.draw_spline_segment_bezier_cubic(
                                 *p_last,
-                                *c_out_last,
+                                c_out_last.calculate(p_last, c_in_last),
                                 c_out,
                                 c_out,
                                 1.0,
