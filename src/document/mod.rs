@@ -10,12 +10,12 @@ use self::artboard::ArtBoard;
 
 const DEFAULT_LAYER_COLORS: [Color; 10] = [
     Color::BLUEVIOLET,
-    Color::OLIVE,
     Color::ORANGERED,
-    Color::LAVENDER,
     Color::CYAN,
+    Color::LAVENDER,
     Color::FORESTGREEN,
     Color::FUCHSIA,
+    Color::OLIVE,
     Color::MAROON,
     Color::SEAGREEN,
     Color::SLATEBLUE,

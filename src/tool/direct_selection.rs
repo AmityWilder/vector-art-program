@@ -305,9 +305,9 @@ impl ToolType for DirectSelection {
                         PathHoverRegion::Edge => todo!(),
 
                         PathHoverRegion::Vert { point, part } => {
-                            const C_IN_COLOR: Color = Color::FORESTGREEN;
+                            const C_IN_COLOR: Color = Color::DODGERBLUE;
                             const P_COLOR: Color = Color::DODGERBLUE;
-                            const C_OUT_COLOR: Color = Color::ORANGE;
+                            const C_OUT_COLOR: Color = Color::DODGERBLUE;
                             let pp = &path.points[*point];
                             if matches!(part, PointPart::Point) {
                                 d.draw_circle_v(pp.p, HOVER_RADIUS, P_COLOR);
@@ -329,7 +329,7 @@ impl ToolType for DirectSelection {
                                                     c_self = c_self_smooth;
                                                 }
                                                 d.draw_line_v(pp.p, c_self_smooth, color.alpha(0.5));
-                                                d.draw_circle_v(c_self_smooth, SNAP_VERT_RADIUS, color.alpha(0.5));
+                                                d.draw_ring(c_self_smooth, SNAP_VERT_RADIUS - 1.0, SNAP_VERT_RADIUS, 0.0, 360.0, 10, color.alpha(0.5));
                                             }
                                         }
                                         d.draw_circle_v(c_self, if !is_dragging { HOVER_RADIUS } else { SNAP_VERT_RADIUS }, color);

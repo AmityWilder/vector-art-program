@@ -48,7 +48,7 @@ impl LayerType for VectorPath {
             let (p1, p2) = (pp1.p, pp2.p);
             let c1_out = pp1.c_out.calculate(&p1, &pp1.c_in);
             let c2_in = pp2.c_in.calculate(&p2, &pp2.c_out);
-            d.draw_spline_segment_bezier_cubic(p1, c1_out, c2_in, p2, 3.0, Color::BLACK);
+            d.draw_spline_segment_bezier_cubic(p1, c1_out, c2_in, p2, 10.0, Color::BLACK);
         }
     }
 
@@ -71,7 +71,7 @@ impl LayerType for VectorPath {
                     }
                     CtrlPoint::Smooth => {
                         d.draw_line_v(p, c_self_ex, color.alpha(0.5));
-                        d.draw_circle_v(c_self_ex, 1.5, color);
+                        d.draw_ring(c_self_ex, 2.0, 3.0, 0.0, 360.0, 10, color);
                     }
                     CtrlPoint::Corner => (),
                 }

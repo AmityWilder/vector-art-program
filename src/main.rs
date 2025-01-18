@@ -76,6 +76,9 @@ fn main() {
     );
     // _ = document.create_group(None, None);
 
+    let mut is_trim_view = false;
+    let mut trim_rtex = rl.load_render_texture(&thread, rl.get_screen_width() as u32, rl.get_screen_height() as u32).unwrap();
+
     let mut current_tool = Tool::default();
     let mut layers_panel = LayersPanel::new(
         Panel::new(
@@ -95,9 +98,15 @@ fn main() {
         let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, document.camera);
 
         if rl.is_window_resized() {
-            window_rect.xmax = rl.get_screen_width () as f32;
-            window_rect.ymax = rl.get_screen_height() as f32;
+            let (width, height) = (
+                rl.get_screen_width (),
+                rl.get_screen_height(),
+            );
+            window_rect.xmax = width  as f32;
+            window_rect.ymax = height as f32;
             layers_panel.panel.update_rec(&window_rect);
+            trim_rtex = rl.load_render_texture(&thread, width as u32, height as u32)
+                .expect("failed to load new render texture");
         }
 
         document.pan(
@@ -124,6 +133,10 @@ fn main() {
             current_tool.tick(&mut rl, &mut document, mouse_world_pos);
         }
 
+        if rl.is_key_pressed(KeyboardKey::KEY_T) {
+            is_trim_view = !is_trim_view;
+        }
+
         document.update_layer_tree_recs(&layers_panel.panel.rec_cache.into());
 
         {
@@ -137,10 +150,55 @@ fn main() {
                 for board in &document.artboards {
                     d.draw_rectangle_rec(board.rect, document.paper_color);
                 }
+            }
 
-                for layer in document.layers.iter() {
-                    layer.borrow().draw_rendered(&mut d);
+            // Render to texture
+            {
+                {
+                    let mut d = d.begin_texture_mode(&thread, &mut trim_rtex);
+                    d.clear_background(Color::BLANK);
+                    {
+                        let mut d = d.begin_mode2D(document.camera);
+                        for layer in document.layers.iter() {
+                            layer.borrow().draw_rendered(&mut d);
+                        }
+                    }
                 }
+
+                if is_trim_view {
+                    let window = window_rect.into();
+                    for board in &document.artboards {
+                        if board.rect.check_collision_recs(&window) {
+                            let rect_world = board.rect;
+                            let tl_world = Vector2::new(rect_world.x, rect_world.y);
+                            let br_world = tl_world + Vector2::new(rect_world.width, rect_world.height);
+                            let tl_screen = d.get_world_to_screen2D(tl_world, &document.camera);
+                            let br_screen = d.get_world_to_screen2D(br_world, &document.camera);
+                            let rect_screen = Rectangle {
+                                x: tl_screen.x,
+                                y: tl_screen.y,
+                                width:  br_screen.x - tl_screen.x,
+                                height: br_screen.y - tl_screen.y,
+                            };
+                            let rect_screen_inv = Rectangle {
+                                x: tl_screen.x,
+                                y: -br_screen.y,
+                                width:  br_screen.x - tl_screen.x,
+                                height: tl_screen.y - br_screen.y,
+                            };
+                            d.draw_texture_pro(&trim_rtex, rect_screen_inv, rect_screen, Vector2::zero(), 0.0, Color::WHITE);
+                        }
+                    }
+                } else {
+                    let rect = Rectangle::new(0.0, 0.0, trim_rtex.width() as f32, trim_rtex.height() as f32);
+                    let mut rect_inv = rect;
+                    rect_inv.height = -rect_inv.height;
+                    d.draw_texture_pro(&trim_rtex, rect_inv, rect, Vector2::zero(), 0.0, Color::MAGENTA);
+                }
+            }
+
+            {
+                let mut d = d.begin_mode2D(document.camera);
 
                 // Artboards foreground
                 for board in &document.artboards {
