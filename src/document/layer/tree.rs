@@ -54,7 +54,7 @@ impl<P: Fn(&Group) -> bool> Iterator for LayerTreeIter<P> {
         self.queue
             .pop_front()
             .map(|(layer, depth)| {
-                if let Layer::Group(group) = &*layer.borrow() {
+                if let Layer::Group(group) = &*layer.read().expect("error handling not yet implemented") {
                     if (self.should_recurs)(group) {
                         self.queue.reserve(group.items.0.len());
                         let new_depth = depth + 1;
@@ -158,7 +158,7 @@ impl LayerTree {
             EXPAND_COLLAPSE_SIZE,
         };
         for (layer, depth) in self.tree_iter(LayerIterDir::TopToBot, |group| group.is_expanded) {
-            let mut layer = layer.borrow_mut();
+            let mut layer = layer.write().expect("error handling not yet implemented");
             let settings = layer.settings_mut();
             let indent_size = depth as f32 * INDENT;
             let left = container.x + indent_size;

@@ -29,7 +29,7 @@ impl LayersPanel {
             document.layers
                 .tree_iter(LayerIterDir::ForeToBack, |group| group.is_expanded)
                 .find_map(|(layer, _depth)| {
-                    let mut layer = layer.borrow_mut();
+                    let mut layer = layer.write().expect("error handling not yet implemented");
                     if layer.settings().slot_rec.check_collision_point_rec(mouse_screen_pos) {
                         if let Layer::Group(Group { is_expanded, expand_button_rec, .. }) = &mut *layer {
                             if expand_button_rec.check_collision_point_rec(mouse_screen_pos) {
@@ -93,157 +93,204 @@ fn main() {
     document.update_layer_tree_recs(&layers_panel.panel.rec_cache.into());
 
     while !rl.window_should_close() {
-        let mouse_screen_pos = rl.get_mouse_position();
-        let mouse_screen_delta = rl.get_mouse_delta();
-        let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, document.camera);
-
-        if rl.is_window_resized() {
-            let (width, height) = (
-                rl.get_screen_width (),
-                rl.get_screen_height(),
-            );
-            window_rect.xmax = width  as f32;
-            window_rect.ymax = height as f32;
-            layers_panel.panel.update_rec(&window_rect);
-            trim_rtex = rl.load_render_texture(&thread, width as u32, height as u32)
-                .expect("failed to load new render texture");
-        }
-
-        {
-            let is_zooming = rl.is_key_down(KeyboardKey::KEY_LEFT_ALT);
-
-            let mut pan = Vector2::zero();
-            if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_MIDDLE) {
-                pan += mouse_screen_delta;
-            }
-            if !is_zooming {
-                pan += (if rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) {
-                    Vector2::new(1.0, 0.0)
+        let is_holding_ctrl = rl.is_key_down(KeyboardKey::KEY_LEFT_CONTROL) || rl.is_key_down(KeyboardKey::KEY_RIGHT_CONTROL);
+        let is_pressing_s = rl.is_key_pressed(KeyboardKey::KEY_S);
+        let is_pressing_o = rl.is_key_pressed(KeyboardKey::KEY_O);
+        if (is_pressing_s || is_pressing_o) && is_holding_ctrl {
+            std::thread::scope(|s| {
+                let task = s.spawn(|| {
+                    if is_pressing_s {
+                        match document.save_t("test.amyvec") {
+                            Ok(()) => println!("file saved successfully"),
+                            Err(e) => println!("failed to save file: {e}"),
+                        }
+                    } else if is_pressing_o {
+                        match Document::load_t("test.amyvec") {
+                            Ok(data) => {
+                                document = data;
+                                println!("file loaded successfully");
+                            },
+                            Err(e) => println!("failed to load file: {e}"),
+                        }
+                    } else {
+                        unimplemented!()
+                    }
+                });
+                let msg = if is_pressing_s {
+                    "saving..."
+                } else if is_pressing_o {
+                    "loading..."
                 } else {
-                    Vector2::new(0.0, 1.0)
-                }) * rl.get_mouse_wheel_move() * 20.0
-            }
-            document.pan(pan);
-
-            document.camera.target += mouse_screen_delta / document.camera.zoom;
-            document.camera.offset += mouse_screen_delta;
-
-            if is_zooming {
-                document.zoom(rl.get_mouse_wheel_move());
-            }
-        }
-
-        if rl.is_key_pressed(KeyboardKey::KEY_V) {
-            current_tool.switch_to_direct_selection();
-        } else if rl.is_key_pressed(KeyboardKey::KEY_P) {
-            current_tool.switch_to_pen();
-        }
-
-        if layers_panel.panel.is_overlapping_point(mouse_screen_pos) {
-            layers_panel.tick(&mut rl, &mut document, mouse_screen_pos);
+                    unimplemented!()
+                };
+                const FONT_SIZE: i32 = 10;
+                const FONT_HALF_SIZE: i32 = FONT_SIZE / 2;
+                let msg_half_width = rl.measure_text(msg, FONT_SIZE) / 2;
+                while !task.is_finished() {
+                    let mut d = rl.begin_drawing(&thread);
+                    d.clear_background(background_color);
+                    d.draw_text(
+                        msg,
+                        d.get_screen_width() / 2 - msg_half_width,
+                        d.get_screen_height() / 2 - FONT_HALF_SIZE,
+                        FONT_SIZE,
+                        Color::GRAY,
+                    );
+                }
+            });
         } else {
-            current_tool.tick(&mut rl, &mut document, mouse_world_pos);
-        }
+            let mouse_screen_pos = rl.get_mouse_position();
+            let mouse_screen_delta = rl.get_mouse_delta();
+            let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, document.camera);
 
-        if rl.is_key_pressed(KeyboardKey::KEY_T) {
-            is_trim_view = !is_trim_view;
-        }
-
-        document.update_layer_tree_recs(&layers_panel.panel.rec_cache.into());
-
-        {
-            let mut d = rl.begin_drawing(&thread);
-            d.clear_background(background_color);
+            if rl.is_window_resized() {
+                let (width, height) = (
+                    rl.get_screen_width (),
+                    rl.get_screen_height(),
+                );
+                window_rect.xmax = width  as f32;
+                window_rect.ymax = height as f32;
+                layers_panel.panel.update_rec(&window_rect);
+                trim_rtex = rl.load_render_texture(&thread, width as u32, height as u32)
+                    .expect("failed to load new render texture");
+            }
 
             {
-                let mut d = d.begin_mode2D(document.camera);
+                let is_zooming = rl.is_key_down(KeyboardKey::KEY_LEFT_ALT);
 
-                // Artboards background
-                for board in &document.artboards {
-                    d.draw_rectangle_rec(board.rect, if !is_trim_view { document.paper_color } else { background_color });
+                let mut pan = Vector2::zero();
+                if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_MIDDLE) {
+                    pan += mouse_screen_delta;
+                }
+                if !is_zooming {
+                    pan += (if rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) {
+                        Vector2::new(1.0, 0.0)
+                    } else {
+                        Vector2::new(0.0, 1.0)
+                    }) * rl.get_mouse_wheel_move() * 20.0
+                }
+                document.pan(pan);
+
+                document.camera.target += mouse_screen_delta / document.camera.zoom;
+                document.camera.offset += mouse_screen_delta;
+
+                if is_zooming {
+                    document.zoom(rl.get_mouse_wheel_move());
                 }
             }
 
-            // Render to texture
+            if rl.is_key_pressed(KeyboardKey::KEY_V) {
+                current_tool.switch_to_direct_selection();
+            } else if rl.is_key_pressed(KeyboardKey::KEY_P) {
+                current_tool.switch_to_pen();
+            }
+
+            if layers_panel.panel.is_overlapping_point(mouse_screen_pos) {
+                layers_panel.tick(&mut rl, &mut document, mouse_screen_pos);
+            } else {
+                current_tool.tick(&mut rl, &mut document, mouse_world_pos);
+            }
+
+            if rl.is_key_pressed(KeyboardKey::KEY_T) {
+                is_trim_view = !is_trim_view;
+            }
+
+            document.update_layer_tree_recs(&layers_panel.panel.rec_cache.into());
+
             {
+                let mut d = rl.begin_drawing(&thread);
+                d.clear_background(background_color);
+
                 {
-                    let mut d = d.begin_texture_mode(&thread, &mut trim_rtex);
-                    d.clear_background(Color::BLANK);
-                    {
-                        let mut d = d.begin_mode2D(document.camera);
-                        for layer in document.layers.iter() {
-                            layer.borrow().draw_rendered(&mut d);
-                        }
-                    }
-                }
+                    let mut d = d.begin_mode2D(document.camera);
 
-                if is_trim_view {
-                    let window = window_rect.into();
+                    // Artboards background
                     for board in &document.artboards {
-                        if board.rect.check_collision_recs(&window) {
-                            let rect_world = board.rect;
-                            let tl_world = Vector2::new(rect_world.x, rect_world.y);
-                            let br_world = tl_world + Vector2::new(rect_world.width, rect_world.height);
-                            let tl_screen = d.get_world_to_screen2D(tl_world, &document.camera);
-                            let br_screen = d.get_world_to_screen2D(br_world, &document.camera);
-                            let rect_screen = Rectangle {
-                                x: tl_screen.x,
-                                y: tl_screen.y,
-                                width:  br_screen.x - tl_screen.x,
-                                height: br_screen.y - tl_screen.y,
-                            };
-                            let rect_screen_inv = Rectangle {
-                                x: tl_screen.x,
-                                y: -br_screen.y,
-                                width:  br_screen.x - tl_screen.x,
-                                height: tl_screen.y - br_screen.y,
-                            };
-                            d.draw_texture_pro(&trim_rtex, rect_screen_inv, rect_screen, Vector2::zero(), 0.0, Color::WHITE);
+                        d.draw_rectangle_rec(board.rect, if !is_trim_view { document.paper_color } else { background_color });
+                    }
+                }
+
+                // Render to texture
+                {
+                    {
+                        let mut d = d.begin_texture_mode(&thread, &mut trim_rtex);
+                        d.clear_background(Color::BLANK);
+                        {
+                            let mut d = d.begin_mode2D(document.camera);
+                            for layer in document.layers.iter() {
+                                layer.read().expect("error handling not yet implemented").draw_rendered(&mut d);
+                            }
                         }
                     }
-                } else {
-                    let rect = Rectangle::new(0.0, 0.0, trim_rtex.width() as f32, trim_rtex.height() as f32);
-                    let mut rect_inv = rect;
-                    rect_inv.height = -rect_inv.height;
-                    d.draw_texture_pro(&trim_rtex, rect_inv, rect, Vector2::zero(), 0.0, Color::MAGENTA);
-                }
-            }
 
-            {
-                // Artboards foreground
-                for board in &document.artboards {
-                    let   left_world = board.rect.x;
-                    let    top_world = board.rect.y;
-                    let  right_world = board.rect.x + board.rect.width;
-                    let bottom_world = board.rect.y + board.rect.height;
-                    let Vector2 { x:  left_screen, y:    top_screen } = d.get_world_to_screen2D(Vector2::new( left_world,    top_world), &document.camera);
-                    let Vector2 { x: right_screen, y: bottom_screen } = d.get_world_to_screen2D(Vector2::new(right_world, bottom_world), &document.camera);
-                    d.draw_text(&board.name, left_screen as i32, top_screen as i32 - 10, 10, Color::WHITE);
-                    d.draw_line_strip(&[
-                        Vector2::new( left_screen,    top_screen),
-                        Vector2::new(right_screen,    top_screen),
-                        Vector2::new(right_screen, bottom_screen),
-                        Vector2::new( left_screen, bottom_screen),
-                        Vector2::new( left_screen,    top_screen),
-                    ], Color::BLACK);
-                }
-
-                // todo: make all ui elements draw without 2D mode
-                let mut d = d.begin_mode2D(document.camera);
-
-                // todo: use draw_selected only on selection
-                match current_tool {
-                    Tool::DirectSelection(_) => for layer in document.layers.iter() {
-                        layer.borrow().draw_selected(&mut d);
+                    if is_trim_view {
+                        let window = window_rect.into();
+                        for board in &document.artboards {
+                            if board.rect.check_collision_recs(&window) {
+                                let rect_world = board.rect;
+                                let tl_world = Vector2::new(rect_world.x, rect_world.y);
+                                let br_world = tl_world + Vector2::new(rect_world.width, rect_world.height);
+                                let tl_screen = d.get_world_to_screen2D(tl_world, &document.camera);
+                                let br_screen = d.get_world_to_screen2D(br_world, &document.camera);
+                                let rect_screen = Rectangle {
+                                    x: tl_screen.x,
+                                    y: tl_screen.y,
+                                    width:  br_screen.x - tl_screen.x,
+                                    height: br_screen.y - tl_screen.y,
+                                };
+                                let rect_screen_inv = Rectangle {
+                                    x: tl_screen.x,
+                                    y: -br_screen.y,
+                                    width:  br_screen.x - tl_screen.x,
+                                    height: tl_screen.y - br_screen.y,
+                                };
+                                d.draw_texture_pro(&trim_rtex, rect_screen_inv, rect_screen, Vector2::zero(), 0.0, Color::WHITE);
+                            }
+                        }
+                    } else {
+                        let rect = Rectangle::new(0.0, 0.0, trim_rtex.width() as f32, trim_rtex.height() as f32);
+                        let mut rect_inv = rect;
+                        rect_inv.height = -rect_inv.height;
+                        d.draw_texture_pro(&trim_rtex, rect_inv, rect, Vector2::zero(), 0.0, Color::MAGENTA);
                     }
-                    _ => (),
                 }
 
-                current_tool.draw(&mut d, &document, mouse_world_pos);
-            }
+                {
+                    // Artboards foreground
+                    for board in &document.artboards {
+                        let   left_world = board.rect.x;
+                        let    top_world = board.rect.y;
+                        let  right_world = board.rect.x + board.rect.width;
+                        let bottom_world = board.rect.y + board.rect.height;
+                        let Vector2 { x:  left_screen, y:    top_screen } = d.get_world_to_screen2D(Vector2::new( left_world,    top_world), &document.camera);
+                        let Vector2 { x: right_screen, y: bottom_screen } = d.get_world_to_screen2D(Vector2::new(right_world, bottom_world), &document.camera);
+                        d.draw_text(&board.name, left_screen as i32, top_screen as i32 - 10, 10, Color::WHITE);
+                        d.draw_line_strip(&[
+                            Vector2::new( left_screen,    top_screen),
+                            Vector2::new(right_screen,    top_screen),
+                            Vector2::new(right_screen, bottom_screen),
+                            Vector2::new( left_screen, bottom_screen),
+                            Vector2::new( left_screen,    top_screen),
+                        ], Color::BLACK);
+                    }
 
-            // Draw layers panel
-            layers_panel.draw(&mut d, &document);
+                    // todo: make all ui elements draw without 2D mode
+                    let mut d = d.begin_mode2D(document.camera);
+
+                    // todo: use draw_selected only on selection
+                    match current_tool {
+                        Tool::DirectSelection(_) => for layer in document.layers.iter() {
+                            layer.read().expect("error handling not yet implemented").draw_selected(&mut d);
+                        }
+                        _ => (),
+                    }
+
+                    current_tool.draw(&mut d, &document, mouse_world_pos);
+                }
+
+                // Draw layers panel
+                layers_panel.draw(&mut d, &document);
+            }
         }
     }
 }

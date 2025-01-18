@@ -32,7 +32,7 @@ impl ToolType for Pen {
             if self.target.is_none() {
                 // create a new path
                 let new_path = document.create_path(None, None);
-                self.layer_color = new_path.borrow().settings().color;
+                self.layer_color = new_path.read().expect("error handling not yet implemented").settings().color;
                 self.target = Some(new_path);
             }
             self.current_anchor = Some(mouse_world_pos);
@@ -40,7 +40,7 @@ impl ToolType for Pen {
 
         if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
             if let Some(anchor) = self.current_anchor.take() {
-                let mut target = self.target.as_ref().expect("`target` should have been set when mouse was pressed").borrow_mut();
+                let mut target = self.target.as_ref().expect("`target` should have been set when mouse was pressed").write().expect("error handling not yet implemented");
                 if let Layer::Path(path) = &mut *target {
                     let mut pp = PathPoint::new(CtrlPoint::Smooth, anchor, CtrlPoint::Exact(mouse_world_pos));
                     pp.clean_corners(0.001 * 0.001);
@@ -54,7 +54,7 @@ impl ToolType for Pen {
 
     fn draw(&self, d: &mut impl RaylibDraw, _document: &Document, mouse_world_pos: Vector2) {
         if let Some(target) = self.target.as_ref() {
-            let target = target.borrow();
+            let target = target.read().expect("error handling not yet implemented");
             if let Layer::Path(path) = &*target {
                 let c_out = mouse_world_pos;
                 let layer_color = self.layer_color;

@@ -30,13 +30,13 @@ impl LayerType for Group {
 
     fn draw_rendered(&self, d: &mut impl RaylibDraw) {
         for layer in self.items.iter() {
-            layer.borrow().draw_rendered(d);
+            layer.read().expect("error handling not yet implemented").draw_rendered(d);
         }
     }
 
     fn draw_selected(&self, d: &mut impl RaylibDraw) {
         for layer in self.items.iter() {
-            layer.borrow().draw_selected(d);
+            layer.read().expect("error handling not yet implemented").draw_selected(d);
         }
     }
 }

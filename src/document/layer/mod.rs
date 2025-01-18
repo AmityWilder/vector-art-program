@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::{Rc, Weak}};
+use std::sync::{Arc, RwLock, Weak};
 use raylib::prelude::*;
 use crate::{appearance::Blending, raster::Raster, vector_path::VectorPath};
 
@@ -17,8 +17,8 @@ pub const LAYER_COLOR_WIDTH: f32 = 4.0;
 pub const TEXT_FONT_SIZE: f32 = 10.0;
 pub const EXPAND_COLLAPSE_SIZE: f32 = 10.0;
 
-pub type StrongLayer = Rc<RefCell<Layer>>;
-pub type WeakLayer = Weak<RefCell<Layer>>;
+pub type StrongLayer = Arc<RwLock<Layer>>;
+pub type WeakLayer = Weak<RwLock<Layer>>;
 
 pub struct LayerSettings {
     pub slot_rec: Rectangle,

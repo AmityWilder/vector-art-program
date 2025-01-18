@@ -118,7 +118,7 @@ impl ToolType for DirectSelection {
                 if rl.is_key_down(KeyboardKey::KEY_LEFT_ALT) {
                     match &mut hover.hover {
                         Hover::Path(PathHover { path_layer, region }) => {
-                            let Layer::Path(path) = &mut *path_layer.borrow_mut() else { panic!("PathHover must reference a Path layer") };
+                            let Layer::Path(path) = &mut *path_layer.write().expect("error handling not yet implemented") else { panic!("PathHover must reference a Path layer") };
                             match region {
                                 PathHoverRegion::Vert { ref point, part: part @ PointPart::Point } => {
                                     let pp = &mut path.points[*point];
@@ -156,7 +156,7 @@ impl ToolType for DirectSelection {
                     Hover::Group(GroupHover { group_layer: _ }) => todo!(),
 
                     Hover::Path(PathHover { path_layer, ref region }) => {
-                        let Layer::Path(path) = &mut *path_layer.borrow_mut() else { panic!("PathHover must reference a Path layer") };
+                        let Layer::Path(path) = &mut *path_layer.write().expect("error handling not yet implemented") else { panic!("PathHover must reference a Path layer") };
                         match region {
                             PathHoverRegion::Fill => todo!(),
 
@@ -207,11 +207,11 @@ impl ToolType for DirectSelection {
             Some(HoverOrDrag { hover, is_dragging: true }) => {
                 match hover {
                     Hover::Group(GroupHover { group_layer }) => {
-                        let Layer::Group(_group) = &mut *group_layer.borrow_mut() else { panic!("GroupHover must reference a Group layer") };
+                        let Layer::Group(_group) = &mut *group_layer.write().expect("error handling not yet implemented") else { panic!("GroupHover must reference a Group layer") };
                         todo!()
                     }
                     Hover::Path(PathHover { path_layer, ref region }) => {
-                        let Layer::Path(path) = &mut *path_layer.borrow_mut() else { panic!("PathHover must reference a Path layer") };
+                        let Layer::Path(path) = &mut *path_layer.write().expect("error handling not yet implemented") else { panic!("PathHover must reference a Path layer") };
                         match region {
                             PathHoverRegion::Fill => {
                                 todo!()
@@ -230,7 +230,7 @@ impl ToolType for DirectSelection {
                         }
                     }
                     Hover::Raster(RasterHover { raster_layer, region: ref _region }) => {
-                        let Layer::Raster(_raster) = &mut *raster_layer.borrow_mut() else { panic!("RasterHover must reference a Raster layer") };
+                        let Layer::Raster(_raster) = &mut *raster_layer.write().expect("error handling not yet implemented") else { panic!("RasterHover must reference a Raster layer") };
                         todo!()
                     }
                 }
@@ -242,7 +242,7 @@ impl ToolType for DirectSelection {
                         LayerIterDir::ForeToBack,
                         |group| !group.settings.is_hidden && !group.settings.is_locked)
                     .find_map(|(layer_rc, _depth)| -> Option<Hover> {
-                        match &mut *layer_rc.borrow_mut() {
+                        match &mut *layer_rc.write().expect("error handling not yet implemented") {
                             Layer::Group(_group) => {
                                 // todo
                                 None
@@ -294,11 +294,11 @@ impl ToolType for DirectSelection {
         if let Some(HoverOrDrag { hover, is_dragging }) = &self.hovered {
             match hover {
                 Hover::Group(GroupHover { group_layer }) => {
-                    let Layer::Group(_group) = &*group_layer.borrow() else { panic!("GroupHover must reference a Group layer") };
+                    let Layer::Group(_group) = &*group_layer.read().expect("error handling not yet implemented") else { panic!("GroupHover must reference a Group layer") };
                     todo!()
                 }
                 Hover::Path(PathHover { path_layer, region }) => {
-                    let Layer::Path(path) = &*path_layer.borrow() else { panic!("PathHover must reference a Path layer") };
+                    let Layer::Path(path) = &*path_layer.read().expect("error handling not yet implemented") else { panic!("PathHover must reference a Path layer") };
                     match region {
                         PathHoverRegion::Fill => todo!(),
 
@@ -348,7 +348,7 @@ impl ToolType for DirectSelection {
                     }
                 }
                 Hover::Raster(RasterHover { raster_layer, region }) => {
-                    let Layer::Raster(_raster) = &*raster_layer.borrow() else { panic!("RasterHover must reference a Raster layer") };
+                    let Layer::Raster(_raster) = &*raster_layer.read().expect("error handling not yet implemented") else { panic!("RasterHover must reference a Raster layer") };
                     match region {
                         RasterHoverRegion::Object => todo!(),
                         RasterHoverRegion::Side { side } => match side {

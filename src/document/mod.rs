@@ -1,9 +1,10 @@
-use std::{cell::RefCell, rc::Rc};
+use std::sync::{Arc, RwLock};
 use layer::{group::Group, tree::{LayerTree, LayerIterDir}, Layer, LayerSettings, LayerType, StrongLayer, WeakLayer};
 use raylib::prelude::*;
 
 pub mod layer;
 pub mod artboard;
+pub mod serialize;
 
 use crate::{raster::Raster, ui::panel::Panel, vector_path::VectorPath};
 use self::artboard::ArtBoard;
@@ -87,19 +88,19 @@ impl Document {
     }
 
     pub fn create_path(&mut self, name: Option<String>, color: Option<Color>) -> StrongLayer {
-        let path = Rc::new(RefCell::new(Layer::Path(VectorPath::new(self.gen_layer_settings(name, color)))));
+        let path = Arc::new(RwLock::new(Layer::Path(VectorPath::new(self.gen_layer_settings(name, color)))));
         self.layers.push(path.clone());
         path
     }
 
     pub fn create_raster(&mut self, name: Option<String>, color: Option<Color>) -> StrongLayer {
-        let path = Rc::new(RefCell::new(Layer::Raster(Raster::new(self.gen_layer_settings(name, color)))));
+        let path = Arc::new(RwLock::new(Layer::Raster(Raster::new(self.gen_layer_settings(name, color)))));
         self.layers.push(path.clone());
         path
     }
 
     pub fn create_group(&mut self, name: Option<String>, color: Option<Color>) -> StrongLayer {
-        let path = Rc::new(RefCell::new(Layer::Group(Group::new(self.gen_layer_settings(name, color)))));
+        let path = Arc::new(RwLock::new(Layer::Group(Group::new(self.gen_layer_settings(name, color)))));
         self.layers.push(path.clone());
         path
     }
@@ -127,7 +128,7 @@ impl Document {
         let mut d = d.begin_scissor_mode(panel_rec.x as i32, panel_rec.y as i32, panel_rec.width as i32, panel_rec.height as i32);
         d.draw_rectangle_rec(panel_rec, panel.background);
         for (layer, _depth) in self.layers.tree_iter(LayerIterDir::TopToBot, |group| group.is_expanded) {
-            let layer = layer.borrow();
+            let layer = layer.read().expect("error handling not yet implemented");
             d.draw_rectangle_rec(layer.settings().slot_rec, Color::new(32,32,32,255));
             d.draw_rectangle_rec(layer.settings().color_rec, layer.settings().color);
             d.draw_rectangle_rec(layer.settings().thumbnail_rec, Color::GRAY);
