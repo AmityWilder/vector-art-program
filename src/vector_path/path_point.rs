@@ -2,6 +2,7 @@ use raylib::prelude::*;
 
 use super::mat2::Matrix2x2;
 
+#[derive(Debug)]
 pub enum CtrlPoint {
     /// Described by a position in the world
     Exact(Vector2),
@@ -69,14 +70,14 @@ impl PathPoint {
         (c_in, p, c_out)
     }
 
-    /// Replace `c_in` and `c_out` with [`None`] if they are closer to `p` than `snap_radius_sqr.sqrt()` pixels
+    /// Replace `c_in` and `c_out` with `Corner` if they are closer to `p` than `snap_radius_sqr.sqrt()` pixels
     pub fn clean_corners(&mut self, snap_radius_sqr: f32) {
         if let Exact(c_in) = self.c_in {
             if c_in.distance_sqr_to(self.p) < snap_radius_sqr {
                 self.c_in = Corner;
                 if matches!(self.c_out, Smooth) {
                     self.c_out = Corner;
-                    return
+                    return; // both have been set
                 }
             }
         }

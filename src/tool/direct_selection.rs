@@ -113,17 +113,55 @@ impl ToolType for DirectSelection {
     fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2) {
         if let Some(hover) = self.hovered.as_mut() {
             if !hover.is_dragging && rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
+                // - clone
+                // - separate path corners
+                if rl.is_key_down(KeyboardKey::KEY_LEFT_ALT) {
+                    match &mut hover.hover {
+                        Hover::Path(PathHover { path_layer, region }) => {
+                            let Layer::Path(path) = &mut *path_layer.borrow_mut() else { panic!("PathHover must reference a Path layer") };
+                            match region {
+                                PathHoverRegion::Vert { ref point, part: part @ PointPart::Point } => {
+                                    let pp = &mut path.points[*point];
+                                    match (&pp.c_in, &pp.c_out) {
+                                        (CtrlPoint::Exact(_), CtrlPoint::Corner) => {
+                                            pp.c_out = CtrlPoint::Exact(mouse_world_pos);
+                                            *part = PointPart::CtrlOut;
+                                        }
+                                        (CtrlPoint::Corner, CtrlPoint::Exact(_)) => {
+                                            pp.c_in = CtrlPoint::Exact(mouse_world_pos);
+                                            *part = PointPart::CtrlIn;
+                                        }
+                                        (CtrlPoint::Corner, CtrlPoint::Corner) => {
+                                            pp.c_in = CtrlPoint::Smooth;
+                                            pp.c_out = CtrlPoint::Exact(mouse_world_pos);
+                                            *part = PointPart::CtrlOut;
+                                        }
+
+                                        _ => (),
+                                    }
+                                }
+
+                                _ => (),
+                            }
+                        }
+
+                        _ => (),
+                    }
+                }
                 // start dragging
                 hover.is_dragging = true;
             } else if hover.is_dragging && rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
                 // finish dragging
                 match &mut hover.hover {
                     Hover::Group(GroupHover { group_layer: _ }) => todo!(),
+
                     Hover::Path(PathHover { path_layer, ref region }) => {
                         let Layer::Path(path) = &mut *path_layer.borrow_mut() else { panic!("PathHover must reference a Path layer") };
                         match region {
                             PathHoverRegion::Fill => todo!(),
+
                             PathHoverRegion::Edge => todo!(),
+
                             PathHoverRegion::Vert { point, part } => {
                                 let pp = &mut path.points[*point];
                                 match part {
@@ -139,8 +177,11 @@ impl ToolType for DirectSelection {
                                             if c_self_ex.distance_sqr_to(pp.p) <= SNAP_VERT_RADIUS_SQR {
                                                 // snap to corner
                                                 *c_self = CtrlPoint::Corner;
-                                                if !({ if let CtrlPoint::Exact(c_opp_ex) = &c_opp { c_opp_ex.distance_to(pp.p) > SNAP_VERT_RADIUS_SQR } else { false } }) {
-                                                    *c_opp = CtrlPoint::Corner;
+                                                match &c_opp {
+                                                    // different enough to stay distinct
+                                                    CtrlPoint::Exact(c_opp_ex) if c_opp_ex.distance_to(pp.p) > SNAP_VERT_RADIUS_SQR => (),
+
+                                                    _ => *c_opp = CtrlPoint::Corner,
                                                 }
                                             } else if let CtrlPoint::Exact(c_opp_ex) = &c_opp {
                                                 // snap to smooth
@@ -155,6 +196,7 @@ impl ToolType for DirectSelection {
                             }
                         }
                     }
+
                     Hover::Raster(RasterHover { raster_layer: _, region: ref _region }) => todo!(),
                 }
                 hover.is_dragging = false;
