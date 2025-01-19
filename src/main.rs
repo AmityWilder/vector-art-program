@@ -216,6 +216,8 @@ fn main() {
             current_tool.switch_to_direct_selection();
         } else if rl.is_key_pressed(KeyboardKey::KEY_P) {
             current_tool.switch_to_pen();
+        } else if rl.is_key_pressed(KeyboardKey::KEY_B) {
+            current_tool.switch_to_brush();
         }
 
         if layers_panel.panel.is_overlapping_point(mouse_screen_pos) {
