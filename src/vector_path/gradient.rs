@@ -1,13 +1,13 @@
 use super::*;
 
 pub struct Control {
-    pos: u8,
-    color: Color,
+    pub pos: u8,
+    pub color: Color,
 }
 
 pub struct Ramp {
     /// Should be sorted and unique by `pos`
-    colors: Vec<Control>,
+    pub colors: Vec<Control>,
 }
 
 impl Ramp {

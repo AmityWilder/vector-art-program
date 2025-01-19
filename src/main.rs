@@ -100,12 +100,12 @@ fn main() {
             std::thread::scope(|s| {
                 let task = s.spawn(|| {
                     if is_pressing_s {
-                        match document.save_t("test.amyvec") {
+                        match document.save_bin("test.amyvec") {
                             Ok(()) => println!("file saved successfully"),
                             Err(e) => println!("failed to save file: {e}"),
                         }
                     } else if is_pressing_o {
-                        match Document::load_t("test.amyvec") {
+                        match Document::load_bin("test.amyvec") {
                             Ok(data) => {
                                 document = data;
                                 println!("file loaded successfully");
