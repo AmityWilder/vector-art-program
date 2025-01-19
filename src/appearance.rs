@@ -28,7 +28,6 @@ impl Default for Appearance {
     fn default() -> Self {
         Self {
             items: vec![
-                StyleItem::Fill(Fill::default()),
                 StyleItem::Stroke(Stroke::default()),
             ],
         }

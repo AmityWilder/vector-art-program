@@ -1,6 +1,6 @@
 use path_point::{CtrlPoint, PathPoint};
 use raylib::prelude::*;
-use crate::{appearance::Appearance, layer::{LayerSettings, LayerType}};
+use crate::{appearance::{Appearance, StyleItem}, layer::{LayerSettings, LayerType}};
 
 pub mod mat2;
 pub mod path_point;
@@ -43,18 +43,36 @@ impl LayerType for VectorPath {
     }
 
     fn draw_rendered(&self, d: &mut impl RaylibDraw) {
-        let thickness = 10.0;
-        let radius = thickness * 0.5;
-        let color = Color::BLACK;
-        for window in self.points.windows(2) {
-            let [pp1, pp2] = window else { unreachable!("window of 2 should have 2 elements") };
-            let (p1, p2) = (pp1.p, pp2.p);
-            let c1_out = pp1.c_out.calculate(&p1, &pp1.c_in);
-            let c2_in = pp2.c_in.calculate(&p2, &pp2.c_out);
-            d.draw_spline_segment_bezier_cubic(p1, c1_out, c2_in, p2, thickness, color);
-        }
-        for point in &self.points {
-            d.draw_circle_v(point.p, radius, color);
+        for item in &self.appearance.items {
+            match item {
+                StyleItem::Stroke(stroke) => {
+                    match (&stroke.thick, &stroke.align, &stroke.pattern) {
+                        (
+                            stroke::WidthProfile::Constant(thickness),
+                            stroke::Align::Middle,
+                            stroke::Pattern::Solid(color),
+                        ) => {
+                            for window in self.points.windows(2) {
+                                let [pp1, pp2] = window else { unreachable!("window of 2 should have 2 elements") };
+                                let (p1, p2) = (pp1.p, pp2.p);
+                                let c1_out = pp1.c_out.calculate(&p1, &pp1.c_in);
+                                let c2_in = pp2.c_in.calculate(&p2, &pp2.c_out);
+                                d.draw_spline_segment_bezier_cubic(p1, c1_out, c2_in, p2, *thickness, color);
+                            }
+                            let radius = thickness * 0.5;
+                            for point in &self.points {
+                                d.draw_circle_v(point.p, radius, color);
+                            }
+                        }
+
+                        _ => todo!(),
+                    }
+                }
+
+                StyleItem::Fill(_fill) => {
+                    // todo
+                }
+            }
         }
     }
 

@@ -71,7 +71,7 @@ fn main() {
     };
 
     let mut document = Document::new();
-    document.create_artboard(None, None, 1024, 1024);
+    document.create_artboard(None, None, 512, 512);
     document.camera.target = Vector2::new(
         0.5 * (document.artboards[0].rect.width  - rl.get_screen_width ()) as f32,
         0.5 * (document.artboards[0].rect.height - rl.get_screen_height()) as f32,

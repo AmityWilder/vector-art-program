@@ -47,8 +47,8 @@ impl Default for Stroke {
     fn default() -> Self {
         Self {
             blend: Blending::default(),
-            pattern: Pattern::Solid(Color::BLACK),
-            thick: WidthProfile::Constant(1.0),
+            pattern: Pattern::Solid(Color::BLUEVIOLET),
+            thick: WidthProfile::Constant(10.0),
             align: Align::Middle,
         }
     }
