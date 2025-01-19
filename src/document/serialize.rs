@@ -122,7 +122,7 @@ impl Document {
 
         let Self {
             title,
-            camera: _,
+            camera,
             paper_color,
             layers,
             selection: _,
@@ -141,6 +141,10 @@ impl Document {
         write_u64(&mut writer, *layer_color_acc   as u64)?;
         write_u64(&mut writer, *layer_name_acc    as u64)?;
         write_u64(&mut writer, *artboard_name_acc as u64)?;
+
+        let camera_peculiar = camera.target * camera.zoom - camera.offset;
+        write_f32(&mut writer, camera.zoom)?;
+        write_vector2(&mut writer, &camera_peculiar)?;
 
         // artboards
         write_u64(&mut writer, artboards.len() as u64)?;
@@ -321,7 +325,7 @@ impl Document {
     }
 
     /// Load as binary
-    pub fn load_bin(path: impl AsRef<Path>) -> io::Result<Self> {
+    pub fn load_bin(path: impl AsRef<Path>, mouse_screen_pos: Vector2) -> io::Result<Self> {
         let mut reader = BufReader::new(File::open(path)?);
         let mut version_line = String::new();
         reader.read_line(&mut version_line)?;
@@ -340,6 +344,12 @@ impl Document {
                 document.layer_color_acc   = read_u64(&mut reader)? as usize;
                 document.layer_name_acc    = read_u64(&mut reader)? as usize;
                 document.artboard_name_acc = read_u64(&mut reader)? as usize;
+
+                document.camera.zoom = read_f32(&mut reader)?;
+                // camera.target * camera.zoom - camera.offset;
+                let camera_peculiar = read_vector2(&mut reader)?;
+                document.camera.target = (camera_peculiar + mouse_screen_pos) / document.camera.zoom;
+                document.camera.offset = mouse_screen_pos;
 
                 // artboards
                 {

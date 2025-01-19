@@ -105,19 +105,6 @@ impl Document {
         path
     }
 
-    pub fn pan(&mut self, v: Vector2) {
-        self.camera.target -= v / self.camera.zoom;
-    }
-
-    pub fn zoom(&mut self, amount: f32) {
-        const ZOOM_SPEED: f32 = 1.5;
-        if amount > 0.0 && self.camera.zoom < 16.0 {
-            self.camera.zoom *= ZOOM_SPEED;
-        } else if amount < 0.0 && self.camera.zoom > 0.125 {
-            self.camera.zoom /= ZOOM_SPEED;
-        }
-    }
-
     pub fn update_layer_tree_recs(&mut self, container: &Rectangle) {
         self.layers.update_ui_recs(container, container.y + layer::INSET);
     }
