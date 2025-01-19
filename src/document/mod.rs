@@ -1,4 +1,5 @@
 use std::sync::{Arc, RwLock};
+use artboard::IntRect2;
 use layer::{group::Group, tree::{LayerTree, LayerIterDir}, Layer, LayerSettings, LayerType, StrongLayer, WeakLayer};
 use raylib::prelude::*;
 
@@ -72,12 +73,12 @@ impl Document {
         }
     }
 
-    pub fn create_artboard(&mut self, name: Option<String>, xy: Option<(f32, f32)>, width: f32, height: f32) {
+    pub fn create_artboard(&mut self, name: Option<String>, xy: Option<(i32, i32)>, width: i32, height: i32) {
         let name = name.unwrap_or_else(|| self.auto_artboard_name());
-        let (x, y) = xy.unwrap_or_else(|| self.artboards.last().map_or((0.0, 0.0), |b| (b.rect.x + b.rect.width, b.rect.y + b.rect.height)));
+        let (x, y) = xy.unwrap_or_else(|| self.artboards.last().map_or((0, 0), |b| (b.rect.x + b.rect.width + 10, b.rect.y)));
         self.artboards.push(ArtBoard {
             name,
-            rect: Rectangle::new(x, y, width, height),
+            rect: IntRect2 { x, y, width, height },
         });
     }
 

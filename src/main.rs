@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use layer::{group::Group, tree::LayerIterDir, Layer, LayerType};
 use raylib::prelude::*;
 // use rand::prelude::*;
@@ -69,10 +71,10 @@ fn main() {
     };
 
     let mut document = Document::new();
-    document.create_artboard(None, None, 256.0, 256.0);
+    document.create_artboard(None, None, 256, 256);
     document.camera.target = Vector2::new(
-        0.5 * (document.artboards[0].rect.width  - rl.get_screen_width()  as f32),
-        0.5 * (document.artboards[0].rect.height - rl.get_screen_height() as f32),
+        0.5 * (document.artboards[0].rect.width  - rl.get_screen_width ()) as f32,
+        0.5 * (document.artboards[0].rect.height - rl.get_screen_height()) as f32,
     );
     // _ = document.create_group(None, None);
 
@@ -99,53 +101,70 @@ fn main() {
         let is_holding_ctrl = rl.is_key_down(KeyboardKey::KEY_LEFT_CONTROL) || rl.is_key_down(KeyboardKey::KEY_RIGHT_CONTROL);
         let is_pressing_s = rl.is_key_pressed(KeyboardKey::KEY_S);
         let is_pressing_o = rl.is_key_pressed(KeyboardKey::KEY_O);
-        if (is_pressing_s || is_pressing_o) && is_holding_ctrl {
-            let mut handle_serialization = || {
-                if is_pressing_s {
-                    match document.save_bin("test.amyvec") {
-                        Ok(()) => println!("file saved successfully"),
-                        Err(e) => println!("failed to save file: {e}"),
-                    }
-                } else if is_pressing_o {
-                    match Document::load_bin("test.amyvec", mouse_screen_pos) {
-                        Ok(data) => {
-                            document = data;
-                            println!("file loaded successfully");
-                        },
-                        Err(e) => println!("failed to load file: {e}"),
-                    }
-                } else {
-                    unimplemented!()
+        let is_pressing_p = rl.is_key_pressed(KeyboardKey::KEY_P);
+        let is_pressing_r = rl.is_key_pressed(KeyboardKey::KEY_R);
+        if (is_pressing_s || is_pressing_o || is_pressing_p || is_pressing_r) && is_holding_ctrl {
+            if is_pressing_r {
+                // cannot be done without blocking
+                match document.render_png("test.png", 0, &mut rl, &thread) {
+                    Ok(()) => println!("file rendered successfully"),
+                    Err(e) => println!("failed to render file: {e}"),
                 }
-            };
-            const IS_SERIALIZATION_NON_BLOCKING: bool = false;
-            if IS_SERIALIZATION_NON_BLOCKING {
-                std::thread::scope(|s| {
-                    let task = s.spawn(|| handle_serialization());
-                    let msg = if is_pressing_s {
-                        "saving..."
+            } else {
+                let mut handle_serialization = || {
+                    let start = Instant::now();
+                    if is_pressing_s {
+                        match document.save_bin("test.amyvec") {
+                            Ok(()) => println!("file saved successfully"),
+                            Err(e) => println!("failed to save file: {e}"),
+                        }
                     } else if is_pressing_o {
-                        "loading..."
+                        match Document::load_bin("test.amyvec", mouse_screen_pos) {
+                            Ok(data) => {
+                                document = data;
+                                println!("file loaded successfully");
+                            },
+                            Err(e) => println!("failed to load file: {e}"),
+                        }
+                    } else if is_pressing_p {
+                        match document.export_svg("test.svg", 0) {
+                            Ok(()) => println!("file exported successfully"),
+                            Err(e) => println!("failed to export file: {e}"),
+                        }
                     } else {
                         unimplemented!()
-                    };
-                    const FONT_SIZE: i32 = 10;
-                    const FONT_HALF_SIZE: i32 = FONT_SIZE / 2;
-                    let msg_half_width = rl.measure_text(msg, FONT_SIZE) / 2;
-                    while !task.is_finished() {
-                        let mut d = rl.begin_drawing(&thread);
-                        d.clear_background(background_color);
-                        d.draw_text(
-                            msg,
-                            d.get_screen_width() / 2 - msg_half_width,
-                            d.get_screen_height() / 2 - FONT_HALF_SIZE,
-                            FONT_SIZE,
-                            Color::GRAY,
-                        );
                     }
-                });
-            } else {
-                handle_serialization();
+                    println!("  finished in {:?}", start.elapsed());
+                };
+                const IS_SERIALIZATION_NON_BLOCKING: bool = false;
+                if IS_SERIALIZATION_NON_BLOCKING {
+                    std::thread::scope(|s| {
+                        let task = s.spawn(|| handle_serialization());
+                        let msg = if is_pressing_s {
+                            "saving..."
+                        } else if is_pressing_o {
+                            "loading..."
+                        } else {
+                            unimplemented!()
+                        };
+                        const FONT_SIZE: i32 = 10;
+                        const FONT_HALF_SIZE: i32 = FONT_SIZE / 2;
+                        let msg_half_width = rl.measure_text(msg, FONT_SIZE) / 2;
+                        while !task.is_finished() {
+                            let mut d = rl.begin_drawing(&thread);
+                            d.clear_background(background_color);
+                            d.draw_text(
+                                msg,
+                                d.get_screen_width() / 2 - msg_half_width,
+                                d.get_screen_height() / 2 - FONT_HALF_SIZE,
+                                FONT_SIZE,
+                                Color::GRAY,
+                            );
+                        }
+                    });
+                } else {
+                    handle_serialization();
+                }
             }
         }
 
@@ -240,8 +259,8 @@ fn main() {
                 if is_trim_view {
                     let window = window_rect.into();
                     for board in &document.artboards {
-                        if board.rect.check_collision_recs(&window) {
-                            let rect_world = board.rect;
+                        let rect_world = Rectangle::from(board.rect);
+                        if rect_world.check_collision_recs(&window) {
                             let tl_world = Vector2::new(rect_world.x, rect_world.y);
                             let br_world = tl_world + Vector2::new(rect_world.width, rect_world.height);
                             let tl_screen = d.get_world_to_screen2D(tl_world, &document.camera);
@@ -272,10 +291,10 @@ fn main() {
             {
                 // Artboards foreground
                 for board in &document.artboards {
-                    let   left_world = board.rect.x;
-                    let    top_world = board.rect.y;
-                    let  right_world = board.rect.x + board.rect.width;
-                    let bottom_world = board.rect.y + board.rect.height;
+                    let   left_world = board.rect.x as f32;
+                    let    top_world = board.rect.y as f32;
+                    let  right_world = (board.rect.x + board.rect.width ) as f32;
+                    let bottom_world = (board.rect.y + board.rect.height) as f32;
                     let Vector2 { x:  left_screen, y:    top_screen } = d.get_world_to_screen2D(Vector2::new( left_world,    top_world), &document.camera);
                     let Vector2 { x: right_screen, y: bottom_screen } = d.get_world_to_screen2D(Vector2::new(right_world, bottom_world), &document.camera);
                     d.draw_text(&board.name, left_screen as i32, top_screen as i32 - 10, 10, Color::WHITE);

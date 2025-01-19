@@ -16,6 +16,8 @@ use crate::{
     }
 };
 
+use super::artboard::IntRect2;
+
 /// Previous formats are structurally incompatible and cannot be converted \
 /// ex: previous versions lack the necessary data to accurately reconstruct them, or rely on removed features
 const VERSION_MAJOR: u8 = 0;
@@ -54,6 +56,14 @@ fn read_f32(reader: &mut BufReader<File>) -> io::Result<f32> {
         .map(|buf| f32::from_le_bytes(buf))
 }
 
+fn write_i32(writer: &mut BufWriter<File>, n: i32) -> io::Result<()> {
+    writer.write_all(&n.to_le_bytes())
+}
+fn read_i32(reader: &mut BufReader<File>) -> io::Result<i32> {
+    read_bytes::<{size_of::<i32>()}>(reader)
+        .map(|buf| i32::from_le_bytes(buf))
+}
+
 fn write_color_rgb(writer: &mut BufWriter<File>, c: Color) -> io::Result<()> {
     writer.write_all(&[c.r, c.g, c.b])
 }
@@ -85,6 +95,21 @@ fn read_rectangle(reader: &mut BufReader<File>) -> io::Result<Rectangle> {
     })
 }
 
+fn write_irect2(writer: &mut BufWriter<File>, r: &IntRect2) -> io::Result<()> {
+    write_i32(writer, r.x)?;
+    write_i32(writer, r.y)?;
+    write_i32(writer, r.width)?;
+    write_i32(writer, r.height)
+}
+fn read_irect2(reader: &mut BufReader<File>) -> io::Result<IntRect2> {
+    Ok(IntRect2 {
+        x:      read_i32(reader)?,
+        y:      read_i32(reader)?,
+        width:  read_i32(reader)?,
+        height: read_i32(reader)?,
+    })
+}
+
 fn write_vector2(writer: &mut BufWriter<File>, v: &Vector2) -> io::Result<()> {
     write_f32(writer, v.x)?;
     write_f32(writer, v.y)
@@ -112,12 +137,17 @@ fn read_str(reader: &mut BufReader<File>) -> io::Result<String> {
         .map_err(|e| io::Error::other(e))
 }
 
+fn extract_blend_mode(bits: u8) -> BlendMode {
+    unsafe { std::mem::transmute((bits & 0b111) as i32) }
+}
+
 impl Document {
     /// Save as binary
     ///
     /// Safety: Mutating the document outside this function while it is being saved is undefined behavior
     pub fn save_bin(&mut self, path: impl AsRef<Path>) -> io::Result<()> {
         let mut writer = BufWriter::new(File::create(path)?);
+        writer.write_all(b"amyvec")?;
         writer.write_all(&[VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, b'\n'])?;
 
         let Self {
@@ -151,7 +181,7 @@ impl Document {
         for ArtBoard { name, rect } in artboards {
             name.retain(is_sterile);
             write_str(&mut writer, &name)?;
-            write_rectangle(&mut writer, &rect)?;
+            write_irect2(&mut writer, &rect)?;
         }
 
         // layers
@@ -328,6 +358,7 @@ impl Document {
     pub fn load_bin(path: impl AsRef<Path>, mouse_screen_pos: Vector2) -> io::Result<Self> {
         let mut reader = BufReader::new(File::open(path)?);
         let mut version_line = String::new();
+        if !matches!(&read_bytes(&mut reader)?, b"amyvec") { Err(io::Error::other("incompatible file extension"))? }
         reader.read_line(&mut version_line)?;
         if let &[version_major, version_minor, version_patch, b'\n'] = version_line.as_bytes() {
             if version_major != VERSION_MAJOR || version_minor > VERSION_MINOR || version_patch > VERSION_PATCH {
@@ -359,27 +390,13 @@ impl Document {
                     for _ in 0..num_artboards {
                         document.artboards.push(ArtBoard {
                             name: read_str(&mut reader)?,
-                            rect: read_rectangle(&mut reader)?,
+                            rect: read_irect2(&mut reader)?,
                         });
                     }
                 }
 
                 // layers
                 fn read_layer_tree(reader: &mut BufReader<File>) -> io::Result<LayerTree> {
-                    fn extract_blend_mode(bits: u8) -> BlendMode {
-                        match bits & 0b111 {
-                            0 => BlendMode::BLEND_ALPHA,
-                            1 => BlendMode::BLEND_ADDITIVE,
-                            2 => BlendMode::BLEND_MULTIPLIED,
-                            3 => BlendMode::BLEND_ADD_COLORS,
-                            4 => BlendMode::BLEND_SUBTRACT_COLORS,
-                            5 => BlendMode::BLEND_ALPHA_PREMULTIPLY,
-                            6 => BlendMode::BLEND_CUSTOM,
-                            7 => BlendMode::BLEND_CUSTOM_SEPARATE,
-                            _ => unreachable!("bitmask restricts possible cases"),
-                        }
-                    }
-
                     let mut tree = LayerTree::new();
                     let num_layers = read_u64(reader)? as usize;
                     tree.reserve(num_layers);
@@ -540,11 +557,27 @@ impl Document {
         }
     }
 
-    pub fn export_svg(&self, _path: impl AsRef<Path>) -> io::Result<()> {
+    pub fn export_svg(&self, path: impl AsRef<Path>, artboard: usize) -> io::Result<()> {
+        let mut svg = BufWriter::new(File::create(path)?);
+        let artboard = self.artboards[artboard].rect;
+        // let top_left = Vector2::new(artboard.x as f32, artboard.y as f32);
+        writeln!(&mut svg, "<svg width=\"{}\" height=\"{}\" xmlns=\"http://www.w3.org/2000/svg\">", artboard.width, artboard.height)?;
+        // "<path d=\"M Z\" fill=\"{}\" stroke=\"{}\" stroke-width=\"{}\" />";
+        svg.write_all(b"</svg>")?;
         Err(io::Error::other("under construction"))
     }
 
-    pub fn render_png(&self, _path: impl AsRef<Path>) -> io::Result<()> {
+    pub fn render_png(&self, path: impl AsRef<Path>, artboard: usize, mut rl: &mut RaylibHandle, thread: &RaylibThread) -> io::Result<()> {
+        let artboard = self.artboards[artboard].rect;
+
+        let mut rtex = rl.load_render_texture(&thread, artboard.width as u32, artboard.height as u32).map_err(|e| io::Error::other(e))?;
+        {
+            let mut d = rl.begin_texture_mode(&thread, &mut rtex);
+            d.clear_background(Color::BLANK);
+        }
+        let image = rtex.load_image().map_err(|e| io::Error::other(e))?;
+        image.export_image(path.as_ref().to_str().ok_or_else(|| io::Error::other("could not convert path to &str"))?);
+
         Err(io::Error::other("under construction"))
     }
 }
