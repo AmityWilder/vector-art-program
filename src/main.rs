@@ -304,8 +304,6 @@ fn main() {
 
             // Draw layers panel
             layers_panel.draw(&mut d, &document);
-
-            d.draw_text(&format!("{:?}", document.camera.target * document.camera.zoom - document.camera.offset), 0, 0, 10, Color::MAGENTA);
         }
     }
 }
