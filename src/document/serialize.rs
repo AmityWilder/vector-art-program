@@ -80,20 +80,20 @@ fn read_color_rgba(reader: &mut BufReader<File>) -> io::Result<Color> {
         .map(|[r, g, b, a]| Color { r, g, b, a })
 }
 
-fn write_rectangle(writer: &mut BufWriter<File>, r: &Rectangle) -> io::Result<()> {
-    write_f32(writer, r.x)?;
-    write_f32(writer, r.y)?;
-    write_f32(writer, r.width)?;
-    write_f32(writer, r.height)
-}
-fn read_rectangle(reader: &mut BufReader<File>) -> io::Result<Rectangle> {
-    Ok(Rectangle {
-        x:      read_f32(reader)?,
-        y:      read_f32(reader)?,
-        width:  read_f32(reader)?,
-        height: read_f32(reader)?,
-    })
-}
+// fn write_rectangle(writer: &mut BufWriter<File>, r: &Rectangle) -> io::Result<()> {
+//     write_f32(writer, r.x)?;
+//     write_f32(writer, r.y)?;
+//     write_f32(writer, r.width)?;
+//     write_f32(writer, r.height)
+// }
+// fn read_rectangle(reader: &mut BufReader<File>) -> io::Result<Rectangle> {
+//     Ok(Rectangle {
+//         x:      read_f32(reader)?,
+//         y:      read_f32(reader)?,
+//         width:  read_f32(reader)?,
+//         height: read_f32(reader)?,
+//     })
+// }
 
 fn write_irect2(writer: &mut BufWriter<File>, r: &IntRect2) -> io::Result<()> {
     write_i32(writer, r.x)?;
@@ -559,7 +559,7 @@ impl Document {
 
     pub fn export_svg(&self, path: impl AsRef<Path>, artboard: usize) -> io::Result<()> {
         let mut svg = BufWriter::new(File::create(path)?);
-        let artboard = self.artboards[artboard].rect;
+        let artboard = self.artboards.get(artboard).ok_or_else(|| io::Error::other("invalid artboard index"))?.rect;
         // let top_left = Vector2::new(artboard.x as f32, artboard.y as f32);
         writeln!(&mut svg, "<svg width=\"{}\" height=\"{}\" xmlns=\"http://www.w3.org/2000/svg\">", artboard.width, artboard.height)?;
         // "<path d=\"M Z\" fill=\"{}\" stroke=\"{}\" stroke-width=\"{}\" />";
@@ -568,16 +568,21 @@ impl Document {
     }
 
     pub fn render_png(&self, path: impl AsRef<Path>, artboard: usize, mut rl: &mut RaylibHandle, thread: &RaylibThread) -> io::Result<()> {
-        let artboard = self.artboards[artboard].rect;
+        let artboard = self.artboards.get(artboard).ok_or_else(|| io::Error::other("invalid artboard index"))?.rect;
+        let filename = path.as_ref().to_str().ok_or_else(|| io::Error::other("could not convert path to &str"))?;
 
         let mut rtex = rl.load_render_texture(&thread, artboard.width as u32, artboard.height as u32).map_err(|e| io::Error::other(e))?;
         {
             let mut d = rl.begin_texture_mode(&thread, &mut rtex);
             d.clear_background(Color::BLANK);
+            for (layer, _depth) in self.layers.tree_iter(LayerIterDir::BackToFore, |g| !g.settings.is_hidden) {
+                let layer = layer.read().map_err(|e| io::Error::other(format!("layer {:?} is poisoned", e.get_ref().settings().name)))?;
+                layer.draw_rendered(&mut d);
+            }
         }
         let image = rtex.load_image().map_err(|e| io::Error::other(e))?;
-        image.export_image(path.as_ref().to_str().ok_or_else(|| io::Error::other("could not convert path to &str"))?);
+        image.export_image(filename);
 
-        Err(io::Error::other("under construction"))
+        Ok(())
     }
 }

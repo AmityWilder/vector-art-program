@@ -250,7 +250,7 @@ fn main() {
                     d.clear_background(Color::BLANK);
                     {
                         let mut d = d.begin_mode2D(document.camera);
-                        for layer in document.layers.iter() {
+                        for (layer, _depth) in document.layers.tree_iter(LayerIterDir::BackToFore, |g| !g.settings.is_hidden) {
                             layer.read().expect("error handling not yet implemented").draw_rendered(&mut d);
                         }
                     }
@@ -312,8 +312,10 @@ fn main() {
 
                 // todo: use draw_selected only on selection
                 match current_tool {
-                    Tool::DirectSelection(_) => for layer in document.layers.iter() {
-                        layer.read().expect("error handling not yet implemented").draw_selected(&mut d);
+                    Tool::DirectSelection(_) => {
+                        for (layer, _depth) in document.layers.tree_iter(LayerIterDir::BackToFore, |g| !g.settings.is_locked) {
+                            layer.read().expect("error handling not yet implemented").draw_selected(&mut d);
+                        }
                     }
                     _ => (),
                 }
