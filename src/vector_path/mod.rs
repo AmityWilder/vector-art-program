@@ -1,4 +1,4 @@
-use path_point::{CtrlPoint, PathPoint};
+use path_point::{CtrlPt1, CtrlPt2, PathPoint, ReflectVector};
 use raylib::prelude::*;
 use crate::{appearance::{Appearance, StyleItem}, layer::{LayerSettings, LayerType}};
 
@@ -52,16 +52,13 @@ impl LayerType for VectorPath {
                             stroke::Align::Middle,
                             stroke::Pattern::Solid(color),
                         ) => {
-                            for window in self.points.windows(2) {
-                                let [pp1, pp2] = window else { unreachable!("window of 2 should have 2 elements") };
-                                let (p1, p2) = (pp1.p, pp2.p);
-                                let c1_out = pp1.c_out.calculate(&p1, &pp1.c_in);
-                                let c2_in = pp2.c_in.calculate(&p2, &pp2.c_out);
-                                d.draw_spline_segment_bezier_cubic(p1, c1_out, c2_in, p2, *thickness, color);
+                            let curve: Vec<_> = self.points.iter().map(|pp| pp.calculate()).collect();
+                            for [a, b] in curve.windows(2).map(|w| <[_; 2]>::try_from(w).unwrap()) {
+                                d.draw_spline_segment_bezier_cubic(a.1, a.2, b.0, b.1, *thickness, color);
                             }
                             let radius = thickness * 0.5;
-                            for point in &self.points {
-                                d.draw_circle_v(point.p, radius, color);
+                            for pp in &self.points {
+                                d.draw_circle_v(pp.p, radius, color);
                             }
                         }
 
@@ -78,26 +75,34 @@ impl LayerType for VectorPath {
 
     fn draw_selected(&self, d: &mut impl RaylibDraw, _camera: &Camera2D, zoom_inv: f32) {
         let color = self.settings.color;
-        for window in self.points.windows(2) {
-            let [pp1, pp2] = window else { unreachable!("window of 2 should have 2 elements") };
-            let (p1, p2) = (pp1.p, pp2.p);
-            let c1_out = pp1.c_out.calculate(&p1, &pp1.c_in);
-            let c2_in = pp2.c_in.calculate(&p2, &pp2.c_out);
-            d.draw_spline_segment_bezier_cubic(p1, c1_out, c2_in, p2, 1.0 * zoom_inv, color);
+        let curve: Vec<_> = self.points.iter().map(|pp| pp.calculate()).collect();
+        for [a, b] in curve.windows(2).map(|w| <[_; 2]>::try_from(w).unwrap()) {
+            d.draw_spline_segment_bezier_cubic(a.1, a.2, b.0, b.1, zoom_inv, color);
         }
         for pp in &self.points {
-            let (c_in, p, c_out) = pp.calculated();
-            for (c_self, c_self_ex) in [(&pp.c_in, c_in), (&pp.c_out, c_out)] {
-                match c_self {
-                    CtrlPoint::Exact(_) => {
-                        d.draw_line_v(p, c_self_ex, color);
-                        d.draw_circle_v(c_self_ex, 3.0 * zoom_inv, color);
+            let p = pp.p;
+            fn draw_ctrl_exact(d: &mut impl RaylibDraw, root: Vector2, handle: Vector2, head_radius: f32, color: Color) {
+                d.draw_line_v(root, handle, color);
+                d.draw_circle_v(handle, head_radius, color);
+            }
+            if let Some(CtrlPt1 { c1: (_, c1), c2 }) = pp.ctrls.as_ref() {
+                draw_ctrl_exact(d, p, *c1, 3.0 * zoom_inv, color);
+                if let Some(c2) = c2.as_ref() {
+                    match c2 {
+                        CtrlPt2::Smooth => {
+                            let c2 = c1.reflected_over(p);
+                            d.draw_line_v(p, c2, color.alpha(0.5));
+                            d.draw_ring(c2, 2.0 * zoom_inv, 3.0 * zoom_inv, 0.0, 360.0, 10, color);
+                        }
+                        CtrlPt2::Mirror(s2) => {
+                            let c2 = c1.reflected_to(p, *s2);
+                            d.draw_line_v(p, c2, color.alpha(0.5));
+                            d.draw_ring(c2, zoom_inv, 3.0 * zoom_inv, 0.0, 360.0, 10, color);
+                        }
+                        CtrlPt2::Exact(c2) => {
+                            draw_ctrl_exact(d, p, *c2, 3.0 * zoom_inv, color);
+                        }
                     }
-                    CtrlPoint::Smooth => {
-                        d.draw_line_v(p, c_self_ex, color.alpha(0.5));
-                        d.draw_ring(c_self_ex, 2.0 * zoom_inv, 3.0 * zoom_inv, 0.0, 360.0, 10, color);
-                    }
-                    CtrlPoint::Corner => (),
                 }
             }
             d.draw_circle_v(p, 4.0 * zoom_inv, color);

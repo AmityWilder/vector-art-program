@@ -317,28 +317,41 @@ impl Document {
                     }
 
                     write_u64(&mut writer, points.len() as u64)?;
-                    for PathPoint { c_in, p, c_out } in points.iter_mut() {
-                        if matches!((&c_in, &c_out), (CtrlPoint::Corner | CtrlPoint::Smooth, CtrlPoint::Corner | CtrlPoint::Smooth)) {
-                            (*c_in, *c_out) = (CtrlPoint::Corner, CtrlPoint::Corner);
-                        }
-                        writer.write_all(&[
-                            (match c_in {
-                                CtrlPoint::Corner   => 0,
-                                CtrlPoint::Smooth   => 0b01,
-                                CtrlPoint::Exact(_) => 0b10,
+                    writer.write_all(
+                        &points.chunks(2)
+                            .map(|pair| {
+                                let mut byte = 0u8;
+                                debug_assert!(pair.len() <= 2);
+                                for i in 0..pair.len() {
+                                    byte |= match pair[i].ctrls.as_ref() {
+                                        None => 0,
+                                        Some(CtrlPt1 { c1: (side, _), c2 }) => (match side {
+                                            Ctrl::In  => 0b0000,
+                                            Ctrl::Out => 0b1000,
+                                        }) | (match c2 {
+                                            None                     => 0b001,
+                                            Some(CtrlPt2::Smooth)    => 0b011,
+                                            Some(CtrlPt2::Mirror(_)) => 0b101,
+                                            Some(CtrlPt2::Exact(_))  => 0b111,
+                                        })
+                                    } << (4 * i);
+                                }
+                                byte
                             })
-                            | (match c_out {
-                                CtrlPoint::Corner   => 0,
-                                CtrlPoint::Smooth   => 0b01,
-                                CtrlPoint::Exact(_) => 0b10,
-                            } << 2)
-                        ])?;
-                        if let CtrlPoint::Exact(c_in) = c_in {
-                            write_vector2(&mut writer, c_in)?;
-                        }
-                        write_vector2(&mut writer, p)?;
-                        if let CtrlPoint::Exact(c_out) = c_out {
-                            write_vector2(&mut writer, c_out)?;
+                            .collect::<Box<[u8]>>()
+                    )?;
+
+                    for pp in points.iter_mut() {
+                        write_vector2(&mut writer, &pp.p)?;
+                        if let Some(CtrlPt1 { c1: (_, c1), c2 }) = pp.ctrls.as_ref() {
+                            write_vector2(&mut writer, c1)?;
+                            if let Some(c2) = c2.as_ref() {
+                                match c2 {
+                                    Smooth => (),
+                                    Mirror(s2) => write_f32(&mut writer, *s2)?,
+                                    Exact(c2) => write_vector2(&mut writer, c2)?,
+                                }
+                            }
                         }
                     }
                 }
@@ -512,23 +525,34 @@ impl Document {
                                     }
 
                                     let num_points = read_u64(reader)? as usize;
+                                    let flags = {
+                                        let mut mashed_flags = vec![0u8; num_points / 2 + num_points % 2];
+                                        reader.read_exact(mashed_flags.as_mut_slice())?;
+                                        let mut flags = Vec::with_capacity(num_points);
+                                        for byte in mashed_flags.iter() {
+                                            flags.push(byte & 0b1111);
+                                            if flags.len() < flags.capacity() {
+                                                flags.push((byte >> 4) & 0b1111);
+                                            }
+                                        }
+                                        flags
+                                    };
                                     let mut points = Vec::with_capacity(num_points);
-                                    for _ in 0..num_points {
-                                        let [flags] = read_bytes::<1>(reader)?;
+                                    for byte in flags {
                                         points.push(PathPoint {
-                                            c_in: match flags & 0b11 {
-                                                0b00 => CtrlPoint::Corner,
-                                                0b01 => CtrlPoint::Smooth,
-                                                0b10 => CtrlPoint::Exact(read_vector2(reader)?),
-                                                _ => unreachable!("bitmask restricts possible cases")
-                                            },
                                             p: read_vector2(reader)?,
-                                            c_out: match (flags >> 2) & 0b11 {
-                                                0b00 => CtrlPoint::Corner,
-                                                0b01 => CtrlPoint::Smooth,
-                                                0b10 => CtrlPoint::Exact(read_vector2(reader)?),
-                                                _ => unreachable!("bitmask restricts possible cases")
-                                            },
+                                            ctrls: if byte & 0b001 != 0 {
+                                                Some(CtrlPt1 {
+                                                    c1: (if byte & 0b1000 != 0 { Ctrl::Out } else { Ctrl::In }, read_vector2(reader)?),
+                                                    c2: match byte & 0b111 {
+                                                        0b001 => None,
+                                                        0b011 => Some(CtrlPt2::Smooth),
+                                                        0b101 => Some(CtrlPt2::Mirror(read_f32(reader)?)),
+                                                        0b111 => Some(CtrlPt2::Exact(read_vector2(reader)?)),
+                                                        _ => unreachable!("we did a lot of bitmasks to get here"),
+                                                    },
+                                                })
+                                            } else { None },
                                         });
                                     }
 

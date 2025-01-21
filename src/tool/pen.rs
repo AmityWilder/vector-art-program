@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use crate::{layer::{Layer, LayerType, StrongLayer}, vector_path::path_point::{CtrlPoint, PathPoint}, Document};
+use crate::{layer::{Layer, LayerType, StrongLayer}, vector_path::path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PathPoint}, Document};
 
 use super::ToolType;
 
@@ -42,9 +42,11 @@ impl ToolType for Pen {
             if let Some(anchor) = self.current_anchor.take() {
                 let mut target = self.target.as_ref().expect("`target` should have been set when mouse was pressed").write().expect("error handling not yet implemented");
                 if let Layer::Path(path) = &mut *target {
-                    let mut pp = PathPoint::new(CtrlPoint::Smooth, anchor, CtrlPoint::Exact(mouse_world_pos));
-                    pp.clean_corners(0.001 * 0.001);
-                    path.points.push(pp);
+                    path.points.push(PathPoint {
+                        p: anchor,
+                        ctrls: (anchor.distance_sqr_to(mouse_world_pos) > 0.001 * 0.001)
+                            .then(|| CtrlPt1 { c1: (Ctrl::Out, mouse_world_pos), c2: Some(CtrlPt2::Smooth) })
+                    });
                 }
             } else {
                 println!("warning: pen was released without having been pressed");
@@ -52,7 +54,8 @@ impl ToolType for Pen {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, _document: &Document, mouse_world_pos: Vector2) {
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, mouse_world_pos: Vector2) {
+        let zoom_inv = document.camera.zoom.recip();
         if let Some(target) = self.target.as_ref() {
             let target = target.read().expect("error handling not yet implemented");
             if let Layer::Path(path) = &*target {
@@ -61,34 +64,22 @@ impl ToolType for Pen {
                 match self.current_anchor {
                     Some(p) => {
                         let c_in = p * 2.0 - c_out;
-                        if let Some(PathPoint { c_in: c_in_last, p: p_last, c_out: c_out_last }) = path.points.last() {
-                            d.draw_spline_segment_bezier_cubic(
-                                *p_last,
-                                c_out_last.calculate(p_last, c_in_last),
-                                c_in,
-                                p,
-                                1.0,
-                                layer_color,
-                            );
+                        if let Some(pp_last) = path.points.last() {
+                            let (_, p_last, c_out_last) = pp_last.calculate();
+                            d.draw_spline_segment_bezier_cubic(p_last, c_out_last, c_in, p, zoom_inv, layer_color);
                         }
                         d.draw_line_v(p, c_out, layer_color);
                         d.draw_line_v(p, p * 2.0 - c_out, layer_color);
-                        d.draw_circle_v(c_in, 3.0, layer_color);
-                        d.draw_circle_v(p, 5.0, layer_color);
-                        d.draw_circle_v(c_out, 3.0, layer_color);
+                        d.draw_circle_v(c_in, 3.0 * zoom_inv, layer_color);
+                        d.draw_circle_v(p, 5.0 * zoom_inv, layer_color);
+                        d.draw_circle_v(c_out, 3.0 * zoom_inv, layer_color);
                     }
                     None => {
-                        if let Some(PathPoint { c_in: c_in_last, p: p_last, c_out: c_out_last }) = path.points.last() {
-                            d.draw_spline_segment_bezier_cubic(
-                                *p_last,
-                                c_out_last.calculate(p_last, c_in_last),
-                                c_out,
-                                c_out,
-                                1.0,
-                                layer_color,
-                            );
+                        if let Some(pp_last) = path.points.last() {
+                            let (_, p_last, c_out_last) = pp_last.calculate();
+                            d.draw_spline_segment_bezier_cubic(p_last, c_out_last, c_out, c_out, zoom_inv, layer_color);
                         }
-                        d.draw_circle_v(c_out, 3.0, layer_color);
+                        d.draw_circle_v(c_out, 3.0 * zoom_inv, layer_color);
                     }
                 }
             }

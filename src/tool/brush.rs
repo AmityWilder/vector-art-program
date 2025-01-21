@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use raylib::prelude::*;
-use crate::{layer::{Layer, LayerType, StrongLayer}, vector_path::path_point::{CtrlPoint, DistanceSqr, PathPoint}, Document};
+use crate::{layer::{LayerType, StrongLayer}, vector_path::path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PathPoint}, Document};
 use super::ToolType;
 
 struct Trail2ndDerivDebugData {
@@ -28,9 +28,11 @@ pub struct Brush {
     /// If there is a layer, it must not die before the pen dies.
     pub target: Option<StrongLayer>,
 
-    /// [`Some`] while dragging, [`None`] otherwise. \
+    /// History of confirmed positions \
     /// (Position, Exit velocity)
     trail: Vec<(Vector2, Vector2)>,
+    /// Gets updated every time distance is changed enough, regardless of anything else
+    short_term_memory: VecDeque<Vector2>,
 
     trail_debug: Option<TrailDebugData>,
 
@@ -45,6 +47,7 @@ impl Brush {
         Self {
             target: None,
             trail: Vec::new(),
+            short_term_memory: VecDeque::with_capacity(64),
             trail_debug: None,
             last_failing: None,
             layer_color: Color::default(),
@@ -134,6 +137,13 @@ impl ToolType for Brush {
                 self.trail_debug = None;
             }
 
+            if self.short_term_memory.back().is_none_or(|last| last.distance_sqr_to(new_pos) > 0.01) {
+                if self.short_term_memory.len() == self.short_term_memory.capacity() {
+                    self.short_term_memory.pop_front();
+                }
+                self.short_term_memory.push_back(new_pos);
+            }
+
             if should_add_point {
                 let pos = self.last_failing.take().unwrap_or(new_pos);
                 self.add_trail_point(pos, mouse_world_delta);
@@ -160,9 +170,10 @@ impl ToolType for Brush {
                 self.trail[i].1 = self.trail[i].1.normalized() * (slice.iter().copied().fold(0.0, |acc, (_p, v)| acc + v.length_sqr()) * inv_len).sqrt();
             }
 
-            path.points = self.trail.iter().map(|(p, _v)| PathPoint::new(CtrlPoint::Corner, *p, CtrlPoint::Corner)).collect();
-
-            // using a heuristic because wow this is hard
+            path.points.reserve(self.trail.len());
+            if let Some((p, _v)) = self.trail.first().copied() {
+                path.points.push(PathPoint { p, ctrls: None });
+            }
             for i in 1..self.trail.len() - 1 {
                 let (prev, _) = self.trail[i - 1];
                 let (curr, _) = self.trail[i];
@@ -170,14 +181,21 @@ impl ToolType for Brush {
                 let speed_in  = (curr - prev).length();
                 let speed_out = (next - curr).length();
                 let t_hat = (next - prev).normalized();
-                let c_in  = curr - t_hat * speed_in  / 3.0;
                 let c_out = curr + t_hat * speed_out / 3.0;
-                path.points[i].c_out = CtrlPoint::Exact(c_out);
-                path.points[i].c_in  = CtrlPoint::Exact(c_in);
+                path.points.push(PathPoint {
+                    p: curr,
+                    ctrls: Some(CtrlPt1 {
+                        c1: (Ctrl::Out, c_out),
+                        c2: Some(CtrlPt2::Mirror(speed_in / 3.0)),
+                    })
+                });
             }
-
+            if let Some((p, _v)) = self.trail.last().copied() {
+                path.points.push(PathPoint { p, ctrls: None });
+            }
             self.last_failing = None;
             self.trail.clear();
+            self.short_term_memory.clear();
         }
     }
 
@@ -196,6 +214,9 @@ impl ToolType for Brush {
             if SHOW_DEBUG {
                 d.draw_line_v(p, p + v, self.layer_color.alpha(0.5));
             }
+        }
+        for p in self.short_term_memory.iter() {
+            d.draw_circle_v(p, 3.0 * inv_zoom, Color::YELLOW);
         }
 
         if SHOW_DEBUG {

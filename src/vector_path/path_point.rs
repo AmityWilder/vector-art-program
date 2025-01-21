@@ -1,29 +1,25 @@
 use raylib::prelude::*;
-
 use super::mat2::Matrix2x2;
-
-#[derive(Debug)]
-pub enum CtrlPoint {
-    /// Described by a position in the world
-    Exact(Vector2),
-
-    /// Control mirrors opposite control
-    ///
-    /// If opposite control is not `Exact`, treat this control like `Corner`
-    Smooth,
-
-    /// Control is identical to anchor
-    Corner,
-}
-
-pub use CtrlPoint::*;
 
 pub trait ReflectVector {
     fn reflected_over(&self, across: Self) -> Self;
+    fn reflected_to(&self, across: Self, length: f32) -> Self;
 }
 impl ReflectVector for Vector2 {
     fn reflected_over(&self, across: Self) -> Self {
-        across * 2.0 - *self
+        Self {
+            x: across.x * 2.0 - self.x,
+            y: across.y * 2.0 - self.y,
+        }
+    }
+
+    fn reflected_to(&self, across: Self, mut length: f32) -> Self {
+        let delta = *self - across;
+        length /= delta.length();
+        Self {
+            x: across.x - length * delta.x,
+            y: across.y - length * delta.y,
+        }
     }
 }
 pub trait DistanceSqr {
@@ -35,73 +31,77 @@ impl DistanceSqr for Vector2 {
     }
 }
 
-impl CtrlPoint {
-    pub fn calculate(&self, p: &Vector2, c_opp: &CtrlPoint) -> Vector2 {
-        match (self, c_opp) {
-            (&Exact(c), _) => c,
-            (Corner, _) | (Smooth, Smooth | Corner) => *p,
-            (Smooth, &Exact(c_opp)) => c_opp.reflected_over(*p),
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Ctrl {
+    In,
+    Out,
+}
+
+impl Ctrl {
+    pub const fn opposite(self) -> Self {
+        match self {
+            Ctrl::In  => Ctrl::Out,
+            Ctrl::Out => Ctrl::In,
         }
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum PPPart {
+    Ctrl(Ctrl),
+    Anchor,
+}
+
+#[derive(Debug, Clone)]
+pub enum CtrlPt2 {
+    Smooth,
+    Mirror(f32),
+    Exact(Vector2),
+}
+
+pub use CtrlPt2::*;
+
+#[derive(Debug, Clone)]
+pub struct CtrlPt1 {
+    pub c1: (Ctrl, Vector2),
+    pub c2: Option<CtrlPt2>,
+}
+
+#[derive(Debug, Clone)]
 pub struct PathPoint {
-    pub c_in: CtrlPoint,
     pub p: Vector2,
-    pub c_out: CtrlPoint,
+    pub ctrls: Option<CtrlPt1>,
 }
 
 impl PathPoint {
-    pub fn new(c_in: CtrlPoint, p: Vector2, c_out: CtrlPoint) -> Self {
-        Self { c_in, p, c_out }
-    }
-
-    /// Convert control points into world positions
-    pub fn calculated(&self) -> (Vector2, Vector2, Vector2) {
-        let p = self.p;
-        let (c_in, c_out) = match (&self.c_in, &self.c_out) {
-            (&Exact(c_in), &Exact(c_out)) => (c_in, c_out),
-            (&Exact(c_in), Smooth) => (c_in, c_in.reflected_over(p)),
-            (&Exact(c_in), Corner) => (c_in, p),
-            (Smooth, &Exact(c_out)) => (c_out.reflected_over(p), c_out),
-            (Corner, &Exact(c_out)) => (p, c_out),
-            (Corner | Smooth, Corner | Smooth) => (p, p),
+    pub fn calculate(&self) -> (Vector2, Vector2, Vector2) {
+        let (c_in, c_out) = match &self.ctrls {
+            Some(CtrlPt1 { c1: (c1_side, c1), c2 }) => {
+                let c_opp = match &c2 {
+                    None => self.p,
+                    Some(CtrlPt2::Smooth) => c1.reflected_over(self.p),
+                    Some(CtrlPt2::Mirror(s2)) => c1.reflected_to(self.p, *s2),
+                    Some(CtrlPt2::Exact(c2)) => *c2,
+                };
+                match c1_side {
+                    Ctrl::In  => (*c1, c_opp),
+                    Ctrl::Out => (c_opp, *c1),
+                }
+            }
+            None => (self.p, self.p),
         };
-        (c_in, p, c_out)
-    }
 
-    /// Replace `c_in` and `c_out` with `Corner` if they are closer to `p` than `snap_radius_sqr.sqrt()` pixels
-    pub fn clean_corners(&mut self, snap_radius_sqr: f32) {
-        if let Exact(c_in) = self.c_in {
-            if c_in.distance_sqr_to(self.p) < snap_radius_sqr {
-                self.c_in = Corner;
-                if matches!(self.c_out, Smooth) {
-                    self.c_out = Corner;
-                    return; // both have been set
-                }
-            }
-        }
-
-        if let Exact(c_out) = self.c_out {
-            if c_out.distance_sqr_to(self.p) < snap_radius_sqr {
-                self.c_out = Corner;
-                if matches!(self.c_out, Smooth) {
-                    self.c_in = Corner;
-                }
-            }
-        }
+        (c_in, self.p, c_out)
     }
 
     /// Translate the point and controls while keeping the controls' relative positions
     pub fn move_point(&mut self, delta: Vector2) {
-        if let Exact(c_in) = &mut self.c_in {
-            *c_in += delta;
-        }
-
         self.p += delta;
-
-        if let Exact(c_out) = &mut self.c_out {
-            *c_out += delta;
+        if let Some(CtrlPt1 { c1: (_, c1), c2 }) = self.ctrls.as_mut() {
+            *c1 += delta;
+            if let Some(Exact(c2)) = c2.as_mut() {
+                *c2 += delta;
+            }
         }
     }
 
@@ -110,15 +110,7 @@ impl PathPoint {
         self.move_point(p - self.p);
     }
 
-    pub fn transform(&mut self, mat: Matrix2x2) {
-        if let Exact(c_in) = &mut self.c_in {
-            *c_in = mat * *c_in;
-        }
-
-        self.p = mat * self.p;
-
-        if let Exact(c_out) = &mut self.c_out {
-            *c_out = mat * *c_out;
-        }
+    pub fn transform(&mut self, _mat: Matrix2x2) {
+        todo!("im not updating this anymore until it gets used")
     }
 }
