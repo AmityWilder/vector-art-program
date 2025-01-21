@@ -29,7 +29,7 @@ impl LayerType for Raster {
         // todo
     }
 
-    fn draw_selected(&self, _d: &mut impl RaylibDraw) {
+    fn draw_selected(&self, _d: &mut impl RaylibDraw, _camera: &Camera2D, _zoom_inv: f32) {
         // todo
     }
 }

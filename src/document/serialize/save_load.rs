@@ -1,7 +1,11 @@
 use std::{fs::File, io::{self, BufRead, BufReader, BufWriter, Read, Write}, path::Path, sync::{Arc, RwLock}};
 use raylib::prelude::*;
 use crate::{
-    document::{artboard::ArtBoard, layer::*, Document},
+    document::{
+        artboard::{ArtBoard, IntRect2},
+        layer::*,
+        Document,
+    },
     appearance::*,
     layer::{
         tree::*,
@@ -15,8 +19,6 @@ use crate::{
         VectorPath,
     }
 };
-
-use super::artboard::IntRect2;
 
 /// Previous formats are structurally incompatible and cannot be converted \
 /// ex: previous versions lack the necessary data to accurately reconstruct them, or rely on removed features
@@ -555,59 +557,5 @@ impl Document {
         } else {
             Err(io::Error::other("version so new i dont know how to read the number"))
         }
-    }
-
-    pub fn export_svg(&self, path: impl AsRef<Path>, artboard: usize) -> io::Result<()> {
-        let mut svg = BufWriter::new(File::create(path)?);
-        let artboard = self.artboards.get(artboard).ok_or_else(|| io::Error::other("invalid artboard index"))?.rect;
-        // let top_left = Vector2::new(artboard.x as f32, artboard.y as f32);
-        writeln!(&mut svg, "<svg width=\"{}\" height=\"{}\" xmlns=\"http://www.w3.org/2000/svg\">", artboard.width, artboard.height)?;
-        // "<path d=\"M Z\" fill=\"{}\" stroke=\"{}\" stroke-width=\"{}\" />";
-        svg.write_all(b"</svg>")?;
-        Err(io::Error::other("under construction"))
-    }
-
-    pub fn render_png(&self, path: impl AsRef<Path>, artboard: usize, mut rl: &mut RaylibHandle, thread: &RaylibThread) -> io::Result<()> {
-        const SUPERSAMPLE_FACTOR: u32 = 8;
-        let is_supersampled = true;
-        let artboard = self.artboards.get(artboard).ok_or_else(|| io::Error::other("invalid artboard index"))?.rect;
-        let filename = path.as_ref().to_str().ok_or_else(|| io::Error::other("could not convert path to &str"))?;
-
-        let mut rtex = rl.load_render_texture(
-            &thread,
-            if is_supersampled { artboard.width  as u32 * SUPERSAMPLE_FACTOR } else { artboard.width  as u32 },
-            if is_supersampled { artboard.height as u32 * SUPERSAMPLE_FACTOR } else { artboard.height as u32 },
-        ).map_err(|e| io::Error::other(e))?;
-
-        let camera = Camera2D {
-            offset: Vector2::zero(),
-            target: Vector2::new(
-                artboard.x as f32,
-                artboard.y as f32,
-            ),
-            rotation: 0.0,
-            zoom: if is_supersampled { SUPERSAMPLE_FACTOR as f32 } else { 1.0 },
-        };
-
-        {
-            let mut d = rl.begin_texture_mode(&thread, &mut rtex);
-            d.clear_background(Color::BLANK);
-            {
-                let mut d = d.begin_mode2D(camera);
-                for (layer, _depth) in self.layers.tree_iter(LayerIterDir::BackToFore, |g| !g.settings.is_hidden) {
-                    let layer = layer.read().map_err(|e| io::Error::other(format!("layer {:?} is poisoned", e.get_ref().settings().name)))?;
-                    layer.draw_rendered(&mut d);
-                }
-            }
-        }
-
-        let mut image = rtex.load_image().map_err(|e| io::Error::other(e))?;
-        if is_supersampled {
-            image.resize(artboard.width, artboard.height);
-        };
-        image.flip_vertical();
-        image.export_image(filename);
-
-        Ok(())
     }
 }

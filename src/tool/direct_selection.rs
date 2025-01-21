@@ -110,7 +110,10 @@ pub const SNAP_VERT_RADIUS: f32 = HOVER_RADIUS * 0.5;
 pub const SNAP_VERT_RADIUS_SQR: f32 = SNAP_VERT_RADIUS * SNAP_VERT_RADIUS;
 
 impl ToolType for DirectSelection {
-    fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2) {
+    fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2, _mouse_world_delta: Vector2) {
+        let zoom_inv = document.camera.zoom.recip();
+        let hover_radius_sqr = HOVER_RADIUS_SQR * zoom_inv * zoom_inv;
+        let snap_vert_radius_sqr = SNAP_VERT_RADIUS_SQR * zoom_inv * zoom_inv;
         if let Some(hover) = self.hovered.as_mut() {
             if !hover.is_dragging && rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
                 // - clone
@@ -174,19 +177,19 @@ impl ToolType for DirectSelection {
                                             PointPart::Point => unreachable!(),
                                         };
                                         if let CtrlPoint::Exact(c_self_ex) = &c_self {
-                                            if c_self_ex.distance_sqr_to(pp.p) <= SNAP_VERT_RADIUS_SQR {
+                                            if c_self_ex.distance_sqr_to(pp.p) <= snap_vert_radius_sqr {
                                                 // snap to corner
                                                 *c_self = CtrlPoint::Corner;
                                                 match &c_opp {
                                                     // different enough to stay distinct
-                                                    CtrlPoint::Exact(c_opp_ex) if c_opp_ex.distance_to(pp.p) > SNAP_VERT_RADIUS_SQR => (),
+                                                    CtrlPoint::Exact(c_opp_ex) if c_opp_ex.distance_to(pp.p) > snap_vert_radius_sqr => (),
 
                                                     _ => *c_opp = CtrlPoint::Corner,
                                                 }
                                             } else if let CtrlPoint::Exact(c_opp_ex) = &c_opp {
                                                 // snap to smooth
                                                 let c_self_smooth = c_opp_ex.reflected_over(pp.p);
-                                                if c_self_ex.distance_sqr_to(c_self_smooth) <= SNAP_VERT_RADIUS_SQR {
+                                                if c_self_ex.distance_sqr_to(c_self_smooth) <= snap_vert_radius_sqr {
                                                     *c_self = CtrlPoint::Smooth;
                                                 }
                                             }
@@ -251,7 +254,7 @@ impl ToolType for DirectSelection {
                                 path.points.iter()
                                     .enumerate()
                                     .find_map(|(i, point)| {
-                                        ((point.p - mouse_world_pos).length_sqr() <= HOVER_RADIUS_SQR)
+                                        ((point.p - mouse_world_pos).length_sqr() <= hover_radius_sqr)
                                             .then(|| Hover::path_vert(layer_rc.clone(), i, PointPart::Point))
                                             .or_else(||
                                                 match point.c_in {
@@ -259,7 +262,7 @@ impl ToolType for DirectSelection {
                                                     CtrlPoint::Smooth => Some(point.c_in.calculate(&point.p, &point.c_out)),
                                                     CtrlPoint::Corner => None,
                                                 }.and_then(|c_in|
-                                                    ((c_in - mouse_world_pos).length_sqr() <= HOVER_RADIUS_SQR)
+                                                    ((c_in - mouse_world_pos).length_sqr() <= hover_radius_sqr)
                                                         .then(|| Hover::path_vert(layer_rc.clone(), i, PointPart::CtrlIn))
                                                 )
                                             )
@@ -269,7 +272,7 @@ impl ToolType for DirectSelection {
                                                     CtrlPoint::Smooth => Some(point.c_out.calculate(&point.p, &point.c_in)),
                                                     CtrlPoint::Corner => None,
                                                 }.and_then(|c_out|
-                                                    ((c_out - mouse_world_pos).length_sqr() <= HOVER_RADIUS_SQR)
+                                                    ((c_out - mouse_world_pos).length_sqr() <= hover_radius_sqr)
                                                         .then(|| Hover::path_vert(layer_rc.clone(), i, PointPart::CtrlOut))
                                                 )
                                             )
@@ -290,7 +293,9 @@ impl ToolType for DirectSelection {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, _document: &Document, _mouse_world_pos: Vector2) {
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, _mouse_world_pos: Vector2) {
+        let zoom_inv = document.camera.zoom.recip();
+        let snap_vert_radius_sqr = SNAP_VERT_RADIUS_SQR * zoom_inv * zoom_inv;
         if let Some(HoverOrDrag { hover, is_dragging }) = &self.hovered {
             match hover {
                 Hover::Group(GroupHover { group_layer }) => {
@@ -310,7 +315,7 @@ impl ToolType for DirectSelection {
                             const C_OUT_COLOR: Color = Color::DODGERBLUE;
                             let pp = &path.points[*point];
                             if matches!(part, PointPart::Point) {
-                                d.draw_circle_v(pp.p, HOVER_RADIUS, P_COLOR);
+                                d.draw_circle_v(pp.p, HOVER_RADIUS * zoom_inv, P_COLOR);
                             } else {
                                 let (c_self, c_opp, color) = match part {
                                     PointPart::CtrlIn  => (&pp.c_in, &pp.c_out, C_IN_COLOR),
@@ -321,24 +326,24 @@ impl ToolType for DirectSelection {
                                     &CtrlPoint::Exact(mut c_self) => {
                                         if *is_dragging {
                                             // preview snap
-                                            if c_self.distance_sqr_to(pp.p) <= SNAP_VERT_RADIUS_SQR {
+                                            if c_self.distance_sqr_to(pp.p) <= snap_vert_radius_sqr {
                                                 c_self = pp.p;
                                             } else if let CtrlPoint::Exact(c_opp) = c_opp {
                                                 let c_self_smooth = c_opp.reflected_over(pp.p);
-                                                if c_self.distance_sqr_to(c_self_smooth) <= SNAP_VERT_RADIUS_SQR {
+                                                if c_self.distance_sqr_to(c_self_smooth) <= snap_vert_radius_sqr {
                                                     c_self = c_self_smooth;
                                                 }
                                                 d.draw_line_v(pp.p, c_self_smooth, color.alpha(0.5));
-                                                d.draw_ring(c_self_smooth, SNAP_VERT_RADIUS - 1.0, SNAP_VERT_RADIUS, 0.0, 360.0, 10, color.alpha(0.5));
+                                                d.draw_ring(c_self_smooth, (SNAP_VERT_RADIUS - 1.0) * zoom_inv, SNAP_VERT_RADIUS * zoom_inv, 0.0, 360.0, 10, color.alpha(0.5));
                                             }
                                         }
-                                        d.draw_circle_v(c_self, if !is_dragging { HOVER_RADIUS } else { SNAP_VERT_RADIUS }, color);
+                                        d.draw_circle_v(c_self, if !is_dragging { HOVER_RADIUS } else { SNAP_VERT_RADIUS } * zoom_inv, color);
                                     }
 
                                     CtrlPoint::Smooth => {
                                         let CtrlPoint::Exact(c_opp) = c_opp else { panic!("should not hover smooth opposite of non-exact") };
                                         let c_self_smooth = c_opp.reflected_over(pp.p);
-                                        d.draw_circle_v(c_self_smooth, if !is_dragging { HOVER_RADIUS } else { SNAP_VERT_RADIUS }, color);
+                                        d.draw_circle_v(c_self_smooth, if !is_dragging { HOVER_RADIUS } else { SNAP_VERT_RADIUS } * zoom_inv, color);
                                     }
 
                                     CtrlPoint::Corner => panic!("should not hover corner"),

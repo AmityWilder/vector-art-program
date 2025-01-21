@@ -1,7 +1,7 @@
 use std::time::Instant;
-
 use layer::{group::Group, tree::LayerIterDir, Layer, LayerType};
 use raylib::prelude::*;
+use serialize::render_png::DownscaleAlgorithm;
 // use rand::prelude::*;
 use ui::panel::{Panel, Rect2, UIBox};
 
@@ -76,7 +76,6 @@ fn main() {
         0.5 * (document.artboards[0].rect.width  - rl.get_screen_width ()) as f32,
         0.5 * (document.artboards[0].rect.height - rl.get_screen_height()) as f32,
     );
-    // _ = document.create_group(None, None);
 
     let mut is_trim_view = false;
     let mut trim_rtex = rl.load_render_texture(&thread, rl.get_screen_width() as u32, rl.get_screen_height() as u32).unwrap();
@@ -94,6 +93,14 @@ fn main() {
     );
     document.update_layer_tree_recs(&layers_panel.panel.rec_cache.into());
 
+    const MIN_ZOOM_EXP: i32 = -3;
+    #[allow(non_snake_case)]
+    let MIN_ZOOM: f32 = 2.0f32.powi(MIN_ZOOM_EXP);
+
+    const MAX_ZOOM_EXP: i32 = 6;
+    #[allow(non_snake_case)]
+    let MAX_ZOOM: f32 = 2.0f32.powi(MAX_ZOOM_EXP);
+
     while !rl.window_should_close() {
         let mouse_screen_pos = rl.get_mouse_position();
         let mouse_screen_delta = rl.get_mouse_delta();
@@ -106,7 +113,7 @@ fn main() {
         if (is_pressing_s || is_pressing_o || is_pressing_p || is_pressing_r) && is_holding_ctrl {
             if is_pressing_r {
                 // cannot be done without blocking
-                match document.render_png("test.png", 0, &mut rl, &thread) {
+                match document.render_png("test.png", 0, &mut rl, &thread, Some(DownscaleAlgorithm::Bicubic), Color::WHITE) {
                     Ok(()) => println!("file rendered successfully"),
                     Err(e) => println!("failed to render file: {e}"),
                 }
@@ -169,6 +176,7 @@ fn main() {
         }
 
         let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, document.camera);
+        let mouse_world_delta = mouse_screen_delta / document.camera.zoom;
 
         if rl.is_window_resized() {
             let (width, height) = (
@@ -204,9 +212,9 @@ fn main() {
             if is_zooming {
                 const ZOOM_SPEED: f32 = 1.5;
                 let amount = rl.get_mouse_wheel_move();
-                if amount > 0.0 && document.camera.zoom < 16.0 {
+                if amount > 0.0 && document.camera.zoom < MAX_ZOOM {
                     document.camera.zoom *= ZOOM_SPEED;
-                } else if amount < 0.0 && document.camera.zoom > 0.125 {
+                } else if amount < 0.0 && document.camera.zoom > MIN_ZOOM {
                     document.camera.zoom /= ZOOM_SPEED;
                 }
             }
@@ -223,7 +231,7 @@ fn main() {
         if layers_panel.panel.is_overlapping_point(mouse_screen_pos) {
             layers_panel.tick(&mut rl, &mut document, mouse_screen_pos);
         } else {
-            current_tool.tick(&mut rl, &mut document, mouse_world_pos);
+            current_tool.tick(&mut rl, &mut document, mouse_world_pos, mouse_world_delta);
         }
 
         if rl.is_key_pressed(KeyboardKey::KEY_T) {
@@ -316,7 +324,7 @@ fn main() {
                 match current_tool {
                     Tool::DirectSelection(_) => {
                         for (layer, _depth) in document.layers.tree_iter(LayerIterDir::BackToFore, |g| !g.settings.is_locked) {
-                            layer.read().expect("error handling not yet implemented").draw_selected(&mut d);
+                            layer.read().expect("error handling not yet implemented").draw_selected(&mut d, &document.camera, document.camera.zoom.recip());
                         }
                     }
                     _ => (),

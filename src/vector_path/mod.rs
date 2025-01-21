@@ -76,14 +76,14 @@ impl LayerType for VectorPath {
         }
     }
 
-    fn draw_selected(&self, d: &mut impl RaylibDraw) {
+    fn draw_selected(&self, d: &mut impl RaylibDraw, _camera: &Camera2D, zoom_inv: f32) {
         let color = self.settings.color;
         for window in self.points.windows(2) {
             let [pp1, pp2] = window else { unreachable!("window of 2 should have 2 elements") };
             let (p1, p2) = (pp1.p, pp2.p);
             let c1_out = pp1.c_out.calculate(&p1, &pp1.c_in);
             let c2_in = pp2.c_in.calculate(&p2, &pp2.c_out);
-            d.draw_spline_segment_bezier_cubic(p1, c1_out, c2_in, p2, 1.0, color);
+            d.draw_spline_segment_bezier_cubic(p1, c1_out, c2_in, p2, 1.0 * zoom_inv, color);
         }
         for pp in &self.points {
             let (c_in, p, c_out) = pp.calculated();
@@ -91,16 +91,16 @@ impl LayerType for VectorPath {
                 match c_self {
                     CtrlPoint::Exact(_) => {
                         d.draw_line_v(p, c_self_ex, color);
-                        d.draw_circle_v(c_self_ex, 3.0, color);
+                        d.draw_circle_v(c_self_ex, 3.0 * zoom_inv, color);
                     }
                     CtrlPoint::Smooth => {
                         d.draw_line_v(p, c_self_ex, color.alpha(0.5));
-                        d.draw_ring(c_self_ex, 2.0, 3.0, 0.0, 360.0, 10, color);
+                        d.draw_ring(c_self_ex, 2.0 * zoom_inv, 3.0 * zoom_inv, 0.0, 360.0, 10, color);
                     }
                     CtrlPoint::Corner => (),
                 }
             }
-            d.draw_circle_v(p, 4.0, color);
+            d.draw_circle_v(p, 4.0 * zoom_inv, color);
         }
     }
 }
