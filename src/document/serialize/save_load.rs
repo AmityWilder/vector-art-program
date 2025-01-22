@@ -1,5 +1,6 @@
-use std::{fs::File, io::{self, BufRead, BufReader, BufWriter, Read, Write}, path::Path, sync::{Arc, RwLock}};
+use std::{collections::VecDeque, fs::File, io::{self, BufRead, BufReader, BufWriter, Read, Write}, path::Path};
 use raylib::prelude::*;
+use rc::StrongLayerMut;
 use crate::{
     document::{
         artboard::{ArtBoard, IntRect2},
@@ -188,8 +189,8 @@ impl Document {
 
         // layers
         writer.write_all(&(layers.len() as u64).to_le_bytes())?;
-        for (layer, _depth) in layers.tree_iter(LayerIterDir::default(), |_| true) {
-            let mut layer = layer.write().map_err(|e| io::Error::other(format!("layer {:?} poisoned", e.get_ref().settings().name)))?;
+        for (mut layer, _depth) in layers.tree_iter_mut(LayerIterDir::default(), |_| true) {
+            let mut layer = layer.write();
 
             // settings
             {
@@ -318,7 +319,7 @@ impl Document {
 
                     write_u64(&mut writer, points.len() as u64)?;
                     writer.write_all(
-                        &points.chunks(2)
+                        &points.make_contiguous().chunks(2)
                             .map(|pair| {
                                 let mut byte = 0u8;
                                 debug_assert!(pair.len() <= 2);
@@ -448,7 +449,7 @@ impl Document {
                         };
 
                         let [layer_type] = read_bytes::<1>(reader)?;
-                        tree.push(Arc::new(RwLock::new(
+                        tree.push(StrongLayerMut::new(
                             match layer_type {
                                 b'g' => {
                                     Layer::Group(Group {
@@ -537,9 +538,9 @@ impl Document {
                                         }
                                         flags
                                     };
-                                    let mut points = Vec::with_capacity(num_points);
+                                    let mut points = VecDeque::with_capacity(num_points);
                                     for byte in flags {
-                                        points.push(PathPoint {
+                                        points.push_back(PathPoint {
                                             p: read_vector2(reader)?,
                                             ctrls: if byte & 0b001 != 0 {
                                                 Some(CtrlPt1 {
@@ -569,7 +570,7 @@ impl Document {
 
                                 x => Err(io::Error::other(format!("unknown layer type: {x:?}")))?,
                             }
-                        )))
+                        ))
                     }
 
                     Ok(tree)

@@ -29,14 +29,14 @@ impl LayerType for Group {
     }
 
     fn draw_rendered(&self, d: &mut impl RaylibDraw) {
-        for layer in self.items.iter() {
-            layer.read().expect("error handling not yet implemented").draw_rendered(d);
+        for item in self.items.iter() {
+            item.read().draw_rendered(d);
         }
     }
 
     fn draw_selected(&self, d: &mut impl RaylibDraw, camera: &Camera2D, zoom_inv: f32) {
-        for layer in self.items.iter() {
-            layer.read().expect("error handling not yet implemented").draw_selected(d, camera, zoom_inv);
+        for item in self.items.iter() {
+            item.read().draw_selected(d, camera, zoom_inv);
         }
     }
 }

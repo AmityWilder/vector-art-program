@@ -1,7 +1,7 @@
-use std::sync::{Arc, RwLock, Weak};
 use raylib::prelude::*;
 use crate::{appearance::Blending, raster::Raster, vector_path::VectorPath};
 
+pub mod rc;
 pub mod group;
 pub mod tree;
 
@@ -16,9 +16,6 @@ pub const LAYER_HEIGHT: f32 = 2.0 * THUMBNAIL_INSET + THUMBNAIL_SIZE;
 pub const LAYER_COLOR_WIDTH: f32 = 4.0;
 pub const TEXT_FONT_SIZE: f32 = 10.0;
 pub const EXPAND_COLLAPSE_SIZE: f32 = 10.0;
-
-pub type StrongLayer = Arc<RwLock<Layer>>;
-pub type WeakLayer = Weak<RwLock<Layer>>;
 
 pub struct LayerSettings {
     pub slot_rec: Rectangle,

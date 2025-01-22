@@ -1,16 +1,16 @@
 use std::{collections::VecDeque, ops::{Deref, DerefMut}};
 use raylib::prelude::*;
 use crate::layer::{group::Group, Layer, LayerType, GAP};
-use super::StrongLayer;
+use super::rc::*;
 
 /// Front is background (bottom in layer panel) \
 /// Back is foreground (top in layer panel)
 ///
 /// Use `tree_iter()` to iterate recursively, `iter()` will only iterate over the current depth.
-pub struct LayerTree(Vec<StrongLayer>);
+pub struct LayerTree(Vec<StrongLayerMut>);
 
 impl Deref for LayerTree {
-    type Target = Vec<StrongLayer>;
+    type Target = Vec<StrongLayerMut>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -54,11 +54,39 @@ impl<P: Fn(&Group) -> bool> Iterator for LayerTreeIter<P> {
         self.queue
             .pop_front()
             .map(|(layer, depth)| {
-                if let Layer::Group(group) = &*layer.read().expect("error handling not yet implemented") {
+                if let Layer::Group(group) = &*layer.read() {
                     if (self.should_recurs)(group) {
                         self.queue.reserve(group.items.0.len());
                         let new_depth = depth + 1;
                         let items = group.items.0.iter().map(|item| (item.clone(), new_depth));
+                        match self.dir {
+                            LayerIterDir::ForeToBack => for item in items       { self.queue.push_front(item); },
+                            LayerIterDir::BackToFore => for item in items.rev() { self.queue.push_front(item); }
+                        }
+                    }
+                }
+                (layer, depth)
+            })
+    }
+}
+
+pub struct LayerTreeIterMut<P: Fn(&Group) -> bool> {
+    queue: VecDeque<(StrongLayerMut, usize)>,
+    dir: LayerIterDir,
+    should_recurs: P,
+}
+
+impl<P: Fn(&Group) -> bool> Iterator for LayerTreeIterMut<P> {
+    type Item = (StrongLayerMut, usize);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.queue
+            .pop_front()
+            .map(|(layer, depth)| {
+                if let Layer::Group(group) = &*layer.read() {
+                    if (self.should_recurs)(group) {
+                        self.queue.reserve(group.items.0.len());
+                        let new_depth = depth + 1;
+                        let items = group.items.0.iter().map(|item| (item.clone_mut(), new_depth));
                         match self.dir {
                             LayerIterDir::ForeToBack => for item in items       { self.queue.push_front(item); },
                             LayerIterDir::BackToFore => for item in items.rev() { self.queue.push_front(item); }
@@ -147,6 +175,20 @@ impl LayerTree {
         }
     }
 
+    /// See [`Self::tree_iter`]
+    pub fn tree_iter_mut<P: Fn(&Group) -> bool>(&mut self, dir: LayerIterDir, should_recurs: P) -> LayerTreeIterMut<P> {
+        let items = self.0.iter().map(|item| (item.clone_mut(), 0));
+        let queue = match dir {
+            LayerIterDir::ForeToBack => VecDeque::from_iter(items.rev()),
+            LayerIterDir::BackToFore => VecDeque::from_iter(items),
+        };
+        LayerTreeIterMut {
+            queue,
+            dir,
+            should_recurs,
+        }
+    }
+
     pub fn update_ui_recs(&mut self, container: &Rectangle, mut top: f32) {
         use super::{
             INDENT,
@@ -157,8 +199,8 @@ impl LayerTree {
             TEXT_FONT_SIZE,
             EXPAND_COLLAPSE_SIZE,
         };
-        for (layer, depth) in self.tree_iter(LayerIterDir::TopToBot, |group| group.is_expanded) {
-            let mut layer = layer.write().expect("error handling not yet implemented");
+        for (mut layer, depth) in self.tree_iter_mut(LayerIterDir::TopToBot, |group| group.is_expanded) {
+            let mut layer = layer.write();
             let settings = layer.settings_mut();
             let indent_size = depth as f32 * INDENT;
             let left = container.x + indent_size;

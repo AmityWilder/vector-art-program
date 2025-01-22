@@ -51,7 +51,7 @@ impl Document {
             {
                 let mut d = d.begin_mode2D(camera);
                 for (layer, _depth) in self.layers.tree_iter(LayerIterDir::BackToFore, |g| !g.settings.is_hidden) {
-                    let layer = layer.read().map_err(|e| io::Error::other(format!("layer {:?} is poisoned", e.get_ref().settings().name)))?;
+                    let layer = layer.read();
                     layer.draw_rendered(&mut d);
                 }
             }

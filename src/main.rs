@@ -1,9 +1,9 @@
 use std::time::Instant;
-use layer::{group::Group, tree::LayerIterDir, Layer, LayerType};
+use layer::{tree::LayerIterDir, LayerType};
 use raylib::prelude::*;
 use serialize::render_png::DownscaleAlgorithm;
 // use rand::prelude::*;
-use ui::panel::{Panel, Rect2, UIBox};
+use ui::{panel::{Panel, Rect2, UIBox}, specialized::layers_panel::LayersPanel};
 
 pub mod vector_path;
 pub mod raster;
@@ -11,42 +11,36 @@ pub mod stack;
 pub mod appearance;
 pub mod document;
 pub mod tool;
+pub mod engine;
+pub mod editor;
 pub mod ui;
 
 use self::{document::*, tool::*};
 
-pub struct LayersPanel {
-    pub panel: Panel,
-}
-
-impl LayersPanel {
-    pub const fn new(panel: Panel) -> Self {
-        Self {
-            panel,
+fn handle_serialization_if_requested(
+    rl: &mut RaylibHandle,
+    thread: &RaylibThread,
+    document: &mut Document,
+    mouse_screen_pos: Vector2,
+) {
+    if rl.is_key_down(KeyboardKey::KEY_LEFT_CONTROL) || rl.is_key_down(KeyboardKey::KEY_RIGHT_CONTROL) {
+        let start = Instant::now();
+        let (result, past_tense, present_tense) =
+            if rl.is_key_pressed(KeyboardKey::KEY_R) {
+                (document.render_png("test.png", 0, rl, thread, Some(DownscaleAlgorithm::Bicubic), Color::WHITE), "rendered", "render")
+            } else if rl.is_key_pressed(KeyboardKey::KEY_S) {
+                (document.save_bin("test.amyvec"), "saved", "save")
+            } else if rl.is_key_pressed(KeyboardKey::KEY_O) {
+                (Document::load_bin("test.amyvec", mouse_screen_pos).and_then(|data| Ok(*document = data)), "loaded", "load")
+            } else if rl.is_key_pressed(KeyboardKey::KEY_P) {
+                (document.export_svg("test.svg", 0), "exported", "export")
+            } else { return };
+        let duration = start.elapsed();
+        match result {
+            Ok(()) => println!("file {past_tense} successfully"),
+            Err(e) => println!("failed to {present_tense} file: {e}"),
         }
-    }
-
-    pub fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_screen_pos: Vector2) {
-        if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-            document.layers
-                .tree_iter(LayerIterDir::ForeToBack, |group| group.is_expanded)
-                .find_map(|(layer, _depth)| {
-                    let mut layer = layer.write().expect("error handling not yet implemented");
-                    if layer.settings().slot_rec.check_collision_point_rec(mouse_screen_pos) {
-                        if let Layer::Group(Group { is_expanded, expand_button_rec, .. }) = &mut *layer {
-                            if expand_button_rec.check_collision_point_rec(mouse_screen_pos) {
-                                *is_expanded = !*is_expanded;
-                                return Some(());
-                            }
-                        }
-                    }
-                    None
-                });
-        }
-    }
-
-    pub fn draw(&self, d: &mut impl RaylibDraw, document: &Document) {
-        document.draw_layer_tree(d, &self.panel);
+        println!("  finished in {duration:?}");
     }
 }
 
@@ -105,78 +99,7 @@ fn main() {
         let mouse_screen_pos = rl.get_mouse_position();
         let mouse_screen_delta = rl.get_mouse_delta();
 
-        let is_holding_ctrl = rl.is_key_down(KeyboardKey::KEY_LEFT_CONTROL) || rl.is_key_down(KeyboardKey::KEY_RIGHT_CONTROL);
-        let is_pressing_s = rl.is_key_pressed(KeyboardKey::KEY_S);
-        let is_pressing_o = rl.is_key_pressed(KeyboardKey::KEY_O);
-        let is_pressing_p = rl.is_key_pressed(KeyboardKey::KEY_P);
-        let is_pressing_r = rl.is_key_pressed(KeyboardKey::KEY_R);
-        if (is_pressing_s || is_pressing_o || is_pressing_p || is_pressing_r) && is_holding_ctrl {
-            if is_pressing_r {
-                // cannot be done without blocking
-                match document.render_png("test.png", 0, &mut rl, &thread, Some(DownscaleAlgorithm::Bicubic), Color::WHITE) {
-                    Ok(()) => println!("file rendered successfully"),
-                    Err(e) => println!("failed to render file: {e}"),
-                }
-            } else {
-                let mut handle_serialization = || {
-                    let start = Instant::now();
-                    if is_pressing_s {
-                        match document.save_bin("test.amyvec") {
-                            Ok(()) => println!("file saved successfully"),
-                            Err(e) => println!("failed to save file: {e}"),
-                        }
-                    } else if is_pressing_o {
-                        match Document::load_bin("test.amyvec", mouse_screen_pos) {
-                            Ok(data) => {
-                                document = data;
-                                println!("file loaded successfully");
-                            },
-                            Err(e) => println!("failed to load file: {e}"),
-                        }
-                    } else if is_pressing_p {
-                        match document.export_svg("test.svg", 0) {
-                            Ok(()) => println!("file exported successfully"),
-                            Err(e) => println!("failed to export file: {e}"),
-                        }
-                    } else {
-                        unimplemented!()
-                    }
-                    println!("  finished in {:?}", start.elapsed());
-                };
-                const IS_SERIALIZATION_NON_BLOCKING: bool = false;
-                if IS_SERIALIZATION_NON_BLOCKING {
-                    std::thread::scope(|s| {
-                        let task = s.spawn(|| handle_serialization());
-                        let msg = if is_pressing_s {
-                            "saving..."
-                        } else if is_pressing_o {
-                            "loading..."
-                        } else {
-                            unimplemented!()
-                        };
-                        const FONT_SIZE: i32 = 10;
-                        const FONT_HALF_SIZE: i32 = FONT_SIZE / 2;
-                        let msg_half_width = rl.measure_text(msg, FONT_SIZE) / 2;
-                        while !task.is_finished() {
-                            let mut d = rl.begin_drawing(&thread);
-                            d.clear_background(background_color);
-                            d.draw_text(
-                                msg,
-                                d.get_screen_width() / 2 - msg_half_width,
-                                d.get_screen_height() / 2 - FONT_HALF_SIZE,
-                                FONT_SIZE,
-                                Color::GRAY,
-                            );
-                        }
-                    });
-                } else {
-                    handle_serialization();
-                }
-            }
-        }
-
-        let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, document.camera);
-        let mouse_world_delta = mouse_screen_delta / document.camera.zoom;
+        handle_serialization_if_requested(&mut rl, &thread, &mut document, mouse_screen_pos);
 
         if rl.is_window_resized() {
             let (width, height) = (
@@ -189,6 +112,9 @@ fn main() {
             trim_rtex = rl.load_render_texture(&thread, width as u32, height as u32)
                 .expect("failed to load new render texture");
         }
+
+        let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, document.camera);
+        let mouse_world_delta = mouse_screen_delta / document.camera.zoom;
 
         {
             let is_zooming = rl.is_key_down(KeyboardKey::KEY_LEFT_ALT);
@@ -261,7 +187,7 @@ fn main() {
                     {
                         let mut d = d.begin_mode2D(document.camera);
                         for (layer, _depth) in document.layers.tree_iter(LayerIterDir::BackToFore, |g| !g.settings.is_hidden) {
-                            layer.read().expect("error handling not yet implemented").draw_rendered(&mut d);
+                            layer.read().draw_rendered(&mut d);
                         }
                     }
                 }
@@ -324,7 +250,7 @@ fn main() {
                 match current_tool {
                     Tool::DirectSelection(_) => {
                         for (layer, _depth) in document.layers.tree_iter(LayerIterDir::BackToFore, |g| !g.settings.is_locked) {
-                            layer.read().expect("error handling not yet implemented").draw_selected(&mut d, &document.camera, document.camera.zoom.recip());
+                            layer.read().draw_selected(&mut d, &document.camera, document.camera.zoom.recip());
                         }
                     }
                     _ => (),

@@ -1,16 +1,14 @@
 use std::collections::VecDeque;
 use raylib::prelude::*;
-use crate::{layer::{LayerType, StrongLayer}, vector_path::path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PathPoint}, Document};
+use crate::{layer::{rc::StrongLayerMut, LayerType}, vector_path::path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PathPoint}, Document};
 use super::ToolType;
 
 struct Trail2ndDerivDebugData {
-    distance_sqr_pprev: f32,
     adj_length_prev: f32,
     opp_length_sqr_prev: f32,
 }
 
 struct TrailDerivDebugData {
-    distance_sqr_prev: f32,
     adj_length: f32,
     opp_length_sqr: f32,
     deriv: Option<Trail2ndDerivDebugData>,
@@ -26,7 +24,7 @@ pub struct Brush {
     /// If [`None`], find a hovered path or create a new path upon clicking.
     /// Must be a `VectorPath` layer.
     /// If there is a layer, it must not die before the pen dies.
-    pub target: Option<StrongLayer>,
+    pub target: Option<StrongLayerMut>,
 
     /// History of confirmed positions \
     /// (Position, Exit velocity)
@@ -72,7 +70,7 @@ impl ToolType for Brush {
             if self.target.is_none() {
                 // create a new path
                 let new_path = document.create_path(None, None);
-                self.layer_color = new_path.read().expect("error handling not yet implemented").settings().color;
+                self.layer_color = new_path.read().settings().color;
                 self.target = Some(new_path);
             }
             self.add_trail_point(mouse_world_pos, Vector2::zero());
@@ -105,7 +103,6 @@ impl ToolType for Brush {
                     let adj_length = (delta_prev / distance_sqr_prev.sqrt()).dot(delta);
                     let opp_length_sqr = distance_sqr - adj_length * adj_length;
                     self.trail_debug.as_mut().unwrap().deriv = Some(TrailDerivDebugData {
-                        distance_sqr_prev,
                         adj_length,
                         opp_length_sqr,
                         deriv: None,
@@ -122,7 +119,6 @@ impl ToolType for Brush {
                         let opp_length_sqr_prev = distance_sqr_prev - adj_length_prev * adj_length_prev;
                         is_inflecting = (opp_length_sqr - opp_length_sqr_prev).abs() <= MIN_OPP_LENGTH_SQR_CHANGE;
                         self.trail_debug.as_mut().unwrap().deriv.as_mut().unwrap().deriv = Some(Trail2ndDerivDebugData {
-                            distance_sqr_pprev,
                             adj_length_prev,
                             opp_length_sqr_prev,
                         });
@@ -154,8 +150,8 @@ impl ToolType for Brush {
 
         // stroke complete
         if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
-            let target = self.target.take().expect("should have when pressed");
-            let mut path = target.write().expect("error handling not yet implemented");
+            let mut target = self.target.take().expect("should have when pressed");
+            let mut path = target.write();
             let path = path.expect_path_mut("brush target should be a path");
 
             if let Some(last) = self.trail.last() {
@@ -172,7 +168,7 @@ impl ToolType for Brush {
 
             path.points.reserve(self.trail.len());
             if let Some((p, _v)) = self.trail.first().copied() {
-                path.points.push(PathPoint { p, ctrls: None });
+                path.points.push_back(PathPoint { p, ctrls: None });
             }
             for i in 1..self.trail.len() - 1 {
                 let (prev, _) = self.trail[i - 1];
@@ -182,7 +178,7 @@ impl ToolType for Brush {
                 let speed_out = (next - curr).length();
                 let t_hat = (next - prev).normalized();
                 let c_out = curr + t_hat * speed_out / 3.0;
-                path.points.push(PathPoint {
+                path.points.push_back(PathPoint {
                     p: curr,
                     ctrls: Some(CtrlPt1 {
                         c1: (Ctrl::Out, c_out),
@@ -191,7 +187,7 @@ impl ToolType for Brush {
                 });
             }
             if let Some((p, _v)) = self.trail.last().copied() {
-                path.points.push(PathPoint { p, ctrls: None });
+                path.points.push_back(PathPoint { p, ctrls: None });
             }
             self.last_failing = None;
             self.trail.clear();
