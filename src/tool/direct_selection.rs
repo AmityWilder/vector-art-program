@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use crate::{layer::{rc::StrongLayerMut, tree::LayerIterDir, Layer}, vector_path::path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PPPart, PathPoint, ReflectVector}, Document};
+use crate::{layer::{rc::StrongLayerMut, tree::LayerIterDir, Layer}, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PPPart, PathPoint, ReflectVector}, VectorPath}, Document};
 use super::ToolType;
 
 pub struct GroupHover {
@@ -87,13 +87,181 @@ pub struct HoverOrDrag {
 }
 
 pub struct DirectSelection {
-    /// (path, point, cin vs p vs cout)
     hovered: Option<HoverOrDrag>,
 }
 
 impl DirectSelection {
     pub fn new() -> Self {
         Self { hovered: None }
+    }
+
+    fn clone_and_separate_path_corners(hover: &mut HoverOrDrag, mouse_world_pos: Vector2) {
+        match &mut hover.hover {
+            Hover::Path(PathHover { path_layer, region }) => {
+                let Layer::Path(path) = &mut *path_layer.write() else { panic!("PathHover must reference a Path layer") };
+                match region {
+                    PathHoverRegion::Vert { ref point, part: part @ PPPart::Anchor } => {
+                        let pp = &mut path.points[*point];
+                        match pp {
+                            PathPoint { ctrls: Some(CtrlPt1 { c1: (filled_side, _), c2: c2 @ None }), .. } => {
+                                *c2 = Some(CtrlPt2::Exact(mouse_world_pos));
+                                *part = PPPart::Ctrl(filled_side.opposite());
+                            }
+
+                            PathPoint { ctrls: ctrls @ None, .. } => {
+                                *ctrls = Some(CtrlPt1 { c1: (Ctrl::Out, mouse_world_pos), c2: Some(CtrlPt2::Smooth) });
+                                *part = PPPart::Ctrl(Ctrl::Out);
+                            }
+
+                            PathPoint { ctrls: Some(CtrlPt1 { c1: _, c2: Some(_) }), .. } => (), // dont do the thing
+                        }
+                    }
+
+                    PathHoverRegion::Edge | PathHoverRegion::Fill | PathHoverRegion::Vert { .. } => (),
+                }
+            }
+
+            Hover::Group(_) => todo!("clone on alt-drag"),
+
+            Hover::Raster(_) => todo!("clone on alt-drag"),
+        }
+    }
+
+    fn begin_dragging(rl: &mut RaylibHandle, hover: &mut HoverOrDrag, mouse_world_pos: Vector2) {
+        if rl.is_key_down(KeyboardKey::KEY_LEFT_ALT) {
+            Self::clone_and_separate_path_corners(hover, mouse_world_pos);
+        }
+        hover.is_dragging = true;
+    }
+
+    fn end_dragging_vert(path: &mut VectorPath, point: &usize, part: &PPPart, snap_vert_radius_sqr: f32) {
+        let pp = &mut path.points[*point];
+
+        if let PPPart::Ctrl(part) = part {
+            fn snap_to_smooth_or_mirror(pp: &mut PathPoint, side_self: Ctrl, c_self: Vector2, c_opp: Vector2, snap_vert_radius_sqr: f32) {
+                if c_self.distance_sqr_to(c_opp.reflected_over(pp.p)) <= snap_vert_radius_sqr {
+                    // snap to smooth
+                    pp.ctrls = Some(CtrlPt1 { c1: (side_self.opposite(), c_opp), c2: Some(CtrlPt2::Smooth) });
+                } else {
+                    // snap to mirror
+                    let mirror_dir = (pp.p - c_opp).normalized();
+                    let s_self = (c_self - pp.p).dot(mirror_dir);
+                    let c_self_mirror = pp.p + mirror_dir * s_self;
+                    if c_self.distance_sqr_to(c_self_mirror) <= snap_vert_radius_sqr {
+                        pp.ctrls = Some(CtrlPt1 { c1: (side_self.opposite(), c_opp), c2: Some(CtrlPt2::Mirror(s_self)) });
+                    }
+                }
+            }
+
+            let CtrlPt1 { c1: (side1, c1), c2 } = pp.ctrls.as_mut().expect("should not drag corner, it should have been made exact when clicked");
+            if part == side1 {
+                if c1.distance_sqr_to(pp.p) <= snap_vert_radius_sqr {
+                    // snap to corner
+                    pp.ctrls = if let Some(CtrlPt2::Exact(c2)) = c2.as_ref() {
+                        Some(CtrlPt1 { c1: (side1.opposite(), *c2), c2: None })
+                    } else { None };
+                } else if let Some(CtrlPt2::Exact(c2)) = c2 {
+                    let (c_self, c_opp) = (*c1, *c2);
+                    snap_to_smooth_or_mirror(pp, *part, c_self, c_opp, snap_vert_radius_sqr);
+                }
+            } else {
+                let Some(CtrlPt2::Exact(c2)) = c2.as_ref() else { panic!("should not drag corner, it should have been made exact when clicked") };
+                let (c_self, c_opp) = (*c2, *c1);
+                snap_to_smooth_or_mirror(pp, *part, c_self, c_opp, snap_vert_radius_sqr);
+            };
+        }
+    }
+
+    fn end_dragging(hover: &mut HoverOrDrag, snap_vert_radius_sqr: f32) {
+        match &mut hover.hover {
+            Hover::Group(GroupHover { group_layer: _ }) => todo!(),
+
+            Hover::Path(PathHover { path_layer, ref region }) => {
+                let Layer::Path(path) = &mut *path_layer.write() else { panic!("PathHover must reference a Path layer") };
+                match region {
+                    PathHoverRegion::Fill => todo!(),
+                    PathHoverRegion::Edge => todo!(),
+                    PathHoverRegion::Vert { point, part } => Self::end_dragging_vert(path, point, part, snap_vert_radius_sqr),
+                }
+            }
+
+            Hover::Raster(RasterHover { raster_layer: _, region: ref _region }) => todo!(),
+        }
+        hover.is_dragging = false;
+    }
+
+    fn tick_dragging(hover: &mut Hover, mouse_world_pos: Vector2) {
+        match hover {
+            Hover::Group(GroupHover { group_layer }) => {
+                let Layer::Group(_group) = &mut *group_layer.write() else { panic!("GroupHover must reference a Group layer") };
+                todo!()
+            }
+            Hover::Path(PathHover { path_layer, ref region }) => {
+                let Layer::Path(path) = &mut *path_layer.write() else { panic!("PathHover must reference a Path layer") };
+                match region {
+                    PathHoverRegion::Fill => {
+                        todo!()
+                    }
+                    PathHoverRegion::Edge => {
+                        todo!()
+                    }
+                    PathHoverRegion::Vert { point, part } => {
+                        let pp = &mut path.points[*point];
+                        match part {
+                            PPPart::Anchor => pp.set_point(mouse_world_pos),
+                            PPPart::Ctrl(side) => {
+                                let CtrlPt1 { c1, c2 } = pp.ctrls.as_mut().expect("should not hover ctrl if there is none");
+                                if c1.0 == *side {
+                                    c1.1 = mouse_world_pos;
+                                } else {
+                                    *c2 = Some(CtrlPt2::Exact(mouse_world_pos));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Hover::Raster(RasterHover { raster_layer, region: ref _region }) => {
+                let Layer::Raster(_raster) = &mut *raster_layer.write() else { panic!("RasterHover must reference a Raster layer") };
+                todo!()
+            }
+        }
+    }
+
+    fn tick_hovering(&mut self, document: &mut Document, mouse_world_pos: Vector2, hover_radius_sqr: f32) {
+        self.hovered = document.layers
+            .tree_iter_mut(
+                LayerIterDir::ForeToBack,
+                |group| !group.settings.is_hidden && !group.settings.is_locked)
+            .find_map(|(layer_rc, _depth)| -> Option<Hover> {
+                match &*layer_rc.read() {
+                    Layer::Group(_group) => {
+                        // todo
+                        None
+                    },
+                    Layer::Path(path) => {
+                        path.points.iter()
+                            .enumerate()
+                            .find_map(|(i, pp)| {
+                                // if c_in or c_out is a corner, then p will match first
+                                let (c_in, p, c_out) = pp.calculate();
+                                [(p, PPPart::Anchor), (c_in, PPPart::Ctrl(Ctrl::In)), (c_out, PPPart::Ctrl(Ctrl::Out))]
+                                    .into_iter()
+                                    .find_map(|(p, sect)| (p.distance_sqr_to(mouse_world_pos) <= hover_radius_sqr)
+                                        .then(|| Hover::path_vert(layer_rc.clone_mut(), i, sect)))
+                            })
+                            .or_else(|| {
+                                // todo: fill/edge
+                                None
+                            })
+                    }
+                    Layer::Raster(_raster) => {
+                        // todo
+                        None
+                    }
+                }
+            })
+            .map(|hover| HoverOrDrag { hover, is_dragging: false });
     }
 }
 
@@ -110,167 +278,15 @@ impl ToolType for DirectSelection {
         let snap_vert_radius_sqr = SNAP_VERT_RADIUS_SQR * zoom_inv * zoom_inv;
         if let Some(hover) = self.hovered.as_mut() {
             if !hover.is_dragging && rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-                // - clone
-                // - separate path corners
-                if rl.is_key_down(KeyboardKey::KEY_LEFT_ALT) {
-                    match &mut hover.hover {
-                        Hover::Path(PathHover { path_layer, region }) => {
-                            let Layer::Path(path) = &mut *path_layer.write() else { panic!("PathHover must reference a Path layer") };
-                            match region {
-                                PathHoverRegion::Vert { ref point, part: part @ PPPart::Anchor } => {
-                                    let pp = &mut path.points[*point];
-                                    match pp {
-                                        PathPoint { ctrls: Some(CtrlPt1 { c1: (filled_side, _), c2: c2 @ None }), .. } => {
-                                            *c2 = Some(CtrlPt2::Exact(mouse_world_pos));
-                                            *part = PPPart::Ctrl(filled_side.opposite());
-                                        }
-                                        PathPoint { ctrls: ctrls @ None, .. } => {
-                                            *ctrls = Some(CtrlPt1 { c1: (Ctrl::Out, mouse_world_pos), c2: Some(CtrlPt2::Smooth) });
-                                            *part = PPPart::Ctrl(Ctrl::Out);
-                                        }
-                                        PathPoint { ctrls: Some(CtrlPt1 { c1: _, c2: Some(_) }), .. } => (), // dont do the thing
-                                    }
-                                }
-
-                                PathHoverRegion::Edge | PathHoverRegion::Fill | PathHoverRegion::Vert { .. } => (),
-                            }
-                        }
-
-                        Hover::Group(_) => todo!("clone on alt-drag"),
-
-                        Hover::Raster(_) => todo!("clone on alt-drag"),
-                    }
-                }
-                // start dragging
-                hover.is_dragging = true;
+                Self::begin_dragging(rl, hover, mouse_world_pos);
             } else if hover.is_dragging && rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
-                // finish dragging
-                match &mut hover.hover {
-                    Hover::Group(GroupHover { group_layer: _ }) => todo!(),
-
-                    Hover::Path(PathHover { path_layer, ref region }) => {
-                        let Layer::Path(path) = &mut *path_layer.write() else { panic!("PathHover must reference a Path layer") };
-                        match region {
-                            PathHoverRegion::Fill => todo!(),
-
-                            PathHoverRegion::Edge => todo!(),
-
-                            PathHoverRegion::Vert { point, part } => {
-                                let pp = &mut path.points[*point];
-
-                                if let PPPart::Ctrl(part) = part {
-                                    let CtrlPt1 { c1: (side1, c1), c2 } = pp.ctrls.as_mut().expect("should not drag corner, it should have been made exact when clicked");
-                                    if part == side1 {
-                                        if c1.distance_sqr_to(pp.p) <= snap_vert_radius_sqr {
-                                            // snap to corner
-                                            pp.ctrls = if let Some(CtrlPt2::Exact(c2)) = c2.as_ref() {
-                                                Some(CtrlPt1 { c1: (side1.opposite(), *c2), c2: None })
-                                            } else { None };
-                                        } else if let Some(CtrlPt2::Exact(c2)) = c2 {
-                                            if c1.distance_sqr_to(c2.reflected_over(pp.p)) <= snap_vert_radius_sqr {
-                                                // snap to smooth
-                                                pp.ctrls = Some(CtrlPt1 { c1: (side1.opposite(), *c2), c2: Some(CtrlPt2::Smooth) });
-                                            } else {
-                                                // todo: snap to mirror
-                                            }
-                                        }
-                                    } else {
-                                        let Some(CtrlPt2::Exact(c2_pos)) = c2.as_mut() else { panic!("should not drag corner, it should have been made exact when clicked") };
-                                        if c2_pos.distance_sqr_to(pp.p) <= snap_vert_radius_sqr {
-                                            // snap to corner
-                                            *c2 = None;
-                                        } else if c2_pos.distance_sqr_to(c1.reflected_over(pp.p)) <= snap_vert_radius_sqr {
-                                            // snap to smooth
-                                            *c2 = Some(CtrlPt2::Smooth);
-                                        } else {
-                                            // todo: snap to mirror
-                                        }
-                                    };
-                                }
-                            }
-                        }
-                    }
-
-                    Hover::Raster(RasterHover { raster_layer: _, region: ref _region }) => todo!(),
-                }
-                hover.is_dragging = false;
+                Self::end_dragging(hover, snap_vert_radius_sqr);
             }
         }
 
         match self.hovered.as_mut() {
-            Some(HoverOrDrag { hover, is_dragging: true }) => {
-                match hover {
-                    Hover::Group(GroupHover { group_layer }) => {
-                        let Layer::Group(_group) = &mut *group_layer.write() else { panic!("GroupHover must reference a Group layer") };
-                        todo!()
-                    }
-                    Hover::Path(PathHover { path_layer, ref region }) => {
-                        let Layer::Path(path) = &mut *path_layer.write() else { panic!("PathHover must reference a Path layer") };
-                        match region {
-                            PathHoverRegion::Fill => {
-                                todo!()
-                            }
-                            PathHoverRegion::Edge => {
-                                todo!()
-                            }
-                            PathHoverRegion::Vert { point, part } => {
-                                let pp = &mut path.points[*point];
-                                match part {
-                                    PPPart::Anchor => pp.set_point(mouse_world_pos),
-                                    PPPart::Ctrl(side) => {
-                                        let CtrlPt1 { c1, c2 } = pp.ctrls.as_mut().expect("should not hover ctrl if there is none");
-                                        if c1.0 == *side {
-                                            c1.1 = mouse_world_pos;
-                                        } else {
-                                            *c2 = Some(CtrlPt2::Exact(mouse_world_pos));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Hover::Raster(RasterHover { raster_layer, region: ref _region }) => {
-                        let Layer::Raster(_raster) = &mut *raster_layer.write() else { panic!("RasterHover must reference a Raster layer") };
-                        todo!()
-                    }
-                }
-            }
-
-            Some(HoverOrDrag { is_dragging: false, .. }) | None => {
-                self.hovered = document.layers
-                    .tree_iter_mut(
-                        LayerIterDir::ForeToBack,
-                        |group| !group.settings.is_hidden && !group.settings.is_locked)
-                    .find_map(|(layer_rc, _depth)| -> Option<Hover> {
-                        match &*layer_rc.read() {
-                            Layer::Group(_group) => {
-                                // todo
-                                None
-                            },
-                            Layer::Path(path) => {
-                                path.points.iter()
-                                    .enumerate()
-                                    .find_map(|(i, pp)| {
-                                        // if c_in or c_out is a corner, then p will match first
-                                        let (c_in, p, c_out) = pp.calculate();
-                                        [(p, PPPart::Anchor), (c_in, PPPart::Ctrl(Ctrl::In)), (c_out, PPPart::Ctrl(Ctrl::Out))]
-                                            .into_iter()
-                                            .find_map(|(p, sect)| (p.distance_sqr_to(mouse_world_pos) <= hover_radius_sqr)
-                                                .then(|| Hover::path_vert(layer_rc.clone_mut(), i, sect)))
-                                    })
-                                    .or_else(|| {
-                                        // todo: fill/edge
-                                        None
-                                    })
-                            }
-                            Layer::Raster(_raster) => {
-                                // todo
-                                None
-                            }
-                        }
-                    })
-                    .map(|hover| HoverOrDrag { hover, is_dragging: false });
-            }
+            Some(HoverOrDrag { hover, is_dragging: true }) => Self::tick_dragging(hover, mouse_world_pos),
+            None | Some(HoverOrDrag { is_dragging: false, .. }) => self.tick_hovering(document, mouse_world_pos, hover_radius_sqr),
         }
     }
 
