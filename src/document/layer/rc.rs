@@ -1,68 +1,67 @@
-use std::{cell::RefCell, rc::{Rc, Weak}};
-use super::Layer;
+use std::{cell::RefCell, rc::{self, Rc}};
 
-/// An owned reference to an immutable [`Layer`]
+/// An owned reference to an immutable `T`
 #[derive(Clone)]
-pub struct StrongLayer(Rc<RefCell<Layer>>);
+pub struct Strong<T>(Rc<RefCell<T>>);
 
-impl StrongLayer {
-    pub fn new(layer: Layer) -> Self {
+impl<T> Strong<T> {
+    pub fn new(layer: T) -> Self {
         Self(Rc::new(RefCell::new(layer)))
     }
 
-    pub fn read<'a>(&'a self) -> impl std::ops::Deref<Target = Layer> + 'a {
+    pub fn read<'a>(&'a self) -> impl std::ops::Deref<Target = T> + 'a {
         self.0.borrow()
     }
 
-    pub fn downgrade(&self) -> WeakLayer {
-        WeakLayer(Rc::downgrade(&self.0))
+    pub fn downgrade(&self) -> Weak<T> {
+        Weak(Rc::downgrade(&self.0))
     }
 }
 
-impl From<StrongLayerMut> for StrongLayer {
-    fn from(value: StrongLayerMut) -> Self {
+impl<T> From<StrongMut<T>> for Strong<T> {
+    fn from(value: StrongMut<T>) -> Self {
         Self(value.0)
     }
 }
 
-/// An unowned reference to an immutable [`Layer`]
+/// An unowned reference to an immutable `T`
 #[derive(Clone)]
-pub struct WeakLayer(Weak<RefCell<Layer>>);
+pub struct Weak<T>(rc::Weak<RefCell<T>>);
 
-impl WeakLayer {
-    pub fn upgrade(&self) -> Option<StrongLayer> {
-        self.0.upgrade().map(|rc| StrongLayer(rc))
+impl<T> Weak<T> {
+    pub fn upgrade(&self) -> Option<Strong<T>> {
+        self.0.upgrade().map(|rc| Strong(rc))
     }
 }
 
-impl From<WeakLayerMut> for WeakLayer {
-    fn from(value: WeakLayerMut) -> Self {
+impl<T> From<WeakMut<T>> for Weak<T> {
+    fn from(value: WeakMut<T>) -> Self {
         Self(value.0)
     }
 }
 
-/// An owned reference to a mutable [`Layer`]
-pub struct StrongLayerMut(Rc<RefCell<Layer>>);
+/// An owned reference to a mutable `T`
+pub struct StrongMut<T>(Rc<RefCell<T>>);
 
-impl StrongLayerMut {
-    pub fn new(layer: Layer) -> Self {
+impl<T> StrongMut<T> {
+    pub fn new(layer: T) -> Self {
         Self(Rc::new(RefCell::new(layer)))
     }
 
-    pub fn read<'a>(&'a self) -> impl std::ops::Deref<Target = Layer> + 'a {
+    pub fn read<'a>(&'a self) -> impl std::ops::Deref<Target = T> + 'a {
         self.0.borrow()
     }
 
-    pub fn write<'a>(&'a mut self) -> impl std::ops::DerefMut<Target = Layer> + 'a {
+    pub fn write<'a>(&'a mut self) -> impl std::ops::DerefMut<Target = T> + 'a {
         self.0.borrow_mut()
     }
 
-    pub fn downgrade(&self) -> WeakLayerMut {
-        WeakLayerMut(Rc::downgrade(&self.0))
+    pub fn downgrade(&self) -> WeakMut<T> {
+        WeakMut(Rc::downgrade(&self.0))
     }
 
-    pub fn clone(&self) -> StrongLayer {
-        StrongLayer(self.0.clone())
+    pub fn clone(&self) -> Strong<T> {
+        Strong(self.0.clone())
     }
 
     pub fn clone_mut(&self) -> Self {
@@ -70,16 +69,16 @@ impl StrongLayerMut {
     }
 }
 
-/// An unowned reference to a mutable [`Layer`]
-pub struct WeakLayerMut(Weak<RefCell<Layer>>);
+/// An unowned reference to a mutable `T`
+pub struct WeakMut<T>(rc::Weak<RefCell<T>>);
 
-impl WeakLayerMut {
-    pub fn upgrade(&self) -> Option<StrongLayerMut> {
-        self.0.upgrade().map(|rc| StrongLayerMut(rc))
+impl<T> WeakMut<T> {
+    pub fn upgrade(&self) -> Option<StrongMut<T>> {
+        self.0.upgrade().map(|rc| StrongMut(rc))
     }
 
-    pub fn clone(&self) -> WeakLayer {
-        WeakLayer(self.0.clone())
+    pub fn clone(&self) -> Weak<T> {
+        Weak(self.0.clone())
     }
 
     pub fn clone_mut(&self) -> Self {

@@ -64,32 +64,6 @@ pub enum Layer {
     Raster(Raster),
 }
 
-impl Layer {
-    pub const fn group (&self) -> Option<&Group>      { if let Self::Group (g) = self { Some(g) } else { None } }
-    pub const fn path  (&self) -> Option<&VectorPath> { if let Self::Path  (p) = self { Some(p) } else { None } }
-    pub const fn raster(&self) -> Option<&Raster>     { if let Self::Raster(r) = self { Some(r) } else { None } }
-
-    pub const fn group_mut (&mut self) -> Option<&mut Group>      { if let Self::Group (g) = self { Some(g) } else { None } }
-    pub const fn path_mut  (&mut self) -> Option<&mut VectorPath> { if let Self::Path  (p) = self { Some(p) } else { None } }
-    pub const fn raster_mut(&mut self) -> Option<&mut Raster>     { if let Self::Raster(r) = self { Some(r) } else { None } }
-
-    pub const fn unwrap_group (&self) -> &Group      { if let Self::Group (g) = self { g } else { panic!("failed to unwrap a group" ) } }
-    pub const fn unwrap_path  (&self) -> &VectorPath { if let Self::Path  (p) = self { p } else { panic!("failed to unwrap a path"  ) } }
-    pub const fn unwrap_raster(&self) -> &Raster     { if let Self::Raster(r) = self { r } else { panic!("failed to unwrap a raster") } }
-
-    pub const fn unwrap_group_mut (&mut self) -> &mut Group      { if let Self::Group (g) = self { g } else { panic!("failed to unwrap a group" ) } }
-    pub const fn unwrap_path_mut  (&mut self) -> &mut VectorPath { if let Self::Path  (p) = self { p } else { panic!("failed to unwrap a path"  ) } }
-    pub const fn unwrap_raster_mut(&mut self) -> &mut Raster     { if let Self::Raster(r) = self { r } else { panic!("failed to unwrap a raster") } }
-
-    pub fn expect_group (&self, msg: &str) -> &Group      { if let Self::Group (g) = self { g } else { panic!("failed to unwrap a group: {msg}" ) } }
-    pub fn expect_path  (&self, msg: &str) -> &VectorPath { if let Self::Path  (p) = self { p } else { panic!("failed to unwrap a path: {msg}"  ) } }
-    pub fn expect_raster(&self, msg: &str) -> &Raster     { if let Self::Raster(r) = self { r } else { panic!("failed to unwrap a raster: {msg}") } }
-
-    pub fn expect_group_mut (&mut self, msg: &str) -> &mut Group      { if let Self::Group (g) = self { g } else { panic!("failed to unwrap a group: {msg}" ) } }
-    pub fn expect_path_mut  (&mut self, msg: &str) -> &mut VectorPath { if let Self::Path  (p) = self { p } else { panic!("failed to unwrap a path: {msg}"  ) } }
-    pub fn expect_raster_mut(&mut self, msg: &str) -> &mut Raster     { if let Self::Raster(r) = self { r } else { panic!("failed to unwrap a raster: {msg}") } }
-}
-
 pub trait LayerType {
     fn settings(&self) -> &LayerSettings;
     fn settings_mut(&mut self) -> &mut LayerSettings;

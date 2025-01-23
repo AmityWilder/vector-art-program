@@ -4,6 +4,7 @@ use raylib::prelude::*;
 use crate::{appearance::{Appearance, StyleItem}, layer::{LayerSettings, LayerType}};
 
 pub mod mat2;
+pub mod effect;
 pub mod path_point;
 pub mod gradient;
 pub mod stroke;

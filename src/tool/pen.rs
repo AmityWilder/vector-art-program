@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use crate::{layer::{rc::StrongLayerMut, tree::LayerIterDir, Layer, LayerType}, vector_path::path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PathPoint}, Document};
+use crate::{layer::{rc::StrongMut, tree::TreeIterDir, Layer, LayerType}, vector_path::path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PathPoint}, Document};
 use super::{direct_selection::HOVER_RADIUS_SQR, ToolType};
 
 pub struct Pen {
@@ -7,7 +7,7 @@ pub struct Pen {
     /// If [`None`], find a hovered path or create a new path upon clicking.
     /// Must be a `VectorPath` layer.
     /// If there is a layer, it must not die before the pen dies.
-    pub target: Option<StrongLayerMut>,
+    pub target: Option<StrongMut<Layer>>,
 
     /// [`Some`] while dragging, [`None`] otherwise.
     current_anchor: Option<usize>,
@@ -46,7 +46,7 @@ impl ToolType for Pen {
                 }
             } else {
                 // starting a new path
-                for (layer, _) in document.layers.tree_iter_mut(LayerIterDir::ForeToBack, |_| false) {
+                for (layer, _) in document.layers.tree_iter_mut(TreeIterDir::ForeToBack, |_| false) {
                     // find hovered endpoint
                     if let Layer::Path(path) = &*layer.read() {
                         if let Some(last_idx) = path.points.len().checked_sub(1) { // failure to subtract 1 implies an empty list
@@ -132,7 +132,7 @@ impl ToolType for Pen {
             }
         } else {
             // show selectable
-            for (layer, _) in document.layers.tree_iter(LayerIterDir::BackToFore, |_| false) {
+            for (layer, _) in document.layers.tree_iter(TreeIterDir::BackToFore, |_| false) {
                 if let Layer::Path(path) = &*layer.read() {
                     if path.points.iter().any(|pp| pp.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR) {
                         path.draw_selected(d, &document.camera, zoom_inv);

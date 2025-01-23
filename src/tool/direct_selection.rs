@@ -1,9 +1,9 @@
 use raylib::prelude::*;
-use crate::{layer::{rc::StrongLayerMut, tree::LayerIterDir, Layer}, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PPPart, PathPoint, ReflectVector}, VectorPath}, Document};
+use crate::{layer::{rc::StrongMut, tree::TreeIterDir, Layer}, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PPPart, PathPoint, ReflectVector}, VectorPath}, Document};
 use super::ToolType;
 
 pub struct GroupHover {
-    pub group_layer: StrongLayerMut,
+    pub group_layer: StrongMut<Layer>,
 }
 
 pub enum PathHoverRegion {
@@ -16,7 +16,7 @@ pub enum PathHoverRegion {
 }
 
 pub struct PathHover {
-    pub path_layer: StrongLayerMut,
+    pub path_layer: StrongMut<Layer>,
     pub region: PathHoverRegion,
 }
 
@@ -45,7 +45,7 @@ pub enum RasterHoverRegion {
 }
 
 pub struct RasterHover {
-    pub raster_layer: StrongLayerMut,
+    pub raster_layer: StrongMut<Layer>,
     pub region: RasterHoverRegion,
 }
 
@@ -56,27 +56,27 @@ pub enum Hover {
 }
 
 impl Hover {
-    pub const fn group(group_layer: StrongLayerMut) -> Self {
+    pub const fn group(group_layer: StrongMut<Layer>) -> Self {
         Self::Group(GroupHover { group_layer })
     }
 
-    pub const fn path_fill(path_layer: StrongLayerMut) -> Self {
+    pub const fn path_fill(path_layer: StrongMut<Layer>) -> Self {
         Self::Path(PathHover { path_layer, region: PathHoverRegion::Fill })
     }
-    pub const fn path_edge(path_layer: StrongLayerMut) -> Self {
+    pub const fn path_edge(path_layer: StrongMut<Layer>) -> Self {
         Self::Path(PathHover { path_layer, region: PathHoverRegion::Edge })
     }
-    pub const fn path_vert(path_layer: StrongLayerMut, point: usize, part: PPPart) -> Self {
+    pub const fn path_vert(path_layer: StrongMut<Layer>, point: usize, part: PPPart) -> Self {
         Self::Path(PathHover { path_layer, region: PathHoverRegion::Vert { point, part } })
     }
 
-    pub const fn raster_object(raster_layer: StrongLayerMut) -> Self {
+    pub const fn raster_object(raster_layer: StrongMut<Layer>) -> Self {
         Self::Raster(RasterHover { raster_layer, region: RasterHoverRegion::Object })
     }
-    pub const fn raster_side(raster_layer: StrongLayerMut, side: Side) -> Self {
+    pub const fn raster_side(raster_layer: StrongMut<Layer>, side: Side) -> Self {
         Self::Raster(RasterHover { raster_layer, region: RasterHoverRegion::Side { side } })
     }
-    pub const fn raster_corner(raster_layer: StrongLayerMut, corner: Corner) -> Self {
+    pub const fn raster_corner(raster_layer: StrongMut<Layer>, corner: Corner) -> Self {
         Self::Raster(RasterHover { raster_layer, region: RasterHoverRegion::Corner { corner } })
     }
 }
@@ -231,7 +231,7 @@ impl DirectSelection {
     fn tick_hovering(&mut self, document: &mut Document, mouse_world_pos: Vector2, hover_radius_sqr: f32) {
         self.hovered = document.layers
             .tree_iter_mut(
-                LayerIterDir::ForeToBack,
+                TreeIterDir::ForeToBack,
                 |group| !group.settings.is_hidden && !group.settings.is_locked)
             .find_map(|(layer_rc, _depth)| -> Option<Hover> {
                 match &*layer_rc.read() {

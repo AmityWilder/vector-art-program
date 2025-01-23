@@ -1,5 +1,5 @@
 use artboard::IntRect2;
-use layer::{group::Group, rc::{StrongLayerMut, WeakLayerMut}, tree::{LayerIterDir, LayerTree}, Layer, LayerSettings, LayerType};
+use layer::{group::Group, rc::{StrongMut, WeakMut}, tree::{TreeIterDir, LayerTree}, Layer, LayerSettings, LayerType};
 use raylib::prelude::*;
 
 pub mod layer;
@@ -27,7 +27,7 @@ pub struct Document {
     pub camera: Camera2D,
     pub paper_color: Color,
     pub layers: LayerTree,
-    pub selection: Vec<WeakLayerMut>,
+    pub selection: Vec<WeakMut<Layer>>,
     pub artboards: Vec<ArtBoard>,
     pub active_artboard: Option<usize>,
     layer_color_acc: usize,
@@ -87,20 +87,20 @@ impl Document {
         LayerSettings::new(name, color)
     }
 
-    pub fn create_path(&mut self, name: Option<String>, color: Option<Color>) -> StrongLayerMut {
-        let path = StrongLayerMut::new(Layer::Path(VectorPath::new(self.gen_layer_settings(name, color))));
+    pub fn create_path(&mut self, name: Option<String>, color: Option<Color>) -> StrongMut<Layer> {
+        let path = StrongMut::new(Layer::Path(VectorPath::new(self.gen_layer_settings(name, color))));
         self.layers.push(path.clone_mut());
         path
     }
 
-    pub fn create_raster(&mut self, name: Option<String>, color: Option<Color>) -> StrongLayerMut {
-        let path = StrongLayerMut::new(Layer::Raster(Raster::new(self.gen_layer_settings(name, color))));
+    pub fn create_raster(&mut self, name: Option<String>, color: Option<Color>) -> StrongMut<Layer> {
+        let path = StrongMut::new(Layer::Raster(Raster::new(self.gen_layer_settings(name, color))));
         self.layers.push(path.clone_mut());
         path
     }
 
-    pub fn create_group(&mut self, name: Option<String>, color: Option<Color>) -> StrongLayerMut {
-        let path = StrongLayerMut::new(Layer::Group(Group::new(self.gen_layer_settings(name, color))));
+    pub fn create_group(&mut self, name: Option<String>, color: Option<Color>) -> StrongMut<Layer> {
+        let path = StrongMut::new(Layer::Group(Group::new(self.gen_layer_settings(name, color))));
         self.layers.push(path.clone_mut());
         path
     }
@@ -114,7 +114,7 @@ impl Document {
         let panel_rec: Rectangle = panel.rec_cache.into();
         let mut d = d.begin_scissor_mode(panel_rec.x as i32, panel_rec.y as i32, panel_rec.width as i32, panel_rec.height as i32);
         d.draw_rectangle_rec(panel_rec, panel.background);
-        for (layer, _depth) in self.layers.tree_iter(LayerIterDir::TopToBot, |group| group.is_expanded) {
+        for (layer, _depth) in self.layers.tree_iter(TreeIterDir::TopToBot, |group| group.is_expanded) {
             let layer = layer.read();
             d.draw_rectangle_rec(layer.settings().slot_rec, Color::new(32,32,32,255));
             d.draw_rectangle_rec(layer.settings().color_rec, layer.settings().color);

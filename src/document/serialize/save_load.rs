@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, fs::File, io::{self, BufRead, BufReader, BufWriter, Read, Write}, path::Path};
 use raylib::prelude::*;
-use rc::StrongLayerMut;
+use rc::StrongMut;
 use crate::{
     document::{
         artboard::{ArtBoard, IntRect2},
@@ -189,7 +189,7 @@ impl Document {
 
         // layers
         writer.write_all(&(layers.len() as u64).to_le_bytes())?;
-        for (mut layer, _depth) in layers.tree_iter_mut(LayerIterDir::default(), |_| true) {
+        for (mut layer, _depth) in layers.tree_iter_mut(TreeIterDir::default(), |_| true) {
             let mut layer = layer.write();
 
             // settings
@@ -450,7 +450,7 @@ impl Document {
                         };
 
                         let [layer_type] = read_bytes::<1>(reader)?;
-                        tree.push(StrongLayerMut::new(
+                        tree.push(StrongMut::new(
                             match layer_type {
                                 b'g' => {
                                     Layer::Group(Group {
