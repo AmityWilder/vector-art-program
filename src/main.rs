@@ -164,6 +164,14 @@ fn main() {
             is_trim_view = !is_trim_view;
         }
 
+        if (rl.is_key_down(KeyboardKey::KEY_LEFT_CONTROL) || rl.is_key_down(KeyboardKey::KEY_RIGHT_CONTROL)) && rl.is_key_pressed(KeyboardKey::KEY_Z) {
+            if rl.is_key_pressed(KeyboardKey::KEY_LEFT_SHIFT) || rl.is_key_pressed(KeyboardKey::KEY_RIGHT_SHIFT) {
+                document.redo();
+            } else {
+                document.undo();
+            }
+        }
+
         document.update_layer_tree_recs(&layers_panel.panel.rec_cache.into());
 
         {

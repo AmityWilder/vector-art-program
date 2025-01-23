@@ -2,15 +2,64 @@ use raylib::prelude::*;
 use crate::{layer::{rc::StrongMut, tree::TreeIterDir, Layer, LayerType}, vector_path::path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PathPoint}, Document};
 use super::{direct_selection::HOVER_RADIUS_SQR, ToolType};
 
-pub struct Pen {
+enum PenStatus {
+    Continue,
+    Finished,
+}
+
+/// The pen tool, possibly waiting for a target
+pub struct Pen(Option<ActivePen>);
+
+impl Pen {
+    pub fn new() -> Self {
+        Self(None)
+    }
+}
+
+impl ToolType for Pen {
+    fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2, _mouse_world_delta: Vector2) {
+        if self.0.is_none() && rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
+            self.0 = Some(ActivePen::new(document, mouse_world_pos));
+        }
+
+        if let Some(pen) = self.0.as_mut() {
+            let status = pen.tick(rl, document, mouse_world_pos);
+            if matches!(status, PenStatus::Finished) {
+                self.0 = None;
+            }
+        }
+    }
+
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, mouse_world_pos: Vector2) {
+        let zoom_inv = document.camera.zoom.recip();
+        if let Some(pen) = self.0.as_ref() {
+            let target = pen.target.read();
+            if let Layer::Path(path) = &*target {
+                path.draw_selected(d, &document.camera, zoom_inv);
+            }
+        } else {
+            // show selectable
+            for (layer, _) in document.layers.tree_iter(TreeIterDir::BackToFore, |_| false) {
+                if let Layer::Path(path) = &*layer.read() {
+                    if path.points.iter().any(|pp| pp.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR) {
+                        path.draw_selected(d, &document.camera, zoom_inv);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// The pen tool while actively drawing
+struct ActivePen {
     /// If [`Some`], continue seleted.
     /// If [`None`], find a hovered path or create a new path upon clicking.
     /// Must be a `VectorPath` layer.
     /// If there is a layer, it must not die before the pen dies.
-    pub target: Option<StrongMut<Layer>>,
+    target: StrongMut<Layer>,
 
-    /// [`Some`] while dragging, [`None`] otherwise.
-    current_anchor: Option<usize>,
+    /// Whether we are modifying an existing point or creating a new one
+    is_dragging: bool,
 
     /// Whether points are being pushed to the front instead of the back \
     /// [`Ctrl::Out`] -> push to back \
@@ -18,70 +67,66 @@ pub struct Pen {
     direction: Ctrl,
 }
 
-impl Pen {
-    pub fn new() -> Self {
+impl ActivePen {
+    pub fn new(document: &mut Document, mouse_world_pos: Vector2) -> Self {
+        // starting a new path
+        for (layer, _) in document.layers.tree_iter_mut(TreeIterDir::ForeToBack, |_| false) {
+            // find hovered endpoint
+            if let Layer::Path(path) = &*layer.read() {
+                if let Some(last_idx) = path.points.len().checked_sub(1) { // failure to subtract 1 implies an empty list
+                    let search_options = [(0, &path.points[0]), (last_idx, &path.points[last_idx])]; // heap allocations are yucky, ew. all my homies use stack arrays
+                    let search_in = if last_idx != 0 { &search_options } else { &search_options[..=0] }; // only check last if the first isn't the last
+                    for (idx, pp) in search_in {
+                        if pp.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR {
+                            return Self {
+                                target: layer.clone_mut(),
+                                is_dragging: true,
+                                direction: if *idx == 0 { Ctrl::In } else { Ctrl::Out },
+                            };
+                        }
+                    }
+                }
+            }
+        }
+
+        // no luck? create a new path
+        let new_path = document.create_path(None, None);
         Self {
-            target: None,
-            current_anchor: None,
+            target: new_path,
+            is_dragging: false,
             direction: Ctrl::Out,
         }
     }
 }
 
-impl ToolType for Pen {
-    fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2, _mouse_world_delta: Vector2) {
-        if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-            if let Some(layer) = &mut self.target {
-                // already drawing
-                let Layer::Path(path) = &mut *layer.write() else { panic!("`target` is required to be a vector path") };
-                let opp_end = match self.direction {
-                    Ctrl::In  => path.points.back(),
-                    Ctrl::Out => path.points.front(),
-                };
-                if let Some(opp_end) = opp_end {
-                    if opp_end.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR {
-                        path.is_closed = true;
-                        self.current_anchor = Some(0);
-                    }
-                }
-            } else {
-                // starting a new path
-                for (layer, _) in document.layers.tree_iter_mut(TreeIterDir::ForeToBack, |_| false) {
-                    // find hovered endpoint
-                    if let Layer::Path(path) = &*layer.read() {
-                        if let Some(last_idx) = path.points.len().checked_sub(1) { // failure to subtract 1 implies an empty list
-                            let search_options = [(0, &path.points[0]), (last_idx, &path.points[last_idx])]; // heap allocations are yucky, ew. all my homies use stack arrays
-                            let search_in = if last_idx != 0 { &search_options } else { &search_options[..=0] }; // only check last if the first isn't the last
-                            for (idx, pp) in search_in {
-                                if pp.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR {
-                                    self.target = Some(layer.clone_mut());
-                                    self.current_anchor = Some(*idx);
-                                    self.direction = if *idx == 0 { Ctrl::In } else { Ctrl::Out };
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
+impl ActivePen {
+    /// returns true if drawing is finished
+    pub fn tick(&mut self, rl: &mut RaylibHandle, _document: &mut Document, mouse_world_pos: Vector2) -> PenStatus {
+        let target = &mut *self.target.write();
+        let Layer::Path(path) = target else { panic!("`target` is required to be a vector path") };
 
-                // no luck?
-                if self.target.is_none() {
-                    // create a new path
-                    let new_path = document.create_path(None, None);
-                    self.target = Some(new_path);
-                    self.current_anchor = None;
-                    self.direction = Ctrl::Out;
+        if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
+            // already drawing
+            let opp_end = match self.direction {
+                Ctrl::In  => path.points.back(),
+                Ctrl::Out => path.points.front(),
+            };
+            if let Some(opp_end) = opp_end {
+                if opp_end.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR {
+                    path.is_closed = true;
+                    self.is_dragging = true;
                 }
             }
         }
 
         if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT) {
-            let mut target = self.target.as_mut().expect("`target` should have been set when mouse was pressed").write();
-            let Layer::Path(path) = &mut *target else { panic!("`target` is required to be a vector path") };
-
-            if let Some(idx) = self.current_anchor {
+            if self.is_dragging {
                 // modifying an existing path point
-                let pp = &mut path.points.get_mut(idx).expect("shouldn't have been able to select a path that had no points originally");
+                let pp = &mut match self.direction {
+                    Ctrl::In  => path.points.front_mut(),
+                    Ctrl::Out => path.points.back_mut(),
+                }.expect("shouldn't have been able to select a path that had no points originally");
+
                 if let Some(CtrlPt1 { c1: (c1_side, c1), c2 }) = pp.ctrls.as_mut() {
                     // modifying existing controls
                     if c1_side == &self.direction {
@@ -102,43 +147,23 @@ impl ToolType for Pen {
                 match self.direction {
                     Ctrl::Out => {
                         path.points.push_back(pp);
-                        self.current_anchor = Some(path.points.len() - 1);
+                        self.is_dragging = true;
                     }
                     Ctrl::In => {
                         path.points.push_front(pp);
-                        self.current_anchor = Some(0);
+                        self.is_dragging = true;
                     }
                 }
             }
         }
 
         if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
-            self.current_anchor = None;
-            let target = self.target.as_ref().expect("`target` should have been set when mouse was pressed").read();
-            let Layer::Path(path) = &*target else { panic!("`target` is required to be a vector path") };
+            self.is_dragging = false;
             if path.is_closed {
-                drop(target);
-                self.target = None;
+                return PenStatus::Finished;
             }
         }
-    }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, mouse_world_pos: Vector2) {
-        let zoom_inv = document.camera.zoom.recip();
-        if let Some(target) = self.target.as_ref() {
-            let target = target.read();
-            if let Layer::Path(path) = &*target {
-                path.draw_selected(d, &document.camera, zoom_inv);
-            }
-        } else {
-            // show selectable
-            for (layer, _) in document.layers.tree_iter(TreeIterDir::BackToFore, |_| false) {
-                if let Layer::Path(path) = &*layer.read() {
-                    if path.points.iter().any(|pp| pp.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR) {
-                        path.draw_selected(d, &document.camera, zoom_inv);
-                    }
-                }
-            }
-        }
+        PenStatus::Continue
     }
 }
