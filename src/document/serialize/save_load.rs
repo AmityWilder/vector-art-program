@@ -252,8 +252,9 @@ impl Document {
                     appearance: Appearance {
                         items: style_items,
                     },
+                    is_closed,
                 }) => {
-                    writer.write_all(&[b'p'])?;
+                    writer.write_all(&[b'p', *is_closed as u8])?; // todo: an entire byte for one bit? :c
 
                     write_u64(&mut writer, style_items.len() as u64)?;
                     for style_item in style_items.iter_mut() {
@@ -461,6 +462,7 @@ impl Document {
                                 },
 
                                 b'p' => {
+                                    let [is_closed] = read_bytes::<1>(reader)?;
                                     let num_style_items = read_u64(reader)? as usize;
                                     let mut style_items = Vec::with_capacity(num_style_items);
                                     for _ in 0..num_style_items {
@@ -561,6 +563,7 @@ impl Document {
                                         settings,
                                         points,
                                         appearance: Appearance { items: style_items },
+                                        is_closed: is_closed != 0,
                                     })
                                 },
 

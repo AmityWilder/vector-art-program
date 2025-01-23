@@ -31,7 +31,20 @@ impl Pen {
 impl ToolType for Pen {
     fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2, _mouse_world_delta: Vector2) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-            if self.target.is_none() {
+            if let Some(layer) = &mut self.target {
+                // already drawing
+                let Layer::Path(path) = &mut *layer.write() else { panic!("`target` is required to be a vector path") };
+                let opp_end = match self.direction {
+                    Ctrl::In  => path.points.back(),
+                    Ctrl::Out => path.points.front(),
+                };
+                if let Some(opp_end) = opp_end {
+                    if opp_end.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR {
+                        path.is_closed = true;
+                        self.current_anchor = Some(0);
+                    }
+                }
+            } else {
                 // starting a new path
                 for (layer, _) in document.layers.tree_iter_mut(LayerIterDir::ForeToBack, |_| false) {
                     // find hovered endpoint
@@ -101,6 +114,12 @@ impl ToolType for Pen {
 
         if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
             self.current_anchor = None;
+            let target = self.target.as_ref().expect("`target` should have been set when mouse was pressed").read();
+            let Layer::Path(path) = &*target else { panic!("`target` is required to be a vector path") };
+            if path.is_closed {
+                drop(target);
+                self.target = None;
+            }
         }
     }
 
