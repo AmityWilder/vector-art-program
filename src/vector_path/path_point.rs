@@ -129,31 +129,61 @@ impl PathPoint {
         todo!("im not updating this anymore until it gets used")
     }
 
-    pub fn draw_selected(&self, d: &mut impl RaylibDraw, zoom_inv: f32, color: Color) {
-        fn draw_ctrl_exact(d: &mut impl RaylibDraw, root: Vector2, handle: Vector2, head_radius: f32, color: Color) {
-            d.draw_line_v(root, handle, color);
-            d.draw_circle_v(handle, head_radius, color);
-        }
+    pub fn draw_selected<D: RaylibDraw>(&self, d: &mut D, zoom_inv: f32, color: Color) {
+        let draw_ctrl_exact = |d: &mut D, handle: Vector2| {
+            d.draw_line_v(self.p, handle, color);
+            d.draw_circle_v(handle, 3.5 * zoom_inv, color);
+        };
         if let Some(CtrlPt1 { c1: (_, c1), c2 }) = self.ctrls.as_ref() {
-            draw_ctrl_exact(d, self.p, *c1, 3.0 * zoom_inv, color);
+            draw_ctrl_exact(d, *c1);
+
             if let Some(c2) = c2.as_ref() {
                 match c2 {
                     CtrlPt2::Smooth => {
                         let c2 = c1.reflected_over(self.p);
                         d.draw_line_v(self.p, c2, color.alpha(0.5));
-                        d.draw_ring(c2, 2.0 * zoom_inv, 3.0 * zoom_inv, 0.0, 360.0, 10, color);
+                        d.draw_ring(c2, 2.5 * zoom_inv, 3.5 * zoom_inv, 0.0, 360.0, 10, color);
                     }
+
                     CtrlPt2::Mirror(s2) => {
                         let c2 = c1.reflected_to(self.p, *s2);
                         d.draw_line_v(self.p, c2, color.alpha(0.5));
-                        d.draw_ring(c2, zoom_inv, 3.0 * zoom_inv, 0.0, 360.0, 10, color);
+                        let radius = 3.0 * zoom_inv;
+                        let size = 2.0 * radius;
+                        d.draw_rectangle_pro(Rectangle::new(c2.x, c2.y, size, size), Vector2::new(radius, radius), 45.0, color);
                     }
+
                     CtrlPt2::Exact(c2) => {
-                        draw_ctrl_exact(d, self.p, *c2, 3.0 * zoom_inv, color);
+                        draw_ctrl_exact(d, *c2);
                     }
                 }
             }
         }
-        d.draw_circle_v(self.p, 4.0 * zoom_inv, color);
+
+        const ANCHOR_EXTENT_INNER: f32 = 2.0;
+        const ANCHOR_OUTLINE_THICK: f32 = 1.0;
+        const ANCHOR_EXTENT_OUTER: f32 = ANCHOR_EXTENT_INNER + ANCHOR_OUTLINE_THICK;
+        const ANCHOR_SIZE_INNER: f32 = ANCHOR_EXTENT_INNER * 2.0;
+        const ANCHOR_SIZE_OUTER: f32 = ANCHOR_EXTENT_OUTER * 2.0;
+        // outline
+        {
+            let rec_outer = Rectangle::new(
+                self.p.x - ANCHOR_EXTENT_OUTER * zoom_inv,
+                self.p.y - ANCHOR_EXTENT_OUTER * zoom_inv,
+                ANCHOR_SIZE_OUTER * zoom_inv,
+                ANCHOR_SIZE_OUTER * zoom_inv,
+            );
+            d.draw_rectangle_rec(rec_outer, color);
+        }
+        // fill
+        {
+            let rec_inner = Rectangle::new(
+                self.p.x - ANCHOR_EXTENT_INNER * zoom_inv,
+                self.p.y - ANCHOR_EXTENT_INNER * zoom_inv,
+                ANCHOR_SIZE_INNER * zoom_inv,
+                ANCHOR_SIZE_INNER * zoom_inv,
+            );
+            d.draw_rectangle_rec(rec_inner, Color::WHITE);
+        }
     }
 }
