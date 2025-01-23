@@ -1,13 +1,29 @@
-use artboard::IntRect2;
-use layer::{group::Group, rc::{StrongMut, WeakMut}, tree::{TreeIterDir, LayerTree}, Layer, LayerSettings, LayerType};
+use crate::{raster::Raster, stack::{StackAdaptor, VecStack}, ui::panel::Panel, vector_path::VectorPath};
 use raylib::prelude::*;
 
 pub mod layer;
 pub mod artboard;
 pub mod serialize;
 
-use crate::{raster::Raster, ui::panel::Panel, vector_path::VectorPath};
-use self::artboard::ArtBoard;
+use self::{
+    artboard::{
+        ArtBoard,
+        IntRect2,
+    },
+    layer::{
+        group::Group,
+        rc::{StrongMut, WeakMut},
+        tree::{TreeIterDir, LayerTree},
+        Layer,
+        LayerSettings,
+        LayerType,
+    }
+};
+
+pub trait Change {
+    fn unapply(&self, document: &mut Document);
+    fn apply  (&self, document: &mut Document);
+}
 
 const DEFAULT_LAYER_COLORS: [Color; 10] = [
     Color::BLUEVIOLET,
@@ -30,6 +46,10 @@ pub struct Document {
     pub selection: Vec<WeakMut<Layer>>,
     pub artboards: Vec<ArtBoard>,
     pub active_artboard: Option<usize>,
+
+    history: VecStack<Box<dyn Change>>,
+    future:  VecStack<Box<dyn Change>>,
+
     layer_color_acc: usize,
     layer_name_acc: usize,
     artboard_name_acc: usize,
@@ -66,9 +86,34 @@ impl Document {
             selection: Vec::new(),
             artboards: Vec::new(),
             active_artboard: None,
+
+            history: VecStack::with_capacity(128),
+            future:  VecStack::with_capacity(128),
+
             layer_color_acc: 0,
             layer_name_acc: 0,
             artboard_name_acc: 0,
+        }
+    }
+
+    /// Apply a change that can be undone/redone and add it to the history
+    pub fn apply(&mut self, change: Box<dyn Change>) {
+        self.future.clear();
+        change.apply(self);
+        self.history.push_no_resize(change);
+    }
+
+    pub fn undo(&mut self) {
+        if let Some(change) = self.history.pop() {
+            change.unapply(self);
+            self.future.push_no_resize(change);
+        }
+    }
+
+    pub fn redo(&mut self) {
+        if let Some(change) = self.future.pop() {
+            change.apply(self);
+            self.history.push_no_resize(change);
         }
     }
 

@@ -161,6 +161,8 @@ impl Document {
             selection: _,
             artboards,
             active_artboard: _,
+            history: _,
+            future: _,
             layer_color_acc,
             layer_name_acc,
             artboard_name_acc,

@@ -5,15 +5,15 @@ use serialize::render_png::DownscaleAlgorithm;
 // use rand::prelude::*;
 use ui::{panel::{Panel, Rect2, UIBox}, specialized::layers_panel::LayersPanel};
 
-pub mod vector_path;
-pub mod raster;
-pub mod stack;
-pub mod appearance;
-pub mod document;
-pub mod tool;
-pub mod engine;
-pub mod editor;
-pub mod ui;
+mod vector_path;
+mod raster;
+mod stack;
+mod appearance;
+mod document;
+mod tool;
+mod engine;
+mod editor;
+mod ui;
 
 use self::{document::*, tool::*};
 
