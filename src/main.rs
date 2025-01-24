@@ -1,5 +1,5 @@
 use std::time::Instant;
-use layer::{tree::TreeIterDir, LayerType};
+use layer::{rc::StrongRef, tree::TreeIterDir, LayerType};
 use raylib::prelude::*;
 use serialize::render_png::DownscaleAlgorithm;
 // use rand::prelude::*;
@@ -85,7 +85,6 @@ fn main() {
             Color::new(24,24,24,255),
         ),
     );
-    document.update_layer_tree_recs(&layers_panel.panel.rec_cache.into());
 
     const MIN_ZOOM_EXP: i32 = -3;
     #[allow(non_snake_case)]
@@ -171,8 +170,6 @@ fn main() {
                 document.undo();
             }
         }
-
-        document.update_layer_tree_recs(&layers_panel.panel.rec_cache.into());
 
         {
             let mut d = rl.begin_drawing(&thread);

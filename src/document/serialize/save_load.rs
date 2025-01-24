@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, fs::File, io::{self, BufRead, BufReader, BufWriter, Read, Write}, path::Path};
 use raylib::prelude::*;
-use rc::StrongMut;
+use rc::{StrongMut, StrongRef};
 use crate::{
     document::{
         artboard::{ArtBoard, IntRect2},
@@ -199,16 +199,10 @@ impl Document {
                 let is_expanded = matches!(&*layer, Layer::Group(Group { is_expanded: true, .. }));
 
                 let LayerSettings {
-                    slot_rec: _,
-                    thumbnail_rec: _,
                     name,
-                    name_rec: _,
                     color,
-                    color_rec: _,
                     is_hidden,
-                    hide_button_rec: _,
                     is_locked,
-                    lock_button_rec: _,
                     is_group,
                     blend: Blending {
                         opacity,
@@ -241,7 +235,6 @@ impl Document {
                     settings: _, // already handled
                     items,
                     is_expanded: _, // already handled
-                    expand_button_rec: _,
                 }) => {
                     writer.write_all(&[b'g'])?;
                     write_u64(&mut writer, items.len() as u64)?;
@@ -433,16 +426,10 @@ impl Document {
                         let opacity = opacity_byte as f32 / 255.0;
 
                         let settings = LayerSettings {
-                            slot_rec: Rectangle::default(),
-                            thumbnail_rec: Rectangle::default(),
                             name,
-                            name_rec: Rectangle::default(),
                             color,
-                            color_rec: Rectangle::default(),
                             is_hidden,
-                            hide_button_rec: Rectangle::default(),
                             is_locked,
-                            lock_button_rec: Rectangle::default(),
                             is_group,
                             blend: Blending {
                                 opacity,
@@ -458,7 +445,6 @@ impl Document {
                                     Layer::Group(Group {
                                         settings,
                                         is_expanded,
-                                        expand_button_rec: Rectangle::default(),
                                         items: read_layer_tree(reader)?,
                                     })
                                 },

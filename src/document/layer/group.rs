@@ -1,11 +1,10 @@
 use raylib::prelude::*;
-use super::{tree::LayerTree, LayerSettings, LayerType};
+use super::{rc::StrongRef, tree::LayerTree, LayerSettings, LayerType};
 
 pub struct Group {
     pub settings: LayerSettings,
     pub items: LayerTree,
     pub is_expanded: bool,
-    pub expand_button_rec: Rectangle,
 }
 
 impl Group {
@@ -14,7 +13,6 @@ impl Group {
             settings: layer,
             items: LayerTree::new(),
             is_expanded: false,
-            expand_button_rec: Rectangle::default(),
         }
     }
 }

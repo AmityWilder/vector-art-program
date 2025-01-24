@@ -1,6 +1,5 @@
 use std::{collections::VecDeque, ops::{Deref, DerefMut}};
-use raylib::prelude::*;
-use crate::layer::{group::Group, Layer, LayerType, GAP};
+use crate::layer::{group::Group, Layer};
 use super::rc::*;
 
 pub trait Recursive: Sized {
@@ -230,54 +229,6 @@ impl<T: Recursive> Tree<T> {
             queue,
             dir,
             should_recurs,
-        }
-    }
-}
-
-impl Tree<Layer> {
-    pub fn update_ui_recs(&mut self, container: &Rectangle, mut top: f32) {
-        use super::{
-            INDENT,
-            THUMBNAIL_SIZE,
-            THUMBNAIL_INSET,
-            LAYER_HEIGHT,
-            LAYER_COLOR_WIDTH,
-            TEXT_FONT_SIZE,
-            EXPAND_COLLAPSE_SIZE,
-        };
-        for (mut layer, depth) in self.tree_iter_mut(TreeIterDir::TopToBot, |group| group.is_expanded) {
-            let mut layer = layer.write();
-            let settings = layer.settings_mut();
-            let indent_size = depth as f32 * INDENT;
-            let left = container.x + indent_size;
-            let width = container.width - indent_size;
-            let mut rec = Rectangle::new(left, top, width, LAYER_HEIGHT);
-            settings.slot_rec = rec;
-            settings.color_rec = {
-                rec.width = LAYER_COLOR_WIDTH;
-                rec
-            };
-            settings.thumbnail_rec = {
-                rec.x += LAYER_COLOR_WIDTH + THUMBNAIL_INSET;
-                rec.y += THUMBNAIL_INSET;
-                (rec.width, rec.height) = (THUMBNAIL_SIZE, THUMBNAIL_SIZE);
-                rec
-            };
-            settings.name_rec = {
-                rec.x += THUMBNAIL_SIZE + THUMBNAIL_INSET;
-                rec.height = TEXT_FONT_SIZE;
-                rec.width = width - LAYER_COLOR_WIDTH + THUMBNAIL_INSET - THUMBNAIL_SIZE;
-                rec
-            };
-            top += LAYER_HEIGHT + GAP;
-            if let Layer::Group(Group { expand_button_rec, .. }) = &mut *layer {
-                *expand_button_rec = {
-                    rec.y += TEXT_FONT_SIZE + 2.0;
-                    rec.width  = EXPAND_COLLAPSE_SIZE;
-                    rec.height = EXPAND_COLLAPSE_SIZE;
-                    rec
-                };
-            }
         }
     }
 }

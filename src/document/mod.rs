@@ -1,4 +1,5 @@
 use crate::{raster::Raster, stack::{StackAdaptor, VecStack}, ui::panel::Panel, vector_path::VectorPath};
+use layer::{rc::StrongRef, ui_iter::INSET};
 use raylib::prelude::*;
 
 pub mod layer;
@@ -13,7 +14,7 @@ use self::{
     layer::{
         group::Group,
         rc::{StrongMut, WeakMut},
-        tree::{TreeIterDir, LayerTree},
+        tree::LayerTree,
         Layer,
         LayerSettings,
         LayerType,
@@ -150,23 +151,24 @@ impl Document {
         path
     }
 
-    pub fn update_layer_tree_recs(&mut self, container: &Rectangle) {
-        self.layers.update_ui_recs(container, container.y + layer::INSET);
-    }
-
     /// Assumes `update_layer_tree_recs` is up to date
     pub fn draw_layer_tree(&self, d: &mut impl RaylibDraw, panel: &Panel) {
+        const SLOT_COLOR: Color = Color::new(32,32,32,255);
+        const TEXT_COLOR: Color = Color::new(200,200,200,255);
         let panel_rec: Rectangle = panel.rec_cache.into();
         let mut d = d.begin_scissor_mode(panel_rec.x as i32, panel_rec.y as i32, panel_rec.width as i32, panel_rec.height as i32);
         d.draw_rectangle_rec(panel_rec, panel.background);
-        for (layer, _depth) in self.layers.tree_iter(TreeIterDir::TopToBot, |group| group.is_expanded) {
+        for (layer, _depth, recs) in self.layers.ui_iter(panel.rec_cache, panel.rec_cache.ymin) {
             let layer = layer.read();
-            d.draw_rectangle_rec(layer.settings().slot_rec, Color::new(32,32,32,255));
-            d.draw_rectangle_rec(layer.settings().color_rec, layer.settings().color);
-            d.draw_rectangle_rec(layer.settings().thumbnail_rec, Color::GRAY);
-            d.draw_text(&layer.settings().name, layer.settings().name_rec.x as i32, layer.settings().name_rec.y as i32, 10, Color::new(200,200,200,255));
+            let settings = layer.settings();
+            let name = settings.name.as_str();
+            d.draw_rectangle_rec(recs.slot_rec, SLOT_COLOR);
+            d.draw_rectangle_rec(recs.color_rec, layer.settings().color);
+            d.draw_rectangle_rec(recs.thumbnail_rec, Color::GRAY);
+            d.draw_text(name, recs.name_rec.x as i32, recs.name_rec.y as i32, 10, TEXT_COLOR);
             // expand icon
-            if let Layer::Group(Group { is_expanded, expand_button_rec, .. }) = &*layer {
+            if let Layer::Group(Group { is_expanded, .. }) = &*layer {
+                let expand_button_rec = recs.expand_button_rec.expect("group should always have expand button");
                 let p0 = Vector2::new(expand_button_rec.x, expand_button_rec.y);
                 let [p1, p2] = if *is_expanded {
                     [
@@ -191,7 +193,7 @@ impl Document {
                         ),
                     ]
                 };
-                d.draw_triangle(p0, p1, p2, Color::new(200,200,200,255));
+                d.draw_triangle(p0, p1, p2, TEXT_COLOR);
             }
         }
     }

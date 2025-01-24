@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use crate::{layer::{rc::StrongMut, tree::TreeIterDir, Layer}, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PPPart, PathPoint, ReflectVector}, VectorPath}, Document};
+use crate::{layer::{rc::{StrongMut, StrongRef}, tree::TreeIterDir, Layer}, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PPPart, PathPoint, ReflectVector}, VectorPath}, Document};
 use super::ToolType;
 
 pub struct GroupHover {

@@ -1,5 +1,6 @@
 use std::{io, path::Path};
 use raylib::prelude::*;
+use rc::StrongRef;
 use crate::{
     artboard::IntRect2, document::{
         layer::*,
