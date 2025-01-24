@@ -23,8 +23,8 @@ use self::{
 };
 
 pub trait Change {
-    fn unapply(&self, document: &mut Document);
-    fn apply  (&self, document: &mut Document);
+    fn redo(&mut self, document: &mut Document) -> Result<(), String>;
+    fn undo(&mut self, document: &mut Document) -> Result<(), String>;
 }
 
 const DEFAULT_LAYER_COLORS: [Color; 10] = [
@@ -101,22 +101,21 @@ impl Document {
     }
 
     /// Apply a change that can be undone/redone and add it to the history
-    pub fn apply(&mut self, change: Box<dyn Change>) {
+    pub fn push_change(&mut self, change: Box<dyn Change>) {
         self.future.clear();
-        change.apply(self);
         self.history.push_no_resize(change);
     }
 
     pub fn undo(&mut self) {
-        if let Some(change) = self.history.pop() {
-            change.unapply(self);
+        if let Some(mut change) = self.history.pop() {
+            change.undo(self);
             self.future.push_no_resize(change);
         }
     }
 
     pub fn redo(&mut self) {
-        if let Some(change) = self.future.pop() {
-            change.apply(self);
+        if let Some(mut change) = self.future.pop() {
+            change.redo(self);
             self.history.push_no_resize(change);
         }
     }

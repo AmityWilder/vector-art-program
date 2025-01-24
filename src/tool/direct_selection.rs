@@ -1,6 +1,29 @@
 use raylib::prelude::*;
-use crate::{layer::{rc::{StrongMut, StrongRef}, tree::TreeIterDir, Layer}, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PPPart, PathPoint, ReflectVector}, VectorPath}, Document};
+use crate::{layer::{rc::{StrongMut, StrongRef}, tree::TreeIterDir, Layer}, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PPPart, PathPoint, ReflectVector}, VectorPath}, Change, Document};
 use super::ToolType;
+
+struct EditPointAction {
+    target: StrongMut<Layer>,
+    idx: usize,
+    pre: PathPoint,
+    post: PathPoint,
+}
+
+impl Change for EditPointAction {
+    fn redo(&mut self, _document: &mut Document) -> Result<(), String> {
+        let mut target = self.target.write();
+        let Layer::Path(path) = &mut *target else { panic!("`target` is required to be a vector path") };
+        path.points[self.idx].clone_from(&self.post);
+        Ok(())
+    }
+
+    fn undo(&mut self, _document: &mut Document) -> Result<(), String> {
+        let mut target = self.target.write();
+        let Layer::Path(path) = &mut *target else { panic!("`target` is required to be a vector path") };
+        path.points[self.idx].clone_from(&self.pre);
+        Ok(())
+    }
+}
 
 pub struct GroupHover {
     pub group_layer: StrongMut<Layer>,

@@ -1,4 +1,4 @@
-use std::{path::{Path, PathBuf}, time::Instant};
+use std::{path::Path, time::Instant};
 use layer::{rc::StrongRef, tree::TreeIterDir, LayerType};
 use raylib::prelude::*;
 use serialize::render_png::DownscaleAlgorithm;
@@ -71,22 +71,28 @@ fn main() {
         let mouse_screen_pos = rl.get_mouse_position();
         let mouse_screen_delta = rl.get_mouse_delta();
 
-        'serialization: loop {
-            if rl.is_key_down(KeyboardKey::KEY_LEFT_CONTROL) || rl.is_key_down(KeyboardKey::KEY_RIGHT_CONTROL) {
+        if rl.is_key_down(KeyboardKey::KEY_LEFT_CONTROL) || rl.is_key_down(KeyboardKey::KEY_RIGHT_CONTROL) {
+            let is_r_pressed = rl.is_key_pressed(KeyboardKey::KEY_R);
+            let is_s_pressed = rl.is_key_pressed(KeyboardKey::KEY_S);
+            let is_o_pressed = rl.is_key_pressed(KeyboardKey::KEY_O);
+            let is_p_pressed = rl.is_key_pressed(KeyboardKey::KEY_P);
+            if is_r_pressed || is_s_pressed || is_o_pressed || is_p_pressed {
                 let start = Instant::now();
                 let save_path = document.path
                     .get_or_insert_with(|| Path::new("test").with_extension("amyvec").to_path_buf())
                     .clone();
                 let (result, past_tense, present_tense) =
-                    if rl.is_key_pressed(KeyboardKey::KEY_R) {
+                    if is_r_pressed {
                         (document.render_png(save_path.with_extension("png"), 0, &mut rl, &thread, Some(DownscaleAlgorithm::Bicubic), Color::WHITE), "rendered", "render")
-                    } else if rl.is_key_pressed(KeyboardKey::KEY_S) {
+                    } else if is_s_pressed {
                         (document.save_bin(save_path.with_extension("amyvec")), "saved", "save")
-                    } else if rl.is_key_pressed(KeyboardKey::KEY_O) {
+                    } else if is_o_pressed {
                         (Document::load_bin(save_path.with_extension("amyvec"), mouse_screen_pos).and_then(|data| Ok(document = data)), "loaded", "load")
-                    } else if rl.is_key_pressed(KeyboardKey::KEY_P) {
+                    } else if is_p_pressed {
                         (document.export_svg(save_path.with_extension("svg"), 0), "exported", "export")
-                    } else { break 'serialization; };
+                    } else {
+                        unreachable!()
+                    };
                 let duration = start.elapsed();
                 match result {
                     Ok(()) => println!("file {past_tense} successfully"),
@@ -94,7 +100,6 @@ fn main() {
                 }
                 println!("  finished in {duration:?}");
             }
-            break 'serialization;
         }
 
         if rl.is_window_resized() {
@@ -113,7 +118,7 @@ fn main() {
         let mouse_world_delta = mouse_screen_delta / document.camera.zoom;
 
         {
-            let is_zooming = rl.is_key_down(KeyboardKey::KEY_LEFT_ALT);
+            let is_zooming = rl.is_key_down(KeyboardKey::KEY_LEFT_ALT) || rl.get_gesture_pinch_vector().length_sqr() > 0.0;
 
             let mut pan = Vector2::zero();
             if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_MIDDLE) {
@@ -133,7 +138,8 @@ fn main() {
 
             if is_zooming {
                 const ZOOM_SPEED: f32 = 1.5;
-                let amount = rl.get_mouse_wheel_move();
+                let scroll = rl.get_mouse_wheel_move();
+                let amount = if scroll != 0.0 { scroll } else { rl.get_gesture_pinch_vector().length() };
                 if amount > 0.0 && document.camera.zoom < MAX_ZOOM {
                     document.camera.zoom *= ZOOM_SPEED;
                 } else if amount < 0.0 && document.camera.zoom > MIN_ZOOM {
@@ -161,7 +167,7 @@ fn main() {
         }
 
         if (rl.is_key_down(KeyboardKey::KEY_LEFT_CONTROL) || rl.is_key_down(KeyboardKey::KEY_RIGHT_CONTROL)) && rl.is_key_pressed(KeyboardKey::KEY_Z) {
-            if rl.is_key_pressed(KeyboardKey::KEY_LEFT_SHIFT) || rl.is_key_pressed(KeyboardKey::KEY_RIGHT_SHIFT) {
+            if rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) || rl.is_key_down(KeyboardKey::KEY_RIGHT_SHIFT) {
                 document.redo();
             } else {
                 document.undo();
