@@ -1,5 +1,6 @@
+use std::path::PathBuf;
 use crate::{raster::Raster, stack::{StackAdaptor, VecStack}, ui::panel::Panel, vector_path::VectorPath};
-use layer::{rc::StrongRef, ui_iter::INSET};
+use layer::rc::StrongRef;
 use raylib::prelude::*;
 
 pub mod layer;
@@ -40,6 +41,7 @@ const DEFAULT_LAYER_COLORS: [Color; 10] = [
 ];
 
 pub struct Document {
+    pub path: Option<PathBuf>,
     pub title: String,
     pub camera: Camera2D,
     pub paper_color: Color,
@@ -75,6 +77,7 @@ impl Document {
 
     pub fn new() -> Self {
         Self {
+            path: None,
             title: "untitled".to_string(),
             camera: Camera2D {
                 offset: Vector2::zero(),

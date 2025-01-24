@@ -154,6 +154,7 @@ impl Document {
         writer.write_all(&[VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, b'\n'])?;
 
         let Self {
+            path: _,
             title,
             camera,
             paper_color,
@@ -368,7 +369,7 @@ impl Document {
 
     /// Load as binary
     pub fn load_bin(path: impl AsRef<Path>, mouse_screen_pos: Vector2) -> io::Result<Self> {
-        let mut reader = BufReader::new(File::open(path)?);
+        let mut reader = BufReader::new(File::open(&path)?);
         let mut version_line = String::new();
         if !matches!(&read_bytes(&mut reader)?, b"amyvec") { Err(io::Error::other("incompatible file extension"))? }
         reader.read_line(&mut version_line)?;
@@ -379,6 +380,8 @@ impl Document {
                 Err(io::Error::other("todo: implement backwards compatibility"))
             } else {
                 let mut document = Self::new();
+
+                document.path = Some(path.as_ref().to_path_buf());
 
                 document.title = read_str(&mut reader)?;
 

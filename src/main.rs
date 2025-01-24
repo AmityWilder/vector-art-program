@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{path::{Path, PathBuf}, time::Instant};
 use layer::{rc::StrongRef, tree::TreeIterDir, LayerType};
 use raylib::prelude::*;
 use serialize::render_png::DownscaleAlgorithm;
@@ -16,33 +16,6 @@ mod editor;
 mod ui;
 
 use self::{document::*, tool::*};
-
-fn handle_serialization_if_requested(
-    rl: &mut RaylibHandle,
-    thread: &RaylibThread,
-    document: &mut Document,
-    mouse_screen_pos: Vector2,
-) {
-    if rl.is_key_down(KeyboardKey::KEY_LEFT_CONTROL) || rl.is_key_down(KeyboardKey::KEY_RIGHT_CONTROL) {
-        let start = Instant::now();
-        let (result, past_tense, present_tense) =
-            if rl.is_key_pressed(KeyboardKey::KEY_R) {
-                (document.render_png("test.png", 0, rl, thread, Some(DownscaleAlgorithm::Bicubic), Color::WHITE), "rendered", "render")
-            } else if rl.is_key_pressed(KeyboardKey::KEY_S) {
-                (document.save_bin("test.amyvec"), "saved", "save")
-            } else if rl.is_key_pressed(KeyboardKey::KEY_O) {
-                (Document::load_bin("test.amyvec", mouse_screen_pos).and_then(|data| Ok(*document = data)), "loaded", "load")
-            } else if rl.is_key_pressed(KeyboardKey::KEY_P) {
-                (document.export_svg("test.svg", 0), "exported", "export")
-            } else { return };
-        let duration = start.elapsed();
-        match result {
-            Ok(()) => println!("file {past_tense} successfully"),
-            Err(e) => println!("failed to {present_tense} file: {e}"),
-        }
-        println!("  finished in {duration:?}");
-    }
-}
 
 fn main() {
     let background_color: Color = Color::new(32,32,32,255);
@@ -98,7 +71,31 @@ fn main() {
         let mouse_screen_pos = rl.get_mouse_position();
         let mouse_screen_delta = rl.get_mouse_delta();
 
-        handle_serialization_if_requested(&mut rl, &thread, &mut document, mouse_screen_pos);
+        'serialization: loop {
+            if rl.is_key_down(KeyboardKey::KEY_LEFT_CONTROL) || rl.is_key_down(KeyboardKey::KEY_RIGHT_CONTROL) {
+                let start = Instant::now();
+                let save_path = document.path
+                    .get_or_insert_with(|| Path::new("test").with_extension("amyvec").to_path_buf())
+                    .clone();
+                let (result, past_tense, present_tense) =
+                    if rl.is_key_pressed(KeyboardKey::KEY_R) {
+                        (document.render_png(save_path.with_extension("png"), 0, &mut rl, &thread, Some(DownscaleAlgorithm::Bicubic), Color::WHITE), "rendered", "render")
+                    } else if rl.is_key_pressed(KeyboardKey::KEY_S) {
+                        (document.save_bin(save_path.with_extension("amyvec")), "saved", "save")
+                    } else if rl.is_key_pressed(KeyboardKey::KEY_O) {
+                        (Document::load_bin(save_path.with_extension("amyvec"), mouse_screen_pos).and_then(|data| Ok(document = data)), "loaded", "load")
+                    } else if rl.is_key_pressed(KeyboardKey::KEY_P) {
+                        (document.export_svg(save_path.with_extension("svg"), 0), "exported", "export")
+                    } else { break 'serialization; };
+                let duration = start.elapsed();
+                match result {
+                    Ok(()) => println!("file {past_tense} successfully"),
+                    Err(e) => println!("failed to {present_tense} file: {e}"),
+                }
+                println!("  finished in {duration:?}");
+            }
+            break 'serialization;
+        }
 
         if rl.is_window_resized() {
             let (width, height) = (
