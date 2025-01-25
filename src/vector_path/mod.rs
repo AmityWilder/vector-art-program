@@ -85,13 +85,10 @@ impl LayerType for VectorPath {
         }
     }
 
-    fn draw_selected(&self, d: &mut impl RaylibDraw, _camera: &Camera2D, zoom_inv: f32) {
+    fn draw_selected(&self, d: &mut impl RaylibDraw, px_world_size: f32) {
         let color = self.settings.color;
         for [a, b] in self.calculate().windows(2).map(|w| <[_; 2]>::try_from(w).unwrap()) {
-            d.draw_spline_segment_bezier_cubic(a.1, a.2, b.0, b.1, zoom_inv, color);
-        }
-        for pp in &self.points {
-            pp.draw_selected(d, zoom_inv, color);
+            d.draw_spline_segment_bezier_cubic(a.1, a.2, b.0, b.1, px_world_size, color);
         }
     }
 }

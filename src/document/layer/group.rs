@@ -32,9 +32,9 @@ impl LayerType for Group {
         }
     }
 
-    fn draw_selected(&self, d: &mut impl RaylibDraw, camera: &Camera2D, zoom_inv: f32) {
+    fn draw_selected(&self, d: &mut impl RaylibDraw, px_world_size: f32) {
         for item in self.items.iter() {
-            item.read().draw_selected(d, camera, zoom_inv);
+            item.read().draw_selected(d, px_world_size);
         }
     }
 }

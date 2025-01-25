@@ -1,3 +1,7 @@
+//! Wrappers for [`Rc<RefCell<T>>`] to enable finer tuning of mutability.
+//! These exist because Rust doesn't appear to have a good means of enabling
+//! multiple mutable references in a guaranteed single-threaded environment.
+
 use std::{cell::RefCell, rc::{self, Rc}};
 
 pub trait StrongRef<T>: Sized {
@@ -125,5 +129,31 @@ impl<T> WeakRef<T> for WeakMut<T> {
 impl<T> WeakMut<T> {
     pub fn clone_mut(&self) -> Self {
         Self(self.0.clone())
+    }
+}
+
+impl<T> PartialEq for Strong<T> {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+impl<T> Eq for Strong<T> {}
+
+impl<T> PartialEq for StrongMut<T> {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+impl<T> Eq for StrongMut<T> {}
+
+impl<T> PartialEq<Strong<T>> for StrongMut<T> {
+    fn eq(&self, other: &Strong<T>) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl<T> PartialEq<StrongMut<T>> for Strong<T> {
+    fn eq(&self, other: &StrongMut<T>) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
     }
 }

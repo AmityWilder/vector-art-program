@@ -158,47 +158,6 @@ impl<T: Recursive> Tree<T> {
     ///
     /// Parent is visited before child regardless of direction.
     ///
-    /// e.g.
-    ///
-    /// [`LayerIterDir::BackToFore`]:
-    /// - 0
-    ///   - 0.0
-    ///   - 0.1
-    ///   - 0.2
-    /// - 1
-    /// - 2
-    ///   - 2.1
-    /// - 3
-    /// - 4
-    /// - 5
-    ///   - 5.0
-    ///     - 5.0.0
-    ///   - 5.1
-    ///   - 5.2
-    ///     - 5.2.0
-    ///     - 5.2.1
-    ///
-    /// [`LayerIterDir::ForeToBack`]:
-    /// - 5
-    ///   - 5.2
-    ///     - 5.2.1
-    ///     - 5.2.0
-    ///   - 5.1
-    ///   - 5.0
-    ///     - 5.0.0
-    /// - 4
-    /// - 3
-    /// - 2
-    ///   - 2.1
-    /// - 1
-    /// - 0
-    ///   - 0.2
-    ///   - 0.1
-    ///   - 0.0
-    ///
-    /// Notice that in both cases, 5 is visited before 5.0 and 5.0 is visited before 5.0.0. \
-    /// But in one, 5.0 comes before 5.1; while in the other, 5.1 comes before 5.0.
-    ///
     /// ---
     ///
     /// Iterator returns elements in a tuple of

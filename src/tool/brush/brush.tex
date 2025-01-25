@@ -1,0 +1,66 @@
+\documentclass[12pt]{article}
+
+\usepackage{graphicx}
+\usepackage{amssymb,amsthm,amsmath}
+\usepackage[margin=1in]{geometry}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+\usepackage{tikz}
+\pagestyle{fancy}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\zmod}[1]{\mathbb{Z}_{#1}}
+\renewcommand{\mod}[3]{{#1} \equiv {#2} \pmod {#3}}
+
+\lhead{Amy Wilder}
+\rhead{Minimizing B\'ezier Curve Points\dots}
+
+\begin{document}
+
+\begin{center}
+    {\Large Minimizing Cubic B\'ezier Curve Control Points From Ongoing Signal While Retaining High Accuracy}
+\end{center}
+
+Given an ongoing, two-dimensional signal, we will create a cubic B\'ezier curve to approximate that signal while using the smallest reasonable number of control points.
+
+Our original signal will be \(s(t) = \langle s_x(t),s_y(t) \rangle\), and the pressure of that signal will be \(s_p(t)\).
+Assume \(\frac{\Delta s_p}{\Delta t}(t)\) is known.
+
+Requirements:
+\begin{itemize}
+    \item We must never add a point while \(s_p(t) = 0\).
+    \item We must always add a point while \(\frac{\Delta s_p}{\Delta t}(t) \ne 0\).
+    \item If \(s_p(t) \ne 0\), whether we add a point will depend on the criteria we are defining.
+\end{itemize}
+
+\section*{Case 1: Point}
+
+Assume \(\frac{\Delta s_p}{\Delta t}(t - \Delta t) = 1\) and \(\frac{\Delta s_p}{\Delta t}(t) = -1\).
+
+\section*{Case 2: Edge}
+
+\section*{Case 3: Corner}
+
+\section*{Case 4: Angle}
+
+\section*{Case 5: Turn}
+
+\section*{Case 6: Inflection}
+
+\begin{center}
+    \begin{tikzpicture}
+        \draw (0,0) circle[radius=2pt];
+        \draw (3,0) circle[radius=2pt];
+    \end{tikzpicture}
+\end{center}
+
+\end{document}

@@ -47,7 +47,7 @@ impl Brush {
     }
 }
 
-const MIN_DISTANCE: f32 = 1.0;
+const MIN_DISTANCE: f32 = 5.0;
 const MIN_DISTANCE_SQR: f32 = MIN_DISTANCE * MIN_DISTANCE;
 const MIN_OPP_LENGTH: f32 = 1.0;
 const MIN_OPP_LENGTH_SQR: f32 = MIN_OPP_LENGTH * MIN_OPP_LENGTH;
@@ -55,7 +55,7 @@ const MIN_OPP_LENGTH_SQR_CHANGE: f32 = 1.0;
 const IS_CURVATURE_SUPPORTED: bool = false;
 
 impl ToolType for Brush {
-    fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2, _mouse_world_delta: Vector2) {
+    fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) && matches!(self, Self::Inactive(_)) {
             // create a new path
             *self = Self::Active {
@@ -68,6 +68,13 @@ impl ToolType for Brush {
         if let Self::Active { target, trail, last_failing } = self {
             if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
                 trail.push(mouse_world_pos);
+
+                let mut layer = target.write();
+                let Layer::Path(path) = &mut *layer else { panic!("brush target should be a path") };
+
+                for _ in 0..2 {
+                    path.points.push_back(PathPoint { p: mouse_world_pos, ctrls: None });
+                }
             }
 
             if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT) {
@@ -113,9 +120,33 @@ impl ToolType for Brush {
                     should_add_point = false;
                 }
 
+                {
+                    let mut layer = target.write();
+                    let Layer::Path(path) = &mut *layer else { panic!("brush target should be a path") };
+
+                    if let Some(back) = path.points.back_mut() {
+                        back.p = new_pos;
+                    }
+                    if let Some(idx) = path.points.len().checked_sub(3) {
+                        let (prev, curr, next) = (path.points[idx].p, path.points[idx + 1].p, path.points[idx + 2].p);
+                        let speed_in  = (curr - prev).length();
+                        let speed_out = (next - curr).length();
+                        let t_hat = (next - prev).normalized();
+                        let c_out = curr + t_hat * speed_out / 3.0;
+                        path.points[idx + 1].ctrls = Some(CtrlPt1 {
+                            c1: (Ctrl::Out, c_out),
+                            c2: Some(CtrlPt2::Mirror(speed_in / 3.0)),
+                        });
+                    }
+                }
+
                 if should_add_point {
                     let pos = last_failing.take().unwrap_or(new_pos);
                     trail.push(pos);
+
+                    let mut layer = target.write();
+                    let Layer::Path(path) = &mut *layer else { panic!("brush target should be a path") };
+                    path.points.push_back(PathPoint { p: new_pos, ctrls: None });
                 } else if !is_too_close {
                     *last_failing = Some(new_pos);
                 }
@@ -133,26 +164,6 @@ impl ToolType for Brush {
                         }
                     }
 
-                    path.points.reserve(trail.len());
-                    if let Some(p) = trail.first().copied() {
-                        path.points.push_back(PathPoint { p, ctrls: None });
-                    }
-                    for i in 1..trail.len() - 1 {
-                        let prev = trail[i - 1];
-                        let curr = trail[i];
-                        let next = trail[i + 1];
-                        let speed_in  = (curr - prev).length();
-                        let speed_out = (next - curr).length();
-                        let t_hat = (next - prev).normalized();
-                        let c_out = curr + t_hat * speed_out / 3.0;
-                        path.points.push_back(PathPoint {
-                            p: curr,
-                            ctrls: Some(CtrlPt1 {
-                                c1: (Ctrl::Out, c_out),
-                                c2: Some(CtrlPt2::Mirror(speed_in / 3.0)),
-                            })
-                        });
-                    }
                     if let Some(p) = trail.last().copied() {
                         path.points.push_back(PathPoint { p, ctrls: None });
                     }
@@ -170,18 +181,14 @@ impl ToolType for Brush {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, mouse_world_pos: Vector2) {
-        if let Self::Active { target, trail, .. } = self {
-            let inv_zoom = document.camera.zoom.recip();
-            let layer_color = { target.read().settings().color };
-            for i in 1..trail.len() {
-                d.draw_line_v(trail[i - 1], trail[i], layer_color);
-            }
-            if let Some(prev) = trail.len().checked_sub(1).and_then(|i| trail.get(i)) {
-                d.draw_line_v(prev, mouse_world_pos, layer_color);
-            }
-            for p in trail.iter().copied() {
-                d.draw_circle_v(p, 3.0 * inv_zoom, layer_color);
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, _mouse_world_pos: Vector2) {
+        if let Self::Active { target, .. } = self {
+            let px_world_size = document.camera.zoom.recip();
+            let layer = target.read();
+            let Layer::Path(path) = &*layer else { panic!("Brush target must be a path") };
+            path.draw_selected(d, px_world_size);
+            for pp in &path.points {
+                pp.draw(d, px_world_size, path.settings.color, false, true, true);
             }
         }
     }

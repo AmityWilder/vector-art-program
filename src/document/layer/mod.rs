@@ -51,7 +51,7 @@ pub trait LayerType {
     fn draw_rendered(&self, d: &mut impl RaylibDraw);
 
     /// Draw with helper visuals
-    fn draw_selected(&self, d: &mut impl RaylibDraw, camera: &Camera2D, zoom_inv: f32);
+    fn draw_selected(&self, d: &mut impl RaylibDraw, px_world_size: f32);
 }
 
 impl LayerType for Layer {
@@ -81,12 +81,12 @@ impl LayerType for Layer {
         }
     }
 
-    fn draw_selected(&self, d: &mut impl RaylibDraw, camera: &Camera2D, zoom_inv: f32) {
+    fn draw_selected(&self, d: &mut impl RaylibDraw, px_world_size: f32) {
         if !self.settings().is_hidden {
             match self {
-                Layer::Group(group) => group.draw_selected(d, camera, zoom_inv),
-                Layer::Path(path) => path.draw_selected(d, camera, zoom_inv),
-                Layer::Raster(raster) => raster.draw_selected(d, camera, zoom_inv),
+                Layer::Group(group) => group.draw_selected(d, px_world_size),
+                Layer::Path(path) => path.draw_selected(d, px_world_size),
+                Layer::Raster(raster) => raster.draw_selected(d, px_world_size),
             }
         }
     }

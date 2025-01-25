@@ -115,7 +115,6 @@ fn main() {
         }
 
         let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, document.camera);
-        let mouse_world_delta = mouse_screen_delta / document.camera.zoom;
 
         {
             let is_zooming = rl.is_key_down(KeyboardKey::KEY_LEFT_ALT) || rl.get_gesture_pinch_vector().length_sqr() > 0.0;
@@ -149,7 +148,7 @@ fn main() {
         }
 
         if rl.is_key_pressed(KeyboardKey::KEY_V) {
-            current_tool.switch_to_direct_selection();
+            current_tool.switch_to_point_selection();
         } else if rl.is_key_pressed(KeyboardKey::KEY_P) {
             current_tool.switch_to_pen();
         } else if rl.is_key_pressed(KeyboardKey::KEY_B) {
@@ -159,7 +158,7 @@ fn main() {
         if layers_panel.panel.is_overlapping_point(mouse_screen_pos) {
             layers_panel.tick(&mut rl, &mut document, mouse_screen_pos);
         } else {
-            current_tool.tick(&mut rl, &mut document, mouse_world_pos, mouse_world_delta);
+            current_tool.tick(&mut rl, &mut document, mouse_world_pos);
         }
 
         if rl.is_key_pressed(KeyboardKey::KEY_T) {
@@ -254,21 +253,13 @@ fn main() {
                 // todo: make all ui elements draw without 2D mode
                 let mut d = d.begin_mode2D(document.camera);
 
-                // todo: use draw_selected only on selection
-                match current_tool {
-                    Tool::DirectSelection(_) => {
-                        for (layer, _depth) in document.layers.tree_iter(TreeIterDir::BackToFore, |g| !g.settings.is_locked) {
-                            layer.read().draw_selected(&mut d, &document.camera, document.camera.zoom.recip());
-                        }
-                    }
-                    _ => (),
-                }
-
                 current_tool.draw(&mut d, &document, mouse_world_pos);
             }
 
             // Draw layers panel
             layers_panel.draw(&mut d, &document);
+
+            d.draw_fps(0, 0);
         }
     }
 }
