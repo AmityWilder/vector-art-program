@@ -1,6 +1,6 @@
 use std::collections::{LinkedList, VecDeque};
 
-pub trait StackAdaptor<T> {
+pub trait Stack<T> {
     fn new() -> Self;
     fn push(&mut self, value: T);
     fn pop(&mut self) -> Option<T>;
@@ -10,9 +10,9 @@ pub trait StackAdaptor<T> {
     fn is_empty(&self) -> bool;
 }
 
-pub struct ListStack<T>(LinkedList<T>);
+pub struct LinkedStack<T>(LinkedList<T>);
 
-impl<T> StackAdaptor<T> for ListStack<T> {
+impl<T> Stack<T> for LinkedStack<T> {
     fn new() -> Self {
         Self(LinkedList::new())
     }
@@ -41,9 +41,51 @@ impl<T> StackAdaptor<T> for ListStack<T> {
     }
 }
 
-pub struct VecStack<T>(VecDeque<T>);
+pub struct VecStack<T>(Vec<T>);
 
 impl<T> VecStack<T> {
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(Vec::with_capacity(capacity))
+    }
+
+    /// `len == capacity`
+    pub fn is_full(&self) -> bool {
+        self.0.len() == self.0.capacity()
+    }
+}
+
+impl<T> Stack<T> for VecStack<T> {
+    fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    fn push(&mut self, value: T) {
+        self.0.push(value);
+    }
+
+    fn pop(&mut self) -> Option<T> {
+        self.0.pop()
+    }
+
+    fn top(&mut self) -> Option<&T> {
+        self.0.last()
+    }
+    fn top_mut(&mut self) -> Option<&mut T> {
+        self.0.last_mut()
+    }
+
+    fn clear(&mut self) {
+        self.0.clear();
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+pub struct VecDestack<T>(VecDeque<T>);
+
+impl<T> VecDestack<T> {
     pub fn with_capacity(capacity: usize) -> Self {
         Self(VecDeque::with_capacity(capacity))
     }
@@ -62,7 +104,7 @@ impl<T> VecStack<T> {
     }
 }
 
-impl<T> StackAdaptor<T> for VecStack<T> {
+impl<T> Stack<T> for VecDestack<T> {
     fn new() -> Self {
         Self(VecDeque::new())
     }

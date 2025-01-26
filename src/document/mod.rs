@@ -1,6 +1,8 @@
 use std::path::PathBuf;
-use crate::{raster::Raster, stack::{StackAdaptor, VecStack}, ui::panel::Panel, vector_path::VectorPath};
-use layer::rc::StrongRef;
+use amylib::collections::stack::{Stack, VecDestack, VecStack};
+use layer::{ui_iter::LayerUiIter, LayerTree};
+use crate::{raster::Raster, ui::panel::Panel, vector_path::VectorPath};
+use amylib::rc::*;
 use raylib::prelude::*;
 
 pub mod layer;
@@ -14,8 +16,6 @@ use self::{
     },
     layer::{
         group::Group,
-        rc::{StrongMut, WeakMut},
-        tree::LayerTree,
         Layer,
         LayerSettings,
         LayerType,
@@ -50,8 +50,8 @@ pub struct Document {
     pub artboards: Vec<ArtBoard>,
     pub active_artboard: Option<usize>,
 
-    history: VecStack<Box<dyn Change>>,
-    future:  VecStack<Box<dyn Change>>,
+    history: VecDestack<Box<dyn Change>>,
+    future:  VecDestack<Box<dyn Change>>,
 
     layer_color_acc: usize,
     layer_name_acc: usize,
@@ -91,8 +91,8 @@ impl Document {
             artboards: Vec::new(),
             active_artboard: None,
 
-            history: VecStack::with_capacity(128),
-            future:  VecStack::with_capacity(128),
+            history: VecDestack::with_capacity(128),
+            future:  VecDestack::with_capacity(128),
 
             layer_color_acc: 0,
             layer_name_acc: 0,
@@ -106,17 +106,23 @@ impl Document {
         self.history.push_no_resize(change);
     }
 
-    pub fn undo(&mut self) {
+    pub fn undo(&mut self) -> Result<Option<()>, String> {
         if let Some(mut change) = self.history.pop() {
-            change.undo(self);
+            change.undo(self)?;
             self.future.push_no_resize(change);
+            Ok(Some(()))
+        } else {
+            Ok(None)
         }
     }
 
-    pub fn redo(&mut self) {
+    pub fn redo(&mut self) -> Result<Option<()>, String> {
         if let Some(mut change) = self.future.pop() {
-            change.redo(self);
+            change.redo(self)?;
             self.history.push_no_resize(change);
+            Ok(Some(()))
+        } else {
+            Ok(None)
         }
     }
 

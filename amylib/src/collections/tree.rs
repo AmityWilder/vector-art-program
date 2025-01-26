@@ -1,6 +1,5 @@
 use std::{collections::VecDeque, ops::{Deref, DerefMut}};
-use crate::layer::{group::Group, Layer};
-use super::rc::*;
+use crate::rc::{Strong, StrongMut};
 
 pub trait Recursive: Sized {
     type Node;
@@ -10,28 +9,11 @@ pub trait Recursive: Sized {
     fn children_mut(node: &mut Self::Node) -> &mut Tree<Self>;
 }
 
-impl Recursive for Layer {
-    type Node = Group;
-    fn get_if_node(&self) -> Option<&Self::Node> {
-        if let Self::Group(group) = self { Some(group) } else { None }
-    }
-    fn get_if_node_mut(&mut self) -> Option<&mut Self::Node> {
-        if let Self::Group(group) = self { Some(group) } else { None }
-    }
-    fn children(node: &Self::Node) -> &Tree<Self> {
-        &node.items
-    }
-    fn children_mut(node: &mut Self::Node) -> &mut Tree<Self> {
-        &mut node.items
-    }
-}
-
 /// Front is background (bottom in layer panel) \
 /// Back is foreground (top in layer panel)
 ///
 /// Use `tree_iter()` to iterate recursively, `iter()` will only iterate over the current depth.
 pub struct Tree<T: Recursive>(Vec<StrongMut<T>>);
-pub type LayerTree = Tree<Layer>;
 
 impl<T: Recursive> Deref for Tree<T> {
     type Target = Vec<StrongMut<T>>;

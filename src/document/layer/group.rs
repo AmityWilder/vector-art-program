@@ -1,5 +1,6 @@
 use raylib::prelude::*;
-use super::{rc::StrongRef, tree::LayerTree, LayerSettings, LayerType};
+use super::{LayerSettings, LayerTree, LayerType};
+use amylib::rc::*;
 
 pub struct Group {
     pub settings: LayerSettings,

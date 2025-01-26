@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, fs::File, io::{self, BufRead, BufReader, BufWriter, Read, Write}, path::Path};
 use raylib::prelude::*;
-use rc::{StrongMut, StrongRef};
+use amylib::{rc::*, collections::tree::*};
 use crate::{
     document::{
         artboard::{ArtBoard, IntRect2},
@@ -8,10 +8,7 @@ use crate::{
         Document,
     },
     appearance::*,
-    layer::{
-        tree::*,
-        group::Group,
-    },
+    layer::group::Group,
     raster::Raster,
     vector_path::{
         fill,

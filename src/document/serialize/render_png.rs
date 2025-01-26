@@ -1,12 +1,7 @@
 use std::{io, path::Path};
 use raylib::prelude::*;
-use rc::StrongRef;
-use crate::{
-    artboard::IntRect2, document::{
-        layer::*,
-        Document,
-    }, layer::tree::*
-};
+use amylib::{rc::*, collections::tree::*};
+use crate::{artboard::IntRect2, document::Document, layer::{BackToFore, LayerType}};
 
 #[derive(Debug, Clone, Copy)]
 pub enum DownscaleAlgorithm {
@@ -51,7 +46,7 @@ impl Document {
             d.clear_background(background);
             {
                 let mut d = d.begin_mode2D(camera);
-                for (layer, _depth) in self.layers.tree_iter(TreeIterDir::BackToFore, |g| !g.settings.is_hidden) {
+                for (layer, _depth) in self.layers.tree_iter(BackToFore, |g| !g.settings.is_hidden) {
                     let layer = layer.read();
                     layer.draw_rendered(&mut d);
                 }

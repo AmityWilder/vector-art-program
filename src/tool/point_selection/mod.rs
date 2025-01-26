@@ -1,29 +1,7 @@
 use raylib::prelude::*;
-use crate::{layer::{rc::{StrongMut, StrongRef}, tree::TreeIterDir, Layer, LayerType}, ui::panel::Rect2, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PPPart, PathPoint, ReflectVector}, VectorPath}, Change, Document};
+use amylib::{rc::*, collections::tree::*};
+use crate::{layer::{BackToFore, ForeToBack, Layer, LayerType}, ui::panel::Rect2, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PPPart, PathPoint, ReflectVector}, VectorPath}, Change, Document};
 use super::ToolType;
-
-struct EditPointAction {
-    target: StrongMut<Layer>,
-    idx: usize,
-    pre: PathPoint,
-    post: PathPoint,
-}
-
-impl Change for EditPointAction {
-    fn redo(&mut self, _document: &mut Document) -> Result<(), String> {
-        let mut target = self.target.write();
-        let Layer::Path(path) = &mut *target else { panic!("`target` is required to be a vector path") };
-        path.points[self.idx].clone_from(&self.post);
-        Ok(())
-    }
-
-    fn undo(&mut self, _document: &mut Document) -> Result<(), String> {
-        let mut target = self.target.write();
-        let Layer::Path(path) = &mut *target else { panic!("`target` is required to be a vector path") };
-        path.points[self.idx].clone_from(&self.pre);
-        Ok(())
-    }
-}
 
 pub const HOVER_RADIUS: f32 = 3.0;
 pub const HOVER_RADIUS_SQR: f32 = HOVER_RADIUS * HOVER_RADIUS;
@@ -31,65 +9,28 @@ pub const HOVER_RADIUS_SQR: f32 = HOVER_RADIUS * HOVER_RADIUS;
 pub const SNAP_VERT_RADIUS: f32 = 3.0;
 pub const SNAP_VERT_RADIUS_SQR: f32 = SNAP_VERT_RADIUS * SNAP_VERT_RADIUS;
 
-struct LayerSelection {
-    pub target: StrongMut<Layer>,
-    pub points: Vec<usize>,
-}
+mod singular;
+mod multiple;
+
+use singular::SingleSelect;
+use multiple::{EnumerateSelectedLayers, EnumerateSelectedPoints, MultiSelect, SelectionPiece};
 
 /// Pieces should be ordered by unique target layer [`TreeIterDir::BackToFore`]. Points should be ordered by index.
 enum Selection {
-    Singular {
-        target: StrongMut<Layer>,
-        pt_idx: usize,
-        part: PPPart,
-    },
-    Multiple {
-        pieces: Vec<LayerSelection>,
-    },
+    Singular(SingleSelect),
+    Multiple(MultiSelect),
 }
 
 struct SelectionState {
-    selection: Selection,
-    drag: Option<(Vector2, Vector2)>, // (start, cumulative)
+    pub selection: Selection,
+    pub drag: Option<(Vector2, Vector2)>, // (start, cumulative)
 }
 
 impl SelectionState {
-    fn drag(&mut self, delta: Vector2) {
+    pub fn drag(&mut self, delta: Vector2) {
         match &mut self.selection {
-            Selection::Singular { target, ref pt_idx, ref part } => {
-                let mut layer = target.write();
-                let Layer::Path(path) = &mut *layer else { panic!("point selection must target path") };
-                let pp = &mut path.points[*pt_idx];
-                match part {
-                    PPPart::Anchor => {
-                        pp.move_point(delta);
-                    }
-
-                    PPPart::Ctrl(side) => {
-                        let CtrlPt1 { c1: (ref c1_side, c1), c2 } = pp.ctrls.as_mut().expect("should not select corner");
-                        if c1_side == side {
-                            *c1 += delta;
-                        } else {
-                            let c2 = c2.as_mut().expect("should not select corner");
-                            match c2 {
-                                CtrlPt2::Exact(c2) => *c2 += delta,
-                                CtrlPt2::Mirror(ref s2) => *c2 = CtrlPt2::Exact(c1.reflected_to(pp.p, *s2) + delta),
-                                CtrlPt2::Smooth => *c2 = CtrlPt2::Exact(c1.reflected_over(pp.p) + delta),
-                            }
-                        }
-                    }
-                }
-            }
-
-            Selection::Multiple { pieces } => {
-                for LayerSelection { target, ref points } in pieces {
-                    let mut layer = target.write();
-                    let Layer::Path(path) = &mut *layer else { panic!("point selection must target path") };
-                    for idx in points {
-                        path.points[*idx].move_point(delta);
-                    }
-                }
-            }
+            Selection::Singular(x) => x.drag(delta),
+            Selection::Multiple(x) => x.drag(delta),
         }
     }
 }
@@ -97,6 +38,15 @@ impl SelectionState {
 pub struct PointSelection {
     state: Option<SelectionState>,
     selection_start: Option<Vector2>,
+}
+
+fn get_minmax_rec(selection_start: Vector2, mouse_world_pos: Vector2) -> Rectangle {
+    Rectangle {
+        x: selection_start.x.min(mouse_world_pos.x),
+        y: selection_start.y.min(mouse_world_pos.y),
+        width:  (mouse_world_pos.x - selection_start.x).abs(),
+        height: (mouse_world_pos.y - selection_start.y).abs(),
+    }
 }
 
 impl PointSelection {
@@ -107,59 +57,22 @@ impl PointSelection {
         }
     }
 
-    fn get_selection_rec(selection_start: Vector2, mouse_world_pos: Vector2) -> Rectangle {
-        Rectangle {
-            x: selection_start.x.min(mouse_world_pos.x),
-            y: selection_start.y.min(mouse_world_pos.y),
-            width:  (mouse_world_pos.x - selection_start.x).abs(),
-            height: (mouse_world_pos.y - selection_start.y).abs(),
-        }
-    }
-
     fn begin_dragging(&mut self, document: &mut Document, mouse_world_pos: Vector2) {
         let drag = Some((mouse_world_pos, mouse_world_pos));
         let is_hovering = |pt: Vector2| pt.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR;
 
         if let Some(state) = self.state.as_mut() {
             match &mut state.selection {
-                Selection::Singular { target, pt_idx, part } => {
-                    let layer = target.read();
-                    let Layer::Path(path) = &*layer else { panic!("point selection must target path") };
-                    let pp = &path.points[*pt_idx];
-                    if let Some(CtrlPt1 { c1: (c1_side, c1), c2 }) = pp.ctrls {
-                        if is_hovering(c1) {
-                            *part = PPPart::Ctrl(c1_side);
-                            state.drag = drag;
-                            return;
-                        }
-                        if let Some(c2) = c2 {
-                            let c2 = match c2 {
-                                CtrlPt2::Exact(c2)  => c2,
-                                CtrlPt2::Smooth     => c1.reflected_over(pp.p),
-                                CtrlPt2::Mirror(s2) => c1.reflected_to(pp.p, s2),
-                            };
-                            if is_hovering(c2) {
-                                *part = PPPart::Ctrl(c1_side.opposite());
-                                state.drag = drag;
-                                return;
-                            }
-                        }
-                    }
-                    if is_hovering(pp.p) {
-                        *part = PPPart::Anchor;
+                Selection::Singular(x) => {
+                    if let Some(part) = x.get_selected(mouse_world_pos) {
+                        x.part = part;
                         state.drag = drag;
                         return;
                     }
                 },
 
-                Selection::Multiple { pieces } => {
-                    let is_selected = pieces.iter()
-                        .any(|LayerSelection { target, points }| {
-                            let layer = target.read();
-                            let Layer::Path(path) = &*layer else { panic!("point selection must target path") };
-                            points.iter().any(|&idx| is_hovering(path.points[idx].p))
-                        });
-                    if is_selected {
+                Selection::Multiple(x) => {
+                    if x.is_selected(mouse_world_pos) {
                         state.drag = drag;
                         return;
                     }
@@ -168,7 +81,7 @@ impl PointSelection {
         }
 
         let hovered_point = document.layers
-            .tree_iter_mut(TreeIterDir::ForeToBack, |_| false)
+            .tree_iter_mut(ForeToBack, |_| false)
             .find_map(|(target, _)| {
                 let layer = target.read();
                 if let Layer::Path(path) = &*layer {
@@ -184,11 +97,11 @@ impl PointSelection {
 
         if let Some((hovered_target, hovered_idx)) = hovered_point {
             self.state = Some(SelectionState {
-                selection: Selection::Singular {
+                selection: Selection::Singular(SingleSelect {
                     target: hovered_target,
                     pt_idx: hovered_idx,
                     part: PPPart::Anchor,
-                },
+                }),
                 drag,
             });
         } else {
@@ -204,7 +117,7 @@ impl PointSelection {
 
         // finalize selection
         if let Some(selection_start) = self.selection_start.take() {
-            let selection_rec = Self::get_selection_rec(selection_start, mouse_world_pos);
+            let selection_rec = get_minmax_rec(selection_start, mouse_world_pos);
 
             let selected = document.layers
                 .tree_iter_mut(TreeIterDir::default(), |_| false)
@@ -220,21 +133,21 @@ impl PointSelection {
 
                         if !points.is_empty() {
                             drop(layer);
-                            return Some(LayerSelection { target, points, });
+                            return Some(SelectionPiece { target, points, });
                         }
                     }
                     None
                 })
-                .collect::<Vec<LayerSelection>>();
+                .collect::<Vec<SelectionPiece>>();
 
             self.state = (!selected.is_empty())
                 .then(|| {
                     SelectionState {
                         selection: match &selected[..] {
-                            [LayerSelection { target, points }] if points.len() == 1
-                                => Selection::Singular { target: target.clone_mut(), pt_idx: points[0], part: PPPart::Anchor },
+                            [SelectionPiece { target, points }] if points.len() == 1
+                                => Selection::Singular(SingleSelect { target: target.clone_mut(), pt_idx: points[0], part: PPPart::Anchor }),
                             [..]
-                                => Selection::Multiple { pieces: selected },
+                                => Selection::Multiple(MultiSelect { pieces: selected }),
                         },
                         drag: None,
                     }
@@ -266,7 +179,7 @@ impl ToolType for PointSelection {
         let px_world_size = document.camera.zoom.recip();
 
         let selection_rec = self.selection_start.as_ref().map(|&selection_start|
-            Self::get_selection_rec(selection_start, mouse_world_pos)
+            get_minmax_rec(selection_start, mouse_world_pos)
         );
 
         if let Some(selection_rec) = selection_rec.as_ref() {
@@ -276,19 +189,37 @@ impl ToolType for PointSelection {
         // goal: draw each control point ONLY ONCE without O(n^2) complexity selection test
         // IMPORTANT: relies on previously stated sorting requirements
 
-        let (selected, is_singular_selection): (&[LayerSelection], bool) = match self.state.as_ref() {
+        let (selected, is_singular_selection): (&[SelectionPiece], bool) = match self.state.as_ref() {
             None => (&[], false),
             Some(state) => match &state.selection {
-                Selection::Singular { target, pt_idx, .. } => (&[LayerSelection { target: target.clone_mut(), points: vec![*pt_idx] }], true),
-                Selection::Multiple { pieces } => (pieces.as_slice(), false),
+                Selection::Singular(SingleSelect { target, pt_idx, .. }) => (&[SelectionPiece { target: target.clone_mut(), points: vec![*pt_idx] }], true),
+                Selection::Multiple(MultiSelect { pieces }) => (pieces.as_slice(), false),
             },
         };
+
+        if let Some(SelectionState { selection: Selection::Multiple(selection), .. }) = self.state.as_ref() {
+            for (selected, target) in document.enumerate_selected_layers(selection) {
+                let layer = target.read();
+                if let Layer::Path(path) = &*layer {
+                    path.draw_selected(d, px_world_size);
+                    if let Some(selected) = selected {
+                        for (is_point_selected, pp) in path.enumerate_selected_points(selected) {
+                            let is_selected = is_point_selected || selection_rec.is_some_and(|rec| rec.check_collision_point_rec(pp.p));
+                            let is_ctrls_vis = is_singular_selection && is_point_selected;
+                            pp.draw(d, px_world_size, path.settings.color, is_selected, is_ctrls_vis, is_ctrls_vis);
+                        }
+                    }
+                }
+            }
+        }
+
+
 
         if selection_rec.is_some() || self.state.is_none() {
             let mut selected_layer_iter = selected.iter();
             let mut current_selected_layer = selected_layer_iter.next();
             // draw selection options
-            for (target, _) in document.layers.tree_iter(TreeIterDir::BackToFore, |_| false) {
+            for (target, _) in document.layers.tree_iter(BackToFore, |_| false) {
                 let mut selected_points_iter = current_selected_layer.as_ref().and_then(|selected_layer| (target == selected_layer.target).then(|| selected_layer.points.iter()));
                 let mut current_selected_point = selected_points_iter.as_mut().and_then(|it| it.next());
                 let layer = target.read();
@@ -308,6 +239,20 @@ impl ToolType for PointSelection {
                     current_selected_layer = selected_layer_iter.next();
                 }
             }
+        } else if is_singular_selection {
+            // draw singular selection
+            let [SelectionPiece { target, points }] = selected else { panic!("singular selection should have exactly one item") };
+            let [idx] = points[..] else { panic!("singular selection should have exactly one item") };
+            let layer = target.read();
+            let Layer::Path(path) = &*layer else { panic!("point selection target must be path") };
+            path.draw_selected(d, px_world_size);
+            for (pp_idx, pp) in path.points.iter().enumerate() {
+                let is_selected = pp_idx == idx;
+                pp.draw(d, px_world_size, path.settings.color, is_selected,
+                    is_singular_selection && (is_selected || pp_idx.checked_sub(1).is_some_and(|prev| prev == idx)),
+                    is_singular_selection && (is_selected || pp_idx.checked_add(1).is_some_and(|next| next == idx)),
+                );
+            }
         } else {
             // draw current selection
             for piece in selected {
@@ -318,8 +263,10 @@ impl ToolType for PointSelection {
                 let mut idx = indices.next();
                 for (pp_idx, pp) in path.points.iter().enumerate() {
                     let is_selected = idx.is_some_and(|idx| pp_idx == idx);
-                    let is_ctrls_vis = is_singular_selection && is_selected;
-                    pp.draw(d, px_world_size, path.settings.color, is_selected, is_ctrls_vis, is_ctrls_vis);
+                    pp.draw(d, px_world_size, path.settings.color, is_selected,
+                        is_singular_selection && (is_selected || idx.is_some_and(|idx| pp_idx == idx)),
+                        is_singular_selection && (is_selected || idx.is_some_and(|idx| pp_idx == idx)),
+                    );
                     if is_selected {
                         idx = indices.next();
                     }

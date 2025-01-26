@@ -1,7 +1,7 @@
 use raylib::prelude::*;
 use crate::ui::panel::Rect2;
-
-use super::{group::Group, rc::{Strong, StrongMut, StrongRef}, tree::{Tree, TreeIter, TreeIterDir, TreeIterMut}, Layer};
+use amylib::{rc::*, collections::tree::*};
+use super::{group::Group, Layer, LayerTree, TopToBot};
 
 pub const INSET: f32 = 2.0;
 pub const GAP: f32 = 2.0;
@@ -58,13 +58,13 @@ impl LayerUI {
     }
 }
 
-pub struct LayerTreeUiIter<T: StrongRef<Layer>, I: Iterator<Item = (T, usize)>> {
+pub struct LayerTreeUiIter<T: Owned<Layer>, I: Iterator<Item = (T, usize)>> {
     tree_iter: I,
     container: Rectangle,
     slot: Rectangle,
 }
 
-impl<T: StrongRef<Layer>, I: Iterator<Item = (T, usize)>> Iterator for LayerTreeUiIter<T, I> {
+impl<T: Owned<Layer>, I: Iterator<Item = (T, usize)>> Iterator for LayerTreeUiIter<T, I> {
     type Item = (T, usize, LayerUI);
     fn next(&mut self) -> Option<Self::Item> {
         let container = &self.container;
@@ -95,12 +95,17 @@ impl<T: StrongRef<Layer>, I: Iterator<Item = (T, usize)>> Iterator for LayerTree
     }
 }
 
-impl Tree<Layer> {
+pub trait LayerUiIter {
+    fn ui_iter(&self, container: Rect2, top: f32) -> LayerTreeUiIter<Strong<Layer>, TreeIter<Layer, impl Fn(&Group) -> bool>>;
+    fn ui_iter_mut(&mut self, container: Rect2, top: f32) -> LayerTreeUiIter<StrongMut<Layer>, TreeIterMut<Layer, impl Fn(&Group) -> bool>>;
+}
+
+impl LayerUiIter for LayerTree {
     /// Iterate over each expanded layer panel item immutably, overlapping `container`, with the first item's y-value being `top`
-    pub fn ui_iter(&self, container: Rect2, top: f32) -> LayerTreeUiIter<Strong<Layer>, TreeIter<Layer, impl Fn(&Group) -> bool>> {
+    fn ui_iter(&self, container: Rect2, top: f32) -> LayerTreeUiIter<Strong<Layer>, TreeIter<Layer, impl Fn(&Group) -> bool>> {
         let container = container.into();
         LayerTreeUiIter {
-            tree_iter: self.tree_iter(TreeIterDir::TopToBot, |group| group.is_expanded),
+            tree_iter: self.tree_iter(TopToBot, |group| group.is_expanded),
             container,
             slot: Rectangle {
                 x: container.x,
@@ -112,10 +117,10 @@ impl Tree<Layer> {
     }
 
     /// Iterate over each expanded layer panel item mutably, overlapping `container`, with the first item's y-value being `top`
-    pub fn ui_iter_mut(&mut self, container: Rect2, top: f32) -> LayerTreeUiIter<StrongMut<Layer>, TreeIterMut<Layer, impl Fn(&Group) -> bool>> {
+    fn ui_iter_mut(&mut self, container: Rect2, top: f32) -> LayerTreeUiIter<StrongMut<Layer>, TreeIterMut<Layer, impl Fn(&Group) -> bool>> {
         let container = container.into();
         LayerTreeUiIter {
-            tree_iter: self.tree_iter_mut(TreeIterDir::TopToBot, |group| group.is_expanded),
+            tree_iter: self.tree_iter_mut(TopToBot, |group| group.is_expanded),
             container,
             slot: Rectangle {
                 x: container.x,

@@ -1,10 +1,9 @@
+use amylib::collections::tree::*;
 use raylib::prelude::*;
 use crate::{appearance::Blending, raster::Raster, vector_path::VectorPath};
 
 pub mod ui_iter;
-pub mod rc;
 pub mod group;
-pub mod tree;
 
 use group::Group;
 
@@ -91,3 +90,45 @@ impl LayerType for Layer {
         }
     }
 }
+
+pub type LayerTree = Tree<Layer>;
+
+impl Recursive for Layer {
+    type Node = Group;
+    fn get_if_node(&self) -> Option<&Self::Node> {
+        if let Self::Group(group) = self { Some(group) } else { None }
+    }
+    fn get_if_node_mut(&mut self) -> Option<&mut Self::Node> {
+        if let Self::Group(group) = self { Some(group) } else { None }
+    }
+    fn children(node: &Self::Node) -> &Tree<Self> {
+        &node.items
+    }
+    fn children_mut(node: &mut Self::Node) -> &mut Tree<Self> {
+        &mut node.items
+    }
+}
+
+/// Start at the background and traverse to the foreground
+///
+/// Visit elements in the order they should be drawn so they occlude each other correctly
+#[allow(non_upper_case_globals)]
+pub const BackToFore: TreeIterDir = TreeIterDir::Forward;
+
+/// Start at the foreground and traverse to the background
+///
+/// Visit elements in the order that mouse collisions should find them
+#[allow(non_upper_case_globals)]
+pub const ForeToBack: TreeIterDir = TreeIterDir::Reverse;
+
+/// Start at the bottommost layer in the layer panel and traverse to the top
+///
+/// Reverse of `TopToBot` for sake of consistency - I haven't found a use for this yet
+#[allow(non_upper_case_globals)]
+pub const BotToTop: TreeIterDir = TreeIterDir::Forward;
+
+/// Start at the topmost layer in the layer panel and traverse to the bottom
+///
+/// Visit elements in the order their height influences following layers
+#[allow(non_upper_case_globals)]
+pub const TopToBot: TreeIterDir = TreeIterDir::Reverse;

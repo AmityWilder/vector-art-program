@@ -1,13 +1,13 @@
 use std::{path::Path, time::Instant};
-use layer::{rc::StrongRef, tree::TreeIterDir, LayerType};
+use amylib::{rc::*, collections::tree::*};
+use layer::{BackToFore, LayerType};
 use raylib::prelude::*;
 use serialize::render_png::DownscaleAlgorithm;
 // use rand::prelude::*;
-use ui::{panel::{Panel, Rect2, UIBox}, specialized::layers_panel::LayersPanel};
+use ui::{panel::*, specialized::layers_panel::*};
 
 mod vector_path;
 mod raster;
-mod stack;
 mod appearance;
 mod document;
 mod tool;
@@ -166,11 +166,11 @@ fn main() {
         }
 
         if (rl.is_key_down(KeyboardKey::KEY_LEFT_CONTROL) || rl.is_key_down(KeyboardKey::KEY_RIGHT_CONTROL)) && rl.is_key_pressed(KeyboardKey::KEY_Z) {
-            if rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) || rl.is_key_down(KeyboardKey::KEY_RIGHT_SHIFT) {
-                document.redo();
+            if let Err(e) = if rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) || rl.is_key_down(KeyboardKey::KEY_RIGHT_SHIFT) {
+                document.redo()
             } else {
-                document.undo();
-            }
+                document.undo()
+            } { println!("error: {e:?}"); }
         }
 
         {
@@ -193,7 +193,7 @@ fn main() {
                     d.clear_background(Color::BLANK);
                     {
                         let mut d = d.begin_mode2D(document.camera);
-                        for (layer, _depth) in document.layers.tree_iter(TreeIterDir::BackToFore, |g| !g.settings.is_hidden) {
+                        for (layer, _depth) in document.layers.tree_iter(BackToFore, |g| !g.settings.is_hidden) {
                             layer.read().draw_rendered(&mut d);
                         }
                     }
