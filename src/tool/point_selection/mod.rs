@@ -82,7 +82,7 @@ impl PointSelection {
 
         let hovered_point = document.layers
             .tree_iter_mut(ForeToBack, |_| false)
-            .find_map(|(target, _)| {
+            .find_map(|(_, target)| {
                 let layer = target.read();
                 if let Layer::Path(path) = &*layer {
                     let idx = path.points.iter()
@@ -121,7 +121,7 @@ impl PointSelection {
 
             let selected = document.layers
                 .tree_iter_mut(TreeIterDir::default(), |_| false)
-                .filter_map(|(target, _)| {
+                .filter_map(|(_, target)| {
                     let layer = target.read();
                     if let Layer::Path(path) = &*layer {
                         let points = path.points.iter()
@@ -219,7 +219,7 @@ impl ToolType for PointSelection {
             let mut selected_layer_iter = selected.iter();
             let mut current_selected_layer = selected_layer_iter.next();
             // draw selection options
-            for (target, _) in document.layers.tree_iter(BackToFore, |_| false) {
+            for (_, target) in document.layers.tree_iter(BackToFore, |_| false) {
                 let mut selected_points_iter = current_selected_layer.as_ref().and_then(|selected_layer| (target == selected_layer.target).then(|| selected_layer.points.iter()));
                 let mut current_selected_point = selected_points_iter.as_mut().and_then(|it| it.next());
                 let layer = target.read();

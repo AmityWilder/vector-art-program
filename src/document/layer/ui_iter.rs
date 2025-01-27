@@ -58,18 +58,18 @@ impl LayerUI {
     }
 }
 
-pub struct LayerTreeUiIter<T: Owned<Layer>, I: Iterator<Item = (T, usize)>> {
+pub struct LayerTreeUiIter<T: Owned<Layer>, I: Iterator<Item = (usize, T)>> {
     tree_iter: I,
     container: Rectangle,
     slot: Rectangle,
 }
 
-impl<T: Owned<Layer>, I: Iterator<Item = (T, usize)>> Iterator for LayerTreeUiIter<T, I> {
-    type Item = (T, usize, LayerUI);
+impl<T: Owned<Layer>, I: Iterator<Item = (usize, T)>> Iterator for LayerTreeUiIter<T, I> {
+    type Item = (usize, T, LayerUI);
     fn next(&mut self) -> Option<Self::Item> {
         let container = &self.container;
         let container_bottom = container.y + container.height;
-        while let Some((layer, depth)) = self.tree_iter.next() {
+        while let Some((depth, layer)) = self.tree_iter.next() {
             let y = self.slot.y;
             if y >= container_bottom {
                 return None; // no more are going to be visible
@@ -86,7 +86,7 @@ impl<T: Owned<Layer>, I: Iterator<Item = (T, usize)>> Iterator for LayerTreeUiIt
                 let is_group = matches!(&*layer.read(), Layer::Group(_));
                 let recs = LayerUI::generate(self.slot, is_group);
                 self.slot.y = bottom;
-                return Some((layer, depth, recs));
+                return Some((depth, layer, recs));
             } else {
                 self.slot.y = bottom;
             }
@@ -96,13 +96,13 @@ impl<T: Owned<Layer>, I: Iterator<Item = (T, usize)>> Iterator for LayerTreeUiIt
 }
 
 pub trait LayerUiIter {
-    fn ui_iter(&self, container: Rect2, top: f32) -> LayerTreeUiIter<Strong<Layer>, TreeIter<Layer, impl Fn(&Group) -> bool>>;
+    fn ui_iter(&self, container: Rect2, top: f32) -> LayerTreeUiIter<Strong<Layer>, DepthFirstIter<Layer, impl Fn(&Group) -> bool>>;
     fn ui_iter_mut(&mut self, container: Rect2, top: f32) -> LayerTreeUiIter<StrongMut<Layer>, TreeIterMut<Layer, impl Fn(&Group) -> bool>>;
 }
 
 impl LayerUiIter for LayerTree {
     /// Iterate over each expanded layer panel item immutably, overlapping `container`, with the first item's y-value being `top`
-    fn ui_iter(&self, container: Rect2, top: f32) -> LayerTreeUiIter<Strong<Layer>, TreeIter<Layer, impl Fn(&Group) -> bool>> {
+    fn ui_iter(&self, container: Rect2, top: f32) -> LayerTreeUiIter<Strong<Layer>, DepthFirstIter<Layer, impl Fn(&Group) -> bool>> {
         let container = container.into();
         LayerTreeUiIter {
             tree_iter: self.tree_iter(TopToBot, |group| group.is_expanded),

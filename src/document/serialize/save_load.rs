@@ -189,7 +189,7 @@ impl Document {
 
         // layers
         writer.write_all(&(layers.len() as u64).to_le_bytes())?;
-        for (mut layer, _depth) in layers.tree_iter_mut(TreeIterDir::default(), |_| true) {
+        for (_depth, mut layer) in layers.tree_iter_mut(TreeIterDir::default(), |_| true) {
             let mut layer = layer.write();
 
             // settings

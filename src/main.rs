@@ -193,7 +193,7 @@ fn main() {
                     d.clear_background(Color::BLANK);
                     {
                         let mut d = d.begin_mode2D(document.camera);
-                        for (layer, _depth) in document.layers.tree_iter(BackToFore, |g| !g.settings.is_hidden) {
+                        for (_depth, layer) in document.layers.tree_iter(BackToFore, |g| !g.settings.is_hidden) {
                             layer.read().draw_rendered(&mut d);
                         }
                     }

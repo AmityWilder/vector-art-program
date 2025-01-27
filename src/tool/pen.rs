@@ -59,7 +59,7 @@ impl Pen {
 
     fn find_target(document: &mut Document, mouse_world_pos: Vector2) -> Self {
         // starting a new path
-        for (layer, _) in document.layers.tree_iter_mut(ForeToBack, |_| false) {
+        for (_, layer) in document.layers.tree_iter_mut(ForeToBack, |_| false) {
             // find hovered endpoint
             if let Layer::Path(path) = &*layer.read() {
                 if let Some(last_idx) = path.points.len().checked_sub(1) { // failure to subtract 1 implies an empty list
@@ -212,7 +212,7 @@ impl ToolType for Pen {
             }
             Self::Inactive(None) => {
                 // show selectable
-                for (layer, _) in document.layers.tree_iter(BackToFore, |_| false) {
+                for (_, layer) in document.layers.tree_iter(BackToFore, |_| false) {
                     if let Layer::Path(path) = &*layer.read() {
                         if path.points.iter().any(|pp| pp.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR) {
                             path.draw_selected(d, px_world_size);

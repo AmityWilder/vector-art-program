@@ -1,6 +1,6 @@
 use std::collections::{LinkedList, VecDeque};
 
-pub trait Stack<T> {
+pub trait Stack<T>: FromIterator<T> {
     fn new() -> Self;
     fn push(&mut self, value: T);
     fn pop(&mut self) -> Option<T>;
@@ -10,91 +10,169 @@ pub trait Stack<T> {
     fn is_empty(&self) -> bool;
 }
 
+pub trait SizedStack<T>: Stack<T> {
+    fn with_capacity(capacity: usize) -> Self;
+    fn is_full(&self) -> bool;
+    fn len(&self) -> usize;
+    fn reserve(&mut self, additional: usize);
+}
+
 pub struct LinkedStack<T>(LinkedList<T>);
 
-impl<T> Stack<T> for LinkedStack<T> {
-    fn new() -> Self {
+impl<T> FromIterator<T> for LinkedStack<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let mut list = LinkedList::new();
+        for item in iter {
+            list.push_front(item);
+        }
+        Self(list)
+    }
+}
+
+impl<T> LinkedStack<T> {
+    pub const fn new() -> Self {
         Self(LinkedList::new())
     }
 
-    fn push(&mut self, value: T) {
+    #[inline]
+    pub fn push(&mut self, value: T) {
         self.0.push_front(value);
     }
 
-    fn pop(&mut self) -> Option<T> {
+    #[inline]
+    pub fn pop(&mut self) -> Option<T> {
         self.0.pop_front()
     }
 
-    fn top(&mut self) -> Option<&T> {
+    #[inline]
+    pub fn top(&mut self) -> Option<&T> {
         self.0.front()
     }
-    fn top_mut(&mut self) -> Option<&mut T> {
+    #[inline]
+    pub fn top_mut(&mut self) -> Option<&mut T> {
         self.0.front_mut()
     }
 
-    fn clear(&mut self) {
+    #[inline]
+    pub fn clear(&mut self) {
         self.0.clear();
     }
 
-    fn is_empty(&self) -> bool {
+    #[inline]
+    pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+}
+
+impl<T> Stack<T> for LinkedStack<T> {
+    #[inline] fn new() -> Self { Self::new() }
+    #[inline] fn push(&mut self, value: T) { self.push(value); }
+    #[inline] fn pop(&mut self) -> Option<T> { self.pop() }
+    #[inline] fn top(&mut self) -> Option<&T> { self.top() }
+    #[inline] fn top_mut(&mut self) -> Option<&mut T> { self.top_mut() }
+    #[inline] fn clear(&mut self) { self.clear(); }
+    #[inline] fn is_empty(&self) -> bool { self.is_empty() }
 }
 
 pub struct VecStack<T>(Vec<T>);
 
+impl<T> FromIterator<T> for VecStack<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Self(Vec::from_iter(iter))
+    }
+}
+
+impl<T, V: Into<Vec<T>>> From<V> for VecStack<T> {
+    fn from(value: V) -> Self {
+        Self(value.into())
+    }
+}
+
 impl<T> VecStack<T> {
+    pub const fn new() -> Self {
+        Self(Vec::new())
+    }
+
     pub fn with_capacity(capacity: usize) -> Self {
         Self(Vec::with_capacity(capacity))
     }
 
-    /// `len == capacity`
     pub fn is_full(&self) -> bool {
         self.0.len() == self.0.capacity()
     }
-}
 
-impl<T> Stack<T> for VecStack<T> {
-    fn new() -> Self {
-        Self(Vec::new())
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
 
-    fn push(&mut self, value: T) {
+    #[inline]
+    pub fn reserve(&mut self, additional: usize) {
+        self.0.reserve(additional)
+    }
+
+    #[inline]
+    pub fn push(&mut self, value: T) {
         self.0.push(value);
     }
 
-    fn pop(&mut self) -> Option<T> {
+    #[inline]
+    pub fn pop(&mut self) -> Option<T> {
         self.0.pop()
     }
 
-    fn top(&mut self) -> Option<&T> {
+    #[inline]
+    pub fn top(&mut self) -> Option<&T> {
         self.0.last()
     }
-    fn top_mut(&mut self) -> Option<&mut T> {
+    #[inline]
+    pub fn top_mut(&mut self) -> Option<&mut T> {
         self.0.last_mut()
     }
 
-    fn clear(&mut self) {
+    #[inline]
+    pub fn clear(&mut self) {
         self.0.clear();
     }
 
-    fn is_empty(&self) -> bool {
+    #[inline]
+    pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 }
 
+impl<T> Stack<T> for VecStack<T> {
+    #[inline] fn new() -> Self { Self::new() }
+    #[inline] fn push(&mut self, value: T) { self.push(value); }
+    #[inline] fn pop(&mut self) -> Option<T> { self.pop() }
+    #[inline] fn top(&mut self) -> Option<&T> { self.top() }
+    #[inline] fn top_mut(&mut self) -> Option<&mut T> { self.top_mut() }
+    #[inline] fn clear(&mut self) { self.clear(); }
+    #[inline] fn is_empty(&self) -> bool { self.is_empty() }
+}
+
+impl<T> SizedStack<T> for VecStack<T> {
+    #[inline] fn with_capacity(capacity: usize) -> Self { Self::with_capacity(capacity) }
+    #[inline] fn is_full(&self) -> bool { self.is_full() }
+    #[inline] fn len(&self) -> usize { self.len() }
+    #[inline] fn reserve(&mut self, additional: usize) { self.reserve(additional) }
+}
+
 pub struct VecDestack<T>(VecDeque<T>);
 
+impl<T> FromIterator<T> for VecDestack<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Self(VecDeque::from_iter(iter))
+    }
+}
+
+impl<T, V: Into<VecDeque<T>>> From<V> for VecDestack<T> {
+    fn from(value: V) -> Self {
+        Self(value.into())
+    }
+}
+
 impl<T> VecDestack<T> {
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self(VecDeque::with_capacity(capacity))
-    }
-
-    /// `len == capacity`
-    pub fn is_full(&self) -> bool {
-        self.0.len() == self.0.capacity()
-    }
-
     /// push an item to the top of the stack.
     /// if the stack is full, eject the oldest item.
     pub fn push_no_resize(&mut self, value: T) -> Option<T> {
@@ -104,31 +182,73 @@ impl<T> VecDestack<T> {
     }
 }
 
-impl<T> Stack<T> for VecDestack<T> {
-    fn new() -> Self {
+impl<T> VecDestack<T> {
+    pub const fn new() -> Self {
         Self(VecDeque::new())
     }
 
-    fn push(&mut self, value: T) {
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(VecDeque::with_capacity(capacity))
+    }
+
+    /// `len == capacity`
+    pub fn is_full(&self) -> bool {
+        self.0.len() == self.0.capacity()
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    #[inline]
+    pub fn reserve(&mut self, additional: usize) {
+        self.0.reserve(additional)
+    }
+
+    #[inline]
+    pub fn push(&mut self, value: T) {
         self.0.push_back(value);
     }
 
-    fn pop(&mut self) -> Option<T> {
+    #[inline]
+    pub fn pop(&mut self) -> Option<T> {
         self.0.pop_back()
     }
 
-    fn top(&mut self) -> Option<&T> {
+    #[inline]
+    pub fn top(&mut self) -> Option<&T> {
         self.0.back()
     }
-    fn top_mut(&mut self) -> Option<&mut T> {
+    #[inline]
+    pub fn top_mut(&mut self) -> Option<&mut T> {
         self.0.back_mut()
     }
 
-    fn clear(&mut self) {
+    #[inline]
+    pub fn clear(&mut self) {
         self.0.clear();
     }
 
-    fn is_empty(&self) -> bool {
+    #[inline]
+    pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+}
+
+impl<T> Stack<T> for VecDestack<T> {
+    #[inline] fn new() -> Self { Self::new() }
+    #[inline] fn push(&mut self, value: T) { self.push(value); }
+    #[inline] fn pop(&mut self) -> Option<T> { self.pop() }
+    #[inline] fn top(&mut self) -> Option<&T> { self.top() }
+    #[inline] fn top_mut(&mut self) -> Option<&mut T> { self.top_mut() }
+    #[inline] fn clear(&mut self) { self.clear(); }
+    #[inline] fn is_empty(&self) -> bool { self.is_empty() }
+}
+
+impl<T> SizedStack<T> for VecDestack<T> {
+    #[inline] fn with_capacity(capacity: usize) -> Self { Self::with_capacity(capacity) }
+    #[inline] fn is_full(&self) -> bool { self.is_full() }
+    #[inline] fn len(&self) -> usize { self.len() }
+    #[inline] fn reserve(&mut self, additional: usize) { self.reserve(additional) }
 }

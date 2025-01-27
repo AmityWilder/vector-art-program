@@ -166,7 +166,7 @@ impl Document {
         let panel_rec: Rectangle = panel.rec_cache.into();
         let mut d = d.begin_scissor_mode(panel_rec.x as i32, panel_rec.y as i32, panel_rec.width as i32, panel_rec.height as i32);
         d.draw_rectangle_rec(panel_rec, panel.background);
-        for (layer, _depth, recs) in self.layers.ui_iter(panel.rec_cache, panel.rec_cache.ymin) {
+        for (_depth, layer, recs) in self.layers.ui_iter(panel.rec_cache, panel.rec_cache.ymin) {
             let layer = layer.read();
             let settings = layer.settings();
             let name = settings.name.as_str();

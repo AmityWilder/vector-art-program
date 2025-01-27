@@ -1,7 +1,7 @@
 use raylib::prelude::*;
 use amylib::rc::*;
 use crate::{layer::{group::Group, BackToFore, Layer}, vector_path::{path_point::{DistanceSqr, PathPoint}, VectorPath}, Change, Document};
-use super::{TreeIter, HOVER_RADIUS_SQR};
+use super::{DepthFirstIter, HOVER_RADIUS_SQR};
 
 struct EditMultiPointAction {
 
@@ -58,17 +58,17 @@ pub trait EnumerateSelectedLayers<T, U> {
     fn enumerate_selected_layers(self, selection: &MultiSelect) -> LayerSelection<'_, T, U, Self::Iter, Self::Key, Self::Val>;
 }
 
-impl<'a> EnumerateSelectedLayers<(Strong<Layer>, usize), Strong<Layer>> for &'a Document {
-    type Iter = TreeIter<Layer, for<'g> fn(&'g Group) -> bool>;
-    type Key = for<'k> fn(&'k (Strong<Layer>, usize)) -> &'k Strong<Layer>;
-    type Val = fn((Strong<Layer>, usize)) -> Strong<Layer>;
-    fn enumerate_selected_layers(self, selection: &MultiSelect) -> LayerSelection<'_, (Strong<Layer>, usize), Strong<Layer>, Self::Iter, Self::Key, Self::Val> {
+impl<'a> EnumerateSelectedLayers<(usize, Strong<Layer>), Strong<Layer>> for &'a Document {
+    type Iter = DepthFirstIter<Layer, for<'g> fn(&'g Group) -> bool>;
+    type Key = for<'k> fn(&'k (usize, Strong<Layer>)) -> &'k Strong<Layer>;
+    type Val = fn((usize, Strong<Layer>)) -> Strong<Layer>;
+    fn enumerate_selected_layers(self, selection: &MultiSelect) -> LayerSelection<'_, (usize, Strong<Layer>), Strong<Layer>, Self::Iter, Self::Key, Self::Val> {
         let mut selected_iter = selection.pieces.iter();
         let awaiting_match = selected_iter.next();
         LayerSelection {
             iter: self.layers.tree_iter(BackToFore, |_| false),
-            key: |(layer, _)| layer,
-            val: |(layer, _)| layer,
+            key: |(_, layer)| layer,
+            val: |(_, layer)| layer,
             selected_iter,
             awaiting_match,
         }
