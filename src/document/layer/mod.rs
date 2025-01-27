@@ -1,4 +1,4 @@
-use amylib::collections::tree::*;
+use amylib::{collections::tree::*, iter::directed::*};
 use raylib::prelude::*;
 use crate::{appearance::Blending, raster::Raster, vector_path::VectorPath};
 
@@ -112,23 +112,19 @@ impl Recursive for Layer {
 /// Start at the background and traverse to the foreground
 ///
 /// Visit elements in the order they should be drawn so they occlude each other correctly
-#[allow(non_upper_case_globals)]
-pub const BackToFore: TreeIterDir = TreeIterDir::Forward;
+pub type BackToFore = CForward;
 
 /// Start at the foreground and traverse to the background
 ///
 /// Visit elements in the order that mouse collisions should find them
-#[allow(non_upper_case_globals)]
-pub const ForeToBack: TreeIterDir = TreeIterDir::Reverse;
+pub type ForeToBack = CReverse;
 
 /// Start at the bottommost layer in the layer panel and traverse to the top
 ///
 /// Reverse of `TopToBot` for sake of consistency - I haven't found a use for this yet
-#[allow(non_upper_case_globals)]
-pub const BotToTop: TreeIterDir = TreeIterDir::Forward;
+pub type BotToTop = CForward;
 
 /// Start at the topmost layer in the layer panel and traverse to the bottom
 ///
 /// Visit elements in the order their height influences following layers
-#[allow(non_upper_case_globals)]
-pub const TopToBot: TreeIterDir = TreeIterDir::Reverse;
+pub type TopToBot = CReverse;

@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use amylib::{rc::*, collections::tree::*};
+use amylib::{collections::tree::*, iter::directed::*, rc::*};
 use crate::{layer::{BackToFore, ForeToBack, Layer, LayerType}, ui::panel::Rect2, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PPPart, PathPoint, ReflectVector}, VectorPath}, Change, Document};
 use super::ToolType;
 
@@ -81,8 +81,9 @@ impl PointSelection {
         }
 
         let hovered_point = document.layers
-            .tree_iter_mut(ForeToBack, |_| false)
-            .find_map(|(_, target)| {
+            .dfs_iter_mut(|_| false)
+            .cdir::<ForeToBack>()
+            .find_map(|target| {
                 let layer = target.read();
                 if let Layer::Path(path) = &*layer {
                     let idx = path.points.iter()
@@ -120,8 +121,8 @@ impl PointSelection {
             let selection_rec = get_minmax_rec(selection_start, mouse_world_pos);
 
             let selected = document.layers
-                .tree_iter_mut(TreeIterDir::default(), |_| false)
-                .filter_map(|(_, target)| {
+                .dfs_iter_mut(|_| false)
+                .filter_map(|target| {
                     let layer = target.read();
                     if let Layer::Path(path) = &*layer {
                         let points = path.points.iter()
@@ -198,7 +199,7 @@ impl ToolType for PointSelection {
         };
 
         if let Some(SelectionState { selection: Selection::Multiple(selection), .. }) = self.state.as_ref() {
-            for (selected, target) in document.enumerate_selected_layers(selection) {
+            for (selected, target) in document.layers.shallow_iter().enumerate_selected_layers(selection) {
                 let layer = target.read();
                 if let Layer::Path(path) = &*layer {
                     path.draw_selected(d, px_world_size);
@@ -219,7 +220,7 @@ impl ToolType for PointSelection {
             let mut selected_layer_iter = selected.iter();
             let mut current_selected_layer = selected_layer_iter.next();
             // draw selection options
-            for (_, target) in document.layers.tree_iter(BackToFore, |_| false) {
+            for target in document.layers.dfs_iter(|_| false).cdir::<BackToFore>() {
                 let mut selected_points_iter = current_selected_layer.as_ref().and_then(|selected_layer| (target == selected_layer.target).then(|| selected_layer.points.iter()));
                 let mut current_selected_point = selected_points_iter.as_mut().and_then(|it| it.next());
                 let layer = target.read();

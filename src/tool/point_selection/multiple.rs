@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use amylib::rc::*;
+use amylib::{iter::directed::*, rc::*};
 use crate::{layer::{group::Group, BackToFore, Layer}, vector_path::{path_point::{DistanceSqr, PathPoint}, VectorPath}, Change, Document};
 use super::{DepthFirstIter, HOVER_RADIUS_SQR};
 
@@ -51,94 +51,79 @@ impl MultiSelect {
     }
 }
 
-pub trait EnumerateSelectedLayers<T, U> {
-    type Iter: Iterator<Item = T>;
-    type Key: for<'k> Fn(&'k T) -> &'k Strong<Layer>;
-    type Val: Fn(T) -> U;
-    fn enumerate_selected_layers(self, selection: &MultiSelect) -> LayerSelection<'_, T, U, Self::Iter, Self::Key, Self::Val>;
+pub trait EnumerateSelectedLayers {
+    fn enumerate_selected_layers(self, selection: &MultiSelect) -> LayerSelection<'_, Self> where Self: Sized;
 }
 
-impl<'a> EnumerateSelectedLayers<(usize, Strong<Layer>), Strong<Layer>> for &'a Document {
-    type Iter = DepthFirstIter<Layer, for<'g> fn(&'g Group) -> bool>;
-    type Key = for<'k> fn(&'k (usize, Strong<Layer>)) -> &'k Strong<Layer>;
-    type Val = fn((usize, Strong<Layer>)) -> Strong<Layer>;
-    fn enumerate_selected_layers(self, selection: &MultiSelect) -> LayerSelection<'_, (usize, Strong<Layer>), Strong<Layer>, Self::Iter, Self::Key, Self::Val> {
-        let mut selected_iter = selection.pieces.iter();
-        let awaiting_match = selected_iter.next();
-        LayerSelection {
-            iter: self.layers.tree_iter(BackToFore, |_| false),
-            key: |(_, layer)| layer,
-            val: |(_, layer)| layer,
-            selected_iter,
-            awaiting_match,
-        }
+impl<I> EnumerateSelectedLayers for I {
+    #[inline]
+    fn enumerate_selected_layers(self, selection: &MultiSelect) -> LayerSelection<'_, Self> where Self: Sized {
+        LayerSelection::new(self, selection)
     }
 }
 
-pub struct LayerSelection<'a, T, U, I: Iterator<Item = T>, K: Fn(&T) -> &Strong<Layer>, V: Fn(T) -> U> {
+pub struct LayerSelection<'a, I> {
     iter: I,
-    key: K,
-    val: V,
     selected_iter: std::slice::Iter<'a, SelectionPiece>,
     awaiting_match: Option<&'a SelectionPiece>,
 }
 
-impl<'a, T, U, I: Iterator<Item = T>, K: Fn(&T) -> &Strong<Layer>, V: Fn(T) -> U> Iterator for LayerSelection<'a, T, U, I, K, V> {
-    type Item = (Option<&'a SelectionPiece>, U);
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().and_then(|item| {
-            let target = (self.key)(&item);
-            let selected_points = self.awaiting_match.and_then(|selected_layer| (*target == selected_layer.target).then_some(selected_layer));
-            if selected_points.is_some() {
-                self.awaiting_match = self.selected_iter.next();
-            }
-            Some((selected_points, (self.val)(item)))
-        })
-    }
-}
-
-pub trait EnumerateSelectedPoints<T, U> {
-    type Iter: Iterator<Item = T>;
-    type Key: for<'k> Fn(&'k T) -> usize;
-    type Val: Fn(T) -> U;
-    fn enumerate_selected_points(self, selection: &SelectionPiece) -> PointSelection<'_, T, U, Self::Iter, Self::Key, Self::Val>;
-}
-
-impl<'a> EnumerateSelectedPoints<(usize, &'a PathPoint), &'a PathPoint> for &'a VectorPath {
-    type Iter = std::iter::Enumerate<std::collections::vec_deque::Iter<'a, PathPoint>>;
-    type Key = for<'k> fn(&'k (usize, &'a PathPoint)) -> usize;
-    type Val = fn((usize, &'a PathPoint)) -> &'a PathPoint;
-    fn enumerate_selected_points(self, selection: &SelectionPiece) -> PointSelection<'_, (usize, &'a PathPoint), &'a PathPoint, Self::Iter, Self::Key, Self::Val> {
-        let mut selected_iter = selection.points.iter().copied();
+impl<'a, I> LayerSelection<'a, I> {
+    fn new(iter: I, selection: &'a MultiSelect) -> Self {
+        let mut selected_iter = selection.pieces.iter();
         let awaiting_match = selected_iter.next();
-        PointSelection {
-            iter: self.points.iter().enumerate(),
-            key: |(idx, _)| *idx,
-            val: |(_, pp)| pp,
+        Self {
+            iter,
             selected_iter,
             awaiting_match,
         }
     }
 }
 
-pub struct PointSelection<'a, T, U, I: Iterator<Item = T>, K: for<'b> Fn(&'b T) -> usize, V: Fn(T) -> U> {
-    iter: I,
-    key: K,
-    val: V,
+impl<'a, I: Iterator<Item = Strong<Layer>>> Iterator for LayerSelection<'a, I> {
+    type Item = (Option<&'a SelectionPiece>, I::Item);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().and_then(|item| {
+            let selected_points = self.awaiting_match.and_then(|selected_layer| (item == selected_layer.target).then_some(selected_layer));
+            if selected_points.is_some() {
+                self.awaiting_match = self.selected_iter.next();
+            }
+            Some((selected_points, item))
+        })
+    }
+}
+
+pub trait EnumerateSelectedPoints<'a> {
+    fn enumerate_selected_points(self, selection: &SelectionPiece) -> PointSelection<'_, std::collections::vec_deque::Iter<'a, PathPoint>> where Self: Sized;
+}
+
+impl<'a> EnumerateSelectedPoints<'a> for &'a VectorPath {
+    fn enumerate_selected_points(self, selection: &SelectionPiece) -> PointSelection<'_, std::collections::vec_deque::Iter<'a, PathPoint>> where Self: Sized {
+        let mut selected_iter = selection.points.iter().copied();
+        let awaiting_match = selected_iter.next();
+        PointSelection {
+            iter: self.points.iter().enumerate(),
+            selected_iter,
+            awaiting_match,
+        }
+    }
+}
+
+pub struct PointSelection<'a, I> {
+    iter: std::iter::Enumerate<I>,
     selected_iter: std::iter::Copied<std::slice::Iter<'a, usize>>,
     awaiting_match: Option<usize>,
 }
 
-impl<'a, T, U, I: Iterator<Item = T>, K: for<'b> Fn(&'b T) -> usize, V: Fn(T) -> U> Iterator for PointSelection<'a, T, U, I, K, V> {
-    type Item = (bool, U);
+impl<'a, I: Iterator> Iterator for PointSelection<'a, I> {
+    type Item = (bool, I::Item);
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().and_then(|item| {
-            let idx = (self.key)(&item);
-            let is_selected = self.awaiting_match.is_some_and(|selected_idx| idx == selected_idx);
+            let is_selected = self.awaiting_match.is_some_and(|selected_idx| item.0 == selected_idx);
             if is_selected {
                 self.awaiting_match = self.selected_iter.next();
             }
-            Some((is_selected, (self.val)(item)))
+            Some((is_selected, item.1))
         })
     }
 }

@@ -1,6 +1,5 @@
 use raylib::prelude::*;
 use super::{LayerSettings, LayerTree, LayerType};
-use amylib::rc::*;
 
 pub struct Group {
     pub settings: LayerSettings,
@@ -28,13 +27,13 @@ impl LayerType for Group {
     }
 
     fn draw_rendered(&self, d: &mut impl RaylibDraw) {
-        for item in self.items.iter() {
+        for item in self.items.shallow_iter() {
             item.read().draw_rendered(d);
         }
     }
 
     fn draw_selected(&self, d: &mut impl RaylibDraw, px_world_size: f32) {
-        for item in self.items.iter() {
+        for item in self.items.shallow_iter() {
             item.read().draw_selected(d, px_world_size);
         }
     }

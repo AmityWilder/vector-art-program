@@ -7,10 +7,11 @@ use std::{cell::{Ref, RefCell, RefMut}, fmt, rc::{self, Rc}};
 // --- Owned ---
 
 /// A strong, owning reference
-pub trait Owned<T: ?Sized> {
-    type Downgraded: Unowned<T>;
-    type Read<'a>: std::ops::Deref<Target = T> + 'a where Self: 'a;
-    type Cloned: Owned<T>;
+pub trait Owned {
+    type Inner: ?Sized;
+    type Downgraded: Unowned<Inner = Self::Inner>;
+    type Read<'a>: std::ops::Deref<Target = Self::Inner> + 'a where Self: 'a;
+    type Cloned: Owned<Inner = Self::Inner>;
     fn read(&self) -> Self::Read<'_>;
     fn downgrade(&self) -> Self::Downgraded;
     fn clone(&self) -> Self::Cloned;
@@ -56,7 +57,8 @@ impl<T: ?Sized> Strong<T> {
     }
 }
 
-impl<T: ?Sized> Owned<T> for Strong<T> {
+impl<T: ?Sized> Owned for Strong<T> {
+    type Inner = T;
     type Downgraded = Weak<T>;
     type Read<'a> = Ref<'a, T> where Self: 'a;
     type Cloned = Self;
@@ -159,7 +161,8 @@ impl<'a, T: ?Sized> AsConst for &'a StrongMut<T> {
     }
 }
 
-impl<T: ?Sized> Owned<T> for StrongMut<T> {
+impl<T: ?Sized> Owned for StrongMut<T> {
+    type Inner = T;
     type Downgraded = WeakMut<T>;
     type Read<'a> = Ref<'a, T> where Self: 'a;
     type Cloned = Strong<T>;
@@ -202,9 +205,10 @@ impl<T: ?Sized> PartialEq<StrongMut<T>> for Strong<T> {
 
 // --- Unowned ---
 
-pub trait Unowned<T: ?Sized> {
-    type Upgraded: Owned<T>;
-    type Cloned: Unowned<T>;
+pub trait Unowned {
+    type Inner: ?Sized;
+    type Upgraded: Owned<Inner = Self::Inner>;
+    type Cloned: Unowned<Inner = Self::Inner>;
     fn upgrade(&self) -> Option<Self::Upgraded>;
     fn clone(&self) -> Self::Cloned;
 }
@@ -223,7 +227,8 @@ impl<T: ?Sized> Weak<T> {
 }
 
 /// A weak, unowning reference
-impl<T: ?Sized> Unowned<T> for Weak<T> {
+impl<T: ?Sized> Unowned for Weak<T> {
+    type Inner = T;
     type Upgraded = Strong<T>;
     type Cloned = Self;
 
@@ -261,7 +266,8 @@ impl<T: ?Sized> WeakMut<T> {
     }
 }
 
-impl<T: ?Sized> Unowned<T> for WeakMut<T> {
+impl<T: ?Sized> Unowned for WeakMut<T> {
+    type Inner = T;
     type Upgraded = StrongMut<T>;
     type Cloned = Weak<T>;
 

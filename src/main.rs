@@ -1,5 +1,5 @@
 use std::{path::Path, time::Instant};
-use amylib::{rc::*, collections::tree::*};
+use amylib::{collections::tree::*, iter::directed::DirectibleDoubleEndedIterator, rc::*};
 use layer::{BackToFore, LayerType};
 use raylib::prelude::*;
 use serialize::render_png::DownscaleAlgorithm;
@@ -193,7 +193,7 @@ fn main() {
                     d.clear_background(Color::BLANK);
                     {
                         let mut d = d.begin_mode2D(document.camera);
-                        for (_depth, layer) in document.layers.tree_iter(BackToFore, |g| !g.settings.is_hidden) {
+                        for layer in document.layers.dfs_iter(|g| !g.settings.is_hidden).cdir::<BackToFore>() {
                             layer.read().draw_rendered(&mut d);
                         }
                     }

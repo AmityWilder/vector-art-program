@@ -1,6 +1,6 @@
 use std::{io, path::Path};
 use raylib::prelude::*;
-use amylib::{rc::*, collections::tree::*};
+use amylib::{collections::tree::*, iter::directed::DirectibleDoubleEndedIterator, rc::*};
 use crate::{artboard::IntRect2, document::Document, layer::{BackToFore, LayerType}};
 
 #[derive(Debug, Clone, Copy)]
@@ -46,7 +46,7 @@ impl Document {
             d.clear_background(background);
             {
                 let mut d = d.begin_mode2D(camera);
-                for (_depth, layer) in self.layers.tree_iter(BackToFore, |g| !g.settings.is_hidden) {
+                for layer in self.layers.dfs_iter(|g| !g.settings.is_hidden).cdir::<BackToFore>() {
                     let layer = layer.read();
                     layer.draw_rendered(&mut d);
                 }
