@@ -99,7 +99,7 @@ pub trait CDirection {
     fn make<I: DoubleEndedIterator>(iter: I) -> Self::Iter<I>;
 }
 
-pub type CDirected<I, D: CDirection> = <D as CDirection>::Iter<I>;
+pub type CDirected<I, D/*: CDirection*/> = <D as CDirection>::Iter<I>;
 
 pub struct CForward;
 pub struct CReverse;

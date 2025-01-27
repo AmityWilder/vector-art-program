@@ -1,7 +1,3 @@
-//! Wrappers for [`Rc<RefCell<T>>`] to enable finer tuning of mutability.
-//! These exist because Rust doesn't appear to have a good means of enabling
-//! multiple mutable references in a guaranteed single-threaded environment.
-
 use std::{cell::{Ref, RefCell, RefMut}, fmt, rc::{self, Rc}};
 
 // --- Owned ---

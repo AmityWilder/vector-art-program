@@ -1,3 +1,4 @@
 pub mod stack;
 pub mod tree;
-pub mod fixed_queue;
+/// non-public until stable
+mod fixed_queue;

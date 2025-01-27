@@ -1,6 +1,7 @@
 use raylib::prelude::*;
+use amymath::prelude::*;
 use amylib::rc::*;
-use crate::{layer::Layer, vector_path::path_point::{CtrlPt1, CtrlPt2, DistanceSqr, PPPart, PathPoint, ReflectVector}, Change, Document};
+use crate::{layer::Layer, vector_path::path_point::{CtrlPt1, CtrlPt2, PPPart, PathPoint}, Change, Document};
 use super::HOVER_RADIUS_SQR;
 
 struct EditSinglePointAction {

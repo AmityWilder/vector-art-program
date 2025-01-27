@@ -1,4 +1,4 @@
-use raylib::prelude::Vector2;
+use raylib::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Matrix2x2 {
@@ -105,27 +105,5 @@ impl std::ops::Mul<Vector2> for Matrix2x2 {
             x: self.m00 * rhs.x + self.m01 * rhs.y,
             y: self.m10 * rhs.x + self.m11 * rhs.y,
         }
-    }
-}
-
-pub trait CrossProduct<Rhs> {
-    type Output;
-    fn cross(self, rhs: Rhs) -> Self::Output;
-}
-
-impl CrossProduct<Vector2> for f32 {
-    type Output = Vector2;
-    fn cross(self, rhs: Vector2) -> Self::Output {
-        Vector2 {
-            x: -self * rhs.y,
-            y:  self * rhs.x,
-        }
-    }
-}
-
-impl CrossProduct<Vector2> for Vector2 {
-    type Output = f32;
-    fn cross(self, rhs: Vector2) -> Self::Output {
-        self.x * rhs.y - self.y * rhs.x
     }
 }

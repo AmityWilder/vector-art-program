@@ -1,5 +1,5 @@
 [workspace]
-members = ["amylib"]
+members = ["amylib", "amymath"]
 
 [package]
 name = "vector-art-program"
@@ -10,3 +10,4 @@ edition = "2021"
 rand = "0.8.5"
 raylib = "5.0.2"
 amylib = { path = "amylib" }
+amymath = { path = "amymath" }

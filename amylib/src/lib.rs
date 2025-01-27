@@ -1,8 +1,18 @@
 pub mod collections;
 pub mod iter;
-pub mod rc;
 
-/// Returns uninitialized memory
-pub const unsafe fn uninit<T>() -> T {
-    std::mem::MaybeUninit::uninit().assume_init()
-}
+/// Wrappers for [`Rc<RefCell<T>>`] to enable finer tuning of mutability.
+///
+/// These exist because Rust allows internal mutability for all [`Rc`] holders, which is
+/// annoying when I want to have an internally-immutable reference to a [`Rc`] that is
+/// only holding a [`RefCell`] because *someone else* needs to be able to mutate it.
+///
+/// - [`Strong`] \
+///   A [`Rc<RefCell<T>>`] with [`Rc<T>`] mutability rules.
+/// - [`StrongMut`] \
+///   A [`Rc<RefCell<T>>`] with [`Rc<RefCell<T>>`] mutability rules.
+/// - [`Weak`] \
+///   A [`Weak<RefCell<T>>`] with [`Weak<T>`] mutability rules.
+/// - [`WeakMut`] \
+///   A [`Weak<RefCell<T>>`] with [`Weak<RefCell<T>>`] mutability rules.
+pub mod rc;

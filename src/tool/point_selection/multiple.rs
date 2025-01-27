@@ -1,6 +1,7 @@
 use raylib::prelude::*;
+use amymath::prelude::*;
 use amylib::{iter::directed::*, rc::*};
-use crate::{layer::{group::Group, BackToFore, Layer}, vector_path::{path_point::{DistanceSqr, PathPoint}, VectorPath}, Change, Document};
+use crate::{layer::{group::Group, BackToFore, Layer}, vector_path::{path_point::PathPoint, VectorPath}, Change, Document};
 use super::{DepthFirstIter, HOVER_RADIUS_SQR};
 
 struct EditMultiPointAction {

@@ -1,6 +1,7 @@
+use amymath::prelude::*;
 use raylib::prelude::*;
 use amylib::{collections::tree::*, iter::directed::*, rc::*};
-use crate::{layer::{BackToFore, ForeToBack, Layer, LayerType}, ui::panel::Rect2, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PPPart, PathPoint, ReflectVector}, VectorPath}, Change, Document};
+use crate::{layer::{BackToFore, ForeToBack, Layer, LayerType}, ui::panel::Rect2, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, PPPart, PathPoint}, VectorPath}, Change, Document};
 use super::ToolType;
 
 pub const HOVER_RADIUS: f32 = 3.0;
@@ -40,15 +41,6 @@ pub struct PointSelection {
     selection_start: Option<Vector2>,
 }
 
-fn get_minmax_rec(selection_start: Vector2, mouse_world_pos: Vector2) -> Rectangle {
-    Rectangle {
-        x: selection_start.x.min(mouse_world_pos.x),
-        y: selection_start.y.min(mouse_world_pos.y),
-        width:  (mouse_world_pos.x - selection_start.x).abs(),
-        height: (mouse_world_pos.y - selection_start.y).abs(),
-    }
-}
-
 impl PointSelection {
     pub const fn new() -> Self {
         Self {
@@ -81,7 +73,7 @@ impl PointSelection {
         }
 
         let hovered_point = document.layers
-            .dfs_iter_mut(|_| false)
+            .shallow_iter_mut()
             .cdir::<ForeToBack>()
             .find_map(|target| {
                 let layer = target.read();
@@ -118,10 +110,10 @@ impl PointSelection {
 
         // finalize selection
         if let Some(selection_start) = self.selection_start.take() {
-            let selection_rec = get_minmax_rec(selection_start, mouse_world_pos);
+            let selection_rec = selection_start.minmax_rec(mouse_world_pos);
 
             let selected = document.layers
-                .dfs_iter_mut(|_| false)
+                .shallow_iter_mut()
                 .filter_map(|target| {
                     let layer = target.read();
                     if let Layer::Path(path) = &*layer {
@@ -180,7 +172,7 @@ impl ToolType for PointSelection {
         let px_world_size = document.camera.zoom.recip();
 
         let selection_rec = self.selection_start.as_ref().map(|&selection_start|
-            get_minmax_rec(selection_start, mouse_world_pos)
+            selection_start.minmax_rec(mouse_world_pos)
         );
 
         if let Some(selection_rec) = selection_rec.as_ref() {

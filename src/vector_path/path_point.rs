@@ -1,35 +1,5 @@
 use raylib::prelude::*;
-use super::mat2::Matrix2x2;
-
-pub trait ReflectVector {
-    fn reflected_over(&self, across: Self) -> Self;
-    fn reflected_to(&self, across: Self, length: f32) -> Self;
-}
-impl ReflectVector for Vector2 {
-    fn reflected_over(&self, across: Self) -> Self {
-        Self {
-            x: across.x * 2.0 - self.x,
-            y: across.y * 2.0 - self.y,
-        }
-    }
-
-    fn reflected_to(&self, across: Self, mut length: f32) -> Self {
-        let delta = *self - across;
-        length /= delta.length();
-        Self {
-            x: across.x - length * delta.x,
-            y: across.y - length * delta.y,
-        }
-    }
-}
-pub trait DistanceSqr {
-    fn distance_sqr_to(&self, v: Self) -> f32;
-}
-impl DistanceSqr for Vector2 {
-    fn distance_sqr_to(&self, v: Self) -> f32 {
-        (*self - v).length_sqr()
-    }
-}
+use amymath::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Ctrl {

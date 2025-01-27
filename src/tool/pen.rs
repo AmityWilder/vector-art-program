@@ -1,6 +1,7 @@
 use raylib::prelude::*;
+use amymath::prelude::*;
 use amylib::{iter::directed::DirectibleDoubleEndedIterator, rc::*};
-use crate::{layer::{BackToFore, ForeToBack, Layer, LayerType}, vector_path::path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PathPoint}, Change, Document};
+use crate::{layer::{BackToFore, ForeToBack, Layer, LayerType}, vector_path::path_point::{Ctrl, CtrlPt1, CtrlPt2, PathPoint}, Change, Document};
 use super::{point_selection::HOVER_RADIUS_SQR, ToolType};
 
 struct AddPointAction {
@@ -212,7 +213,7 @@ impl ToolType for Pen {
             }
             Self::Inactive(None) => {
                 // show selectable
-                for layer in document.layers.dfs_iter(|_| false).cdir::<BackToFore>() {
+                for layer in document.layers.shallow_iter().cdir::<BackToFore>() {
                     if let Layer::Path(path) = &*layer.read() {
                         if path.points.iter().any(|pp| pp.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR) {
                             path.draw_selected(d, px_world_size);

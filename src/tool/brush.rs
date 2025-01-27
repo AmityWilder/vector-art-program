@@ -1,7 +1,8 @@
 use std::collections::VecDeque;
 use raylib::prelude::*;
 use amylib::rc::*;
-use crate::{layer::{Layer, LayerType}, vector_path::path_point::{Ctrl, CtrlPt1, CtrlPt2, DistanceSqr, PathPoint}, Change, Document};
+use amymath::prelude::*;
+use crate::{layer::{Layer, LayerType}, vector_path::path_point::{Ctrl, CtrlPt1, CtrlPt2, PathPoint}, Change, Document};
 use super::ToolType;
 
 struct BrushAction {

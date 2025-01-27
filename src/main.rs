@@ -1,5 +1,5 @@
 use std::{path::Path, time::Instant};
-use amylib::{collections::tree::*, iter::directed::DirectibleDoubleEndedIterator, rc::*};
+use amylib::iter::directed::DirectibleDoubleEndedIterator;
 use layer::{BackToFore, LayerType};
 use raylib::prelude::*;
 use serialize::render_png::DownscaleAlgorithm;
