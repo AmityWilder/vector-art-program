@@ -2,7 +2,7 @@ use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{iter::directed::*, rc::*};
 use crate::{layer::{group::Group, BackToFore, Layer, LayerType}, vector_path::{path_point::PathPoint, VectorPath}, Change, Document};
-use super::{DepthFirstIter, HOVER_RADIUS_SQR};
+use super::{DepthFirstIter, HOVER_RADIUS, HOVER_RADIUS_SQR};
 
 struct EditMultiPointAction {
 
@@ -43,7 +43,7 @@ impl MultiSelect {
             .any(|SelectionPiece { target, points }| {
                 let layer = target.read();
                 let Layer::Path(path) = &*layer else { panic!("point selection must target path") };
-                points.iter().any(|&idx| path.points[idx].p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR)
+                points.iter().any(|&idx| path.points[idx].p.rec_distance_to(mouse_world_pos) <= HOVER_RADIUS)
             })
     }
 

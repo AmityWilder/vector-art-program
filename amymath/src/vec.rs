@@ -46,11 +46,19 @@ impl ReflectVector for Vector2 {
 }
 
 pub trait DistanceSqr {
+    /// Distance squared
     fn distance_sqr_to(&self, v: Self) -> f32;
+
+    /// Rectangular distance
+    fn rec_distance_to(&self, v: Self) -> f32;
 }
 
 impl DistanceSqr for Vector2 {
     fn distance_sqr_to(&self, v: Self) -> f32 {
-        (*self - v).length_sqr()
+        (*self - v).length()
+    }
+
+    fn rec_distance_to(&self, v: Self) -> f32 {
+        (self.x - v.x).abs().max((self.y - v.y).abs())
     }
 }

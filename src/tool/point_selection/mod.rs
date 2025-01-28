@@ -13,8 +13,8 @@ pub const SNAP_VERT_RADIUS_SQR: f32 = SNAP_VERT_RADIUS * SNAP_VERT_RADIUS;
 mod singular;
 mod multiple;
 
-use singular::SingleSelect;
-use multiple::{EnumerateSelectedLayers, EnumerateSelectedPoints, MultiSelect, SelectionPiece};
+use singular::*;
+use multiple::*;
 
 /// Pieces should be ordered by unique target layer [`TreeIterDir::BackToFore`]. Points should be ordered by index.
 enum Selection {
@@ -51,7 +51,6 @@ impl PointSelection {
 
     fn begin_dragging(&mut self, document: &mut Document, mouse_world_pos: Vector2) {
         let drag = Some((mouse_world_pos, mouse_world_pos));
-        let is_hovering = |pt: Vector2| pt.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR;
 
         if let Some(state) = self.state.as_mut() {
             match &mut state.selection {
@@ -79,7 +78,7 @@ impl PointSelection {
                 let layer = target.read();
                 if let Layer::Path(path) = &*layer {
                     let idx = path.points.iter()
-                        .position(|pp| is_hovering(pp.p));
+                        .position(|pp| pp.p.rec_distance_to(mouse_world_pos) <= HOVER_RADIUS);
                     if let Some(idx) = idx {
                         drop(layer);
                         return Some((target, idx));

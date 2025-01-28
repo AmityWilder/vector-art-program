@@ -258,8 +258,6 @@ fn main() {
 
             // Draw layers panel
             layers_panel.draw(&mut d, &document);
-
-            d.draw_fps(0, 0);
         }
     }
 }

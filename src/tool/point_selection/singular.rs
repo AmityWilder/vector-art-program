@@ -2,7 +2,7 @@ use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{prelude::DirectibleDoubleEndedIterator, rc::*};
 use crate::{layer::{BackToFore, Layer, LayerType}, vector_path::path_point::{CtrlPt1, CtrlPt2, PPPart, PathPoint}, Change, Document};
-use super::{multiple::{EnumerateSelectedPoints, SelectionPiece}, HOVER_RADIUS_SQR};
+use super::{multiple::{EnumerateSelectedPoints, SelectionPiece}, HOVER_RADIUS, HOVER_RADIUS_SQR};
 
 struct EditSinglePointAction {
     target: StrongMut<Layer>,
@@ -78,7 +78,7 @@ impl SingleSelect {
                 }
             }
         }
-        (pp.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR)
+        (pp.p.rec_distance_to(mouse_world_pos) <= HOVER_RADIUS)
             .then_some(PPPart::Anchor)
     }
 
@@ -112,6 +112,7 @@ impl SingleSelect {
             for (pp_idx, pp) in path.points.iter().enumerate() {
                 let is_selected = pp_idx == idx;
                 pp.draw(d, px_world_size, path.settings.color, is_selected,
+                    // dont implement this until i can click and drag them directly
                     is_selected/* || pp_idx.checked_sub(1).is_some_and(|prev| prev == idx)*/,
                     is_selected/* || pp_idx.checked_add(1).is_some_and(|next| next == idx)*/,
                 );
