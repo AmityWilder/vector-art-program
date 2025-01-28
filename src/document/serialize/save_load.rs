@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, fs::File, io::{self, BufRead, BufReader, BufWriter, Read, Write}, path::Path};
 use raylib::prelude::*;
-use amylib::{rc::*, collections::tree::*};
+use amylib::{collections::tree::*, io::*, rc::*};
 use crate::{
     document::{
         artboard::{ArtBoard, IntRect2},
@@ -34,102 +34,43 @@ const fn is_sterile(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == ' ' || c.is_ascii_punctuation()
 }
 
-fn read_bytes<const N: usize>(reader: &mut BufReader<File>) -> io::Result<[u8; N]> {
-    let mut buf = [0u8; N];
-    reader.read_exact(&mut buf)?;
-    Ok(buf)
-}
-
-fn write_u64(writer: &mut BufWriter<File>, n: u64) -> io::Result<()> {
-    writer.write_all(&n.to_le_bytes())
-}
-fn read_u64(reader: &mut BufReader<File>) -> io::Result<u64> {
-    read_bytes::<{size_of::<u64>()}>(reader)
-        .map(|buf| u64::from_le_bytes(buf))
-}
-
-fn write_f32(writer: &mut BufWriter<File>, n: f32) -> io::Result<()> {
-    writer.write_all(&n.to_le_bytes())
-}
-fn read_f32(reader: &mut BufReader<File>) -> io::Result<f32> {
-    read_bytes::<{size_of::<f32>()}>(reader)
-        .map(|buf| f32::from_le_bytes(buf))
-}
-
-fn write_i32(writer: &mut BufWriter<File>, n: i32) -> io::Result<()> {
-    writer.write_all(&n.to_le_bytes())
-}
-fn read_i32(reader: &mut BufReader<File>) -> io::Result<i32> {
-    read_bytes::<{size_of::<i32>()}>(reader)
-        .map(|buf| i32::from_le_bytes(buf))
-}
-
 fn write_color_rgb(writer: &mut BufWriter<File>, c: Color) -> io::Result<()> {
-    writer.write_all(&[c.r, c.g, c.b])
+    writer.write_le_arr([c.r, c.g, c.b])
 }
 fn read_color_rgb(reader: &mut BufReader<File>) -> io::Result<Color> {
-    read_bytes::<3>(reader)
-        .map(|[r, g, b]| Color { r, g, b, a: 255 })
+    reader.read_le_arr().map(|[r, g, b]| Color { r, g, b, a: 255 })
 }
 
 fn write_color_rgba(writer: &mut BufWriter<File>, c: Color) -> io::Result<()> {
-    writer.write_all(&[c.r, c.g, c.b, c.a])
+    writer.write_le_arr([c.r, c.g, c.b, c.a])
 }
 fn read_color_rgba(reader: &mut BufReader<File>) -> io::Result<Color> {
-    read_bytes::<4>(reader)
-        .map(|[r, g, b, a]| Color { r, g, b, a })
+    reader.read_le_arr().map(|[r, g, b, a]| Color { r, g, b, a })
 }
-
-// fn write_rectangle(writer: &mut BufWriter<File>, r: &Rectangle) -> io::Result<()> {
-//     write_f32(writer, r.x)?;
-//     write_f32(writer, r.y)?;
-//     write_f32(writer, r.width)?;
-//     write_f32(writer, r.height)
-// }
-// fn read_rectangle(reader: &mut BufReader<File>) -> io::Result<Rectangle> {
-//     Ok(Rectangle {
-//         x:      read_f32(reader)?,
-//         y:      read_f32(reader)?,
-//         width:  read_f32(reader)?,
-//         height: read_f32(reader)?,
-//     })
-// }
 
 fn write_irect2(writer: &mut BufWriter<File>, r: &IntRect2) -> io::Result<()> {
-    write_i32(writer, r.x)?;
-    write_i32(writer, r.y)?;
-    write_i32(writer, r.width)?;
-    write_i32(writer, r.height)
+    writer.write_le_arr([r.x, r.y, r.width, r.height])
 }
 fn read_irect2(reader: &mut BufReader<File>) -> io::Result<IntRect2> {
-    Ok(IntRect2 {
-        x:      read_i32(reader)?,
-        y:      read_i32(reader)?,
-        width:  read_i32(reader)?,
-        height: read_i32(reader)?,
-    })
+    reader.read_le_arr().map(|[x, y, width, height]| IntRect2 { x, y, width, height  })
 }
 
 fn write_vector2(writer: &mut BufWriter<File>, v: &Vector2) -> io::Result<()> {
-    write_f32(writer, v.x)?;
-    write_f32(writer, v.y)
+    writer.write_le_arr([v.x, v.y])
 }
 fn read_vector2(reader: &mut BufReader<File>) -> io::Result<Vector2> {
-    Ok(Vector2 {
-        x: read_f32(reader)?,
-        y: read_f32(reader)?,
-    })
+    reader.read_le_arr().map(|[x, y]| Vector2 { x, y  })
 }
 
 fn read_vec(reader: &mut BufReader<File>) -> io::Result<Vec<u8>> {
-    let mut buf = vec![0u8; read_u64(reader)? as usize];
+    let mut buf = vec![0u8; reader.read_le()?];
     reader.read_exact(buf.as_mut_slice())?;
     Ok(buf)
 }
 
 fn write_str(writer: &mut BufWriter<File>, s: &str) -> io::Result<()> {
     let bytes = s.as_bytes();
-    writer.write_all(&(bytes.len() as u64).to_le_bytes())?;
+    writer.write_le(bytes.len())?;
     writer.write_all(bytes)
 }
 fn read_str(reader: &mut BufReader<File>) -> io::Result<String> {
@@ -171,16 +112,16 @@ impl Document {
 
         write_color_rgb(&mut writer, *paper_color)?;
 
-        write_u64(&mut writer, *layer_color_acc   as u64)?;
-        write_u64(&mut writer, *layer_name_acc    as u64)?;
-        write_u64(&mut writer, *artboard_name_acc as u64)?;
+        writer.write_le(*layer_color_acc)?;
+        writer.write_le(*layer_name_acc)?;
+        writer.write_le(*artboard_name_acc)?;
 
         let camera_peculiar = camera.target * camera.zoom - camera.offset;
-        write_f32(&mut writer, camera.zoom)?;
+        writer.write_le(camera.zoom)?;
         write_vector2(&mut writer, &camera_peculiar)?;
 
         // artboards
-        write_u64(&mut writer, artboards.len() as u64)?;
+        writer.write_le(artboards.len())?;
         for ArtBoard { name, rect } in artboards {
             name.retain(is_sterile);
             write_str(&mut writer, &name)?;
@@ -188,7 +129,7 @@ impl Document {
         }
 
         // layers
-        writer.write_all(&(layers.len() as u64).to_le_bytes())?;
+        writer.write_le(layers.len())?;
         for mut layer in layers.dfs_iter_mut(|_| true) {
             let mut layer = layer.write();
 
@@ -234,8 +175,8 @@ impl Document {
                     items,
                     is_expanded: _, // already handled
                 }) => {
-                    writer.write_all(&[b'g'])?;
-                    write_u64(&mut writer, items.len() as u64)?;
+                    writer.write_le(b'g')?;
+                    writer.write_le(items.len())?;
                     // actual items handled by containing loop
                 }
 
@@ -249,7 +190,7 @@ impl Document {
                 }) => {
                     writer.write_all(&[b'p', *is_closed as u8])?; // todo: an entire byte for one bit? :c
 
-                    write_u64(&mut writer, style_items.len() as u64)?;
+                    writer.write_le(style_items.len())?;
                     for style_item in style_items.iter_mut() {
                         match style_item {
                             StyleItem::Stroke(stroke::Stroke {
@@ -261,7 +202,7 @@ impl Document {
                                 thick,
                                 align,
                             }) => {
-                                writer.write_all(&[b's'])?;
+                                writer.write_le(b's')?;
 
                                 let opacity_byte = (opacity.clamp(0.0, 1.0) * 255.0) as u8;
                                 *opacity = opacity_byte as f32 / 255.0;
@@ -282,7 +223,7 @@ impl Document {
                                 }
 
                                 match thick {
-                                    stroke::WidthProfile::Constant(thick) => write_f32(&mut writer, *thick)?,
+                                    stroke::WidthProfile::Constant(thick) => writer.write_le(*thick)?,
                                     stroke::WidthProfile::Variable(_) => unimplemented!("not doing until supported"),
                                 }
                             }
@@ -294,11 +235,11 @@ impl Document {
                                 },
                                 pattern,
                             }) => {
-                                writer.write_all(&[b'f'])?;
+                                writer.write_le(b'f')?;
 
                                 let opacity_byte = (opacity.clamp(0.0, 1.0) * 255.0) as u8;
                                 *opacity = opacity_byte as f32 / 255.0;
-                                writer.write_all(&[
+                                writer.write_le_arr([
                                     ((matches!(pattern, fill::Pattern::Gradient { .. }) as u8) << 3)
                                     | (*blend_mode as i32 as u8),
                                     opacity_byte])?;
@@ -311,7 +252,7 @@ impl Document {
                         }
                     }
 
-                    write_u64(&mut writer, points.len() as u64)?;
+                    writer.write_le(points.len())?;
                     writer.write_all(
                         &points.make_contiguous().chunks(2)
                             .map(|pair| {
@@ -343,7 +284,7 @@ impl Document {
                             if let Some(c2) = c2.as_ref() {
                                 match c2 {
                                     Smooth => (),
-                                    Mirror(s2) => write_f32(&mut writer, *s2)?,
+                                    Mirror(s2) => writer.write_le(*s2)?,
                                     Exact(c2) => write_vector2(&mut writer, c2)?,
                                 }
                             }
@@ -355,7 +296,7 @@ impl Document {
                     settings: _, // already handled
                     texture: _, // TODO
                 }) => {
-                    writer.write_all(&[b'r'])?;
+                    writer.write_le(b'r')?;
                     unimplemented!("not doing until supported")
                 }
             }
@@ -368,7 +309,7 @@ impl Document {
     pub fn load_bin(path: impl AsRef<Path>, mouse_screen_pos: Vector2) -> io::Result<Self> {
         let mut reader = BufReader::new(File::open(&path)?);
         let mut version_line = String::new();
-        if !matches!(&read_bytes(&mut reader)?, b"amyvec") { Err(io::Error::other("incompatible file extension"))? }
+        if !matches!(&reader.read_le_arr()?, b"amyvec") { Err(io::Error::other("incompatible file extension"))? }
         reader.read_line(&mut version_line)?;
         if let &[version_major, version_minor, version_patch, b'\n'] = version_line.as_bytes() {
             if version_major != VERSION_MAJOR || version_minor > VERSION_MINOR || version_patch > VERSION_PATCH {
@@ -384,11 +325,11 @@ impl Document {
 
                 document.paper_color = read_color_rgb(&mut reader)?;
 
-                document.layer_color_acc   = read_u64(&mut reader)? as usize;
-                document.layer_name_acc    = read_u64(&mut reader)? as usize;
-                document.artboard_name_acc = read_u64(&mut reader)? as usize;
+                document.layer_color_acc   = reader.read_le()?;
+                document.layer_name_acc    = reader.read_le()?;
+                document.artboard_name_acc = reader.read_le()?;
 
-                document.camera.zoom = read_f32(&mut reader)?;
+                document.camera.zoom = reader.read_le()?;
                 // camera.target * camera.zoom - camera.offset;
                 let camera_peculiar = read_vector2(&mut reader)?;
                 document.camera.target = (camera_peculiar + mouse_screen_pos) / document.camera.zoom;
@@ -396,7 +337,7 @@ impl Document {
 
                 // artboards
                 {
-                    let num_artboards = read_u64(&mut reader)? as usize;
+                    let num_artboards = reader.read_le()?;
                     document.artboards.reserve(num_artboards);
 
                     for _ in 0..num_artboards {
@@ -410,19 +351,19 @@ impl Document {
                 // layers
                 fn read_layer_tree(reader: &mut BufReader<File>) -> io::Result<LayerTree> {
                     let mut tree = LayerTree::new();
-                    let num_layers = read_u64(reader)? as usize;
+                    let num_layers = reader.read_le()?;
                     tree.reserve(num_layers);
 
                     for _ in 0..num_layers {
                         let name = read_str(reader)?;
-                        let [flags] = read_bytes::<1>(reader)?;
+                        let flags: u8 = reader.read_le()?;
                         let is_expanded = ((flags >> 6) & 1) != 0;
                         let is_hidden   = ((flags >> 5) & 1) != 0;
                         let is_locked   = ((flags >> 4) & 1) != 0;
                         let is_group    = ((flags >> 3) & 1) != 0;
                         let blend_mode = extract_blend_mode(flags);
                         let color = read_color_rgb(reader)?;
-                        let [opacity_byte] = read_bytes::<1>(reader)?;
+                        let opacity_byte: u8 = reader.read_le()?;
                         let opacity = opacity_byte as f32 / 255.0;
 
                         let settings = LayerSettings {
@@ -438,7 +379,7 @@ impl Document {
                             artwork_bounds: Rectangle::default(),
                         };
 
-                        let [layer_type] = read_bytes::<1>(reader)?;
+                        let layer_type = reader.read_le()?;
                         tree.push(StrongMut::new(
                             match layer_type {
                                 b'g' => {
@@ -450,14 +391,14 @@ impl Document {
                                 },
 
                                 b'p' => {
-                                    let [is_closed] = read_bytes::<1>(reader)?;
-                                    let num_style_items = read_u64(reader)? as usize;
+                                    let is_closed = reader.read_le()?;
+                                    let num_style_items = reader.read_le()?;
                                     let mut style_items = Vec::with_capacity(num_style_items);
                                     for _ in 0..num_style_items {
-                                        let [style_item_type] = read_bytes::<1>(reader)?;
+                                        let style_item_type = reader.read_le()?;
                                         style_items.push(match style_item_type {
                                             b's' => {
-                                                let [flags, opacity_byte] = read_bytes::<2>(reader)?;
+                                                let [flags, opacity_byte]: [u8; 2] = reader.read_le_arr()?;
                                                 let opacity = opacity_byte as f32 / 255.0;
                                                 let is_gradient = (flags >> 6) & 1 != 0;
                                                 let is_variable_thickness = (flags >> 5) & 1 != 0;
@@ -476,7 +417,7 @@ impl Document {
                                                 };
 
                                                 let thick = if !is_variable_thickness {
-                                                    stroke::WidthProfile::Constant(read_f32(reader)?)
+                                                    stroke::WidthProfile::Constant(reader.read_le()?)
                                                 } else {
                                                     unimplemented!("not doing until supported")
                                                 };
@@ -493,7 +434,7 @@ impl Document {
                                             }
 
                                             b'f' => {
-                                                let [flags, opacity_byte] = read_bytes::<2>(reader)?;
+                                                let [flags, opacity_byte]: [u8; 2] = reader.read_le_arr()?;
                                                 let opacity = opacity_byte as f32 / 255.0;
                                                 let is_gradient = (flags >> 3) & 1 != 0;
                                                 let blend_mode = extract_blend_mode(flags);
@@ -515,7 +456,7 @@ impl Document {
                                         });
                                     }
 
-                                    let num_points = read_u64(reader)? as usize;
+                                    let num_points = reader.read_le()?;
                                     let flags = {
                                         let mut mashed_flags = vec![0u8; num_points / 2 + num_points % 2];
                                         reader.read_exact(mashed_flags.as_mut_slice())?;
@@ -538,7 +479,7 @@ impl Document {
                                                     c2: match byte & 0b111 {
                                                         0b001 => None,
                                                         0b011 => Some(CtrlPt2::Smooth),
-                                                        0b101 => Some(CtrlPt2::Mirror(read_f32(reader)?)),
+                                                        0b101 => Some(CtrlPt2::Mirror(reader.read_le()?)),
                                                         0b111 => Some(CtrlPt2::Exact(read_vector2(reader)?)),
                                                         _ => unreachable!("we did a lot of bitmasks to get here"),
                                                     },
@@ -551,7 +492,7 @@ impl Document {
                                         settings,
                                         points,
                                         appearance: Appearance { items: style_items },
-                                        is_closed: is_closed != 0,
+                                        is_closed,
                                     })
                                 },
 

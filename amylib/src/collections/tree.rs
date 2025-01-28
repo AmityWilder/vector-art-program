@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
-use crate::rc::{Owned, Strong, StrongMut};
-use super::stack::VecStack;
+use crate::rc::*;
+use super::VecStack;
 
 pub trait Recursive: Sized {
     type Node;

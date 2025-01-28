@@ -1,3 +1,4 @@
+use amymath::prelude::*;
 use super::*;
 
 pub struct Control {
@@ -30,6 +31,6 @@ impl Ramp {
             }
         }
         let t = (t - lower.pos as f32) / (upper.pos as f32 - lower.pos as f32); // normalize
-        mix(&lower.color, &upper.color, t)
+        lower.color.mix(upper.color, t)
     }
 }

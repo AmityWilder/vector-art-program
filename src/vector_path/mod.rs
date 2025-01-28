@@ -9,15 +9,6 @@ pub mod gradient;
 pub mod stroke;
 pub mod fill;
 
-fn mix(c0: &Color, c1: &Color, amount: f32) -> Color {
-    Color {
-        r: lerp(c0.r as f32, c1.r as f32, amount) as u8,
-        g: lerp(c0.g as f32, c1.g as f32, amount) as u8,
-        b: lerp(c0.b as f32, c1.b as f32, amount) as u8,
-        a: lerp(c0.a as f32, c1.a as f32, amount) as u8,
-    }
-}
-
 pub struct VectorPath {
     pub settings: LayerSettings,
     pub points: VecDeque<PathPoint>,
