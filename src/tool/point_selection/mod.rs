@@ -182,86 +182,25 @@ impl ToolType for PointSelection {
         // goal: draw each control point ONLY ONCE without O(n^2) complexity selection test
         // IMPORTANT: relies on previously stated sorting requirements
 
-        let (selected, is_singular_selection): (&[SelectionPiece], bool) = match self.state.as_ref() {
-            None => (&[], false),
-            Some(state) => match &state.selection {
-                Selection::Singular(SingleSelect { target, pt_idx, .. }) => (&[SelectionPiece { target: target.clone_mut(), points: vec![*pt_idx] }], true),
-                Selection::Multiple(MultiSelect { pieces }) => (pieces.as_slice(), false),
-            },
-        };
+        match self.state.as_ref() {
+            Some(SelectionState { selection: Selection::Singular(selected), .. }) => {
+                selected.draw(d, document, px_world_size, selection_rec);
+            }
 
-        if let Some(SelectionState { selection: Selection::Multiple(selection), .. }) = self.state.as_ref() {
-            for (selected, target) in document.layers.shallow_iter().enumerate_selected_layers(selection) {
-                let layer = target.read();
-                if let Layer::Path(path) = &*layer {
-                    path.draw_selected(d, px_world_size);
-                    if let Some(selected) = selected {
-                        for (is_point_selected, pp) in path.enumerate_selected_points(selected) {
-                            let is_selected = is_point_selected || selection_rec.is_some_and(|rec| rec.check_collision_point_rec(pp.p));
-                            let is_ctrls_vis = is_singular_selection && is_point_selected;
-                            pp.draw(d, px_world_size, path.settings.color, is_selected, is_ctrls_vis, is_ctrls_vis);
+            Some(SelectionState { selection: Selection::Multiple(selected), .. }) => {
+                selected.draw(d, document, px_world_size, selection_rec);
+            }
+
+            None => {
+                // draw selection options
+                for target in document.layers.shallow_iter().cdir::<BackToFore>() {
+                    let layer = target.read();
+                    if let Layer::Path(path) = &*layer {
+                        path.draw_selected(d, px_world_size);
+                        for pp in path.points.iter() {
+                            let is_selected = selection_rec.is_some_and(|rec| rec.check_collision_point_rec(pp.p));
+                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false);
                         }
-                    }
-                }
-            }
-        }
-
-
-
-        if selection_rec.is_some() || self.state.is_none() {
-            let mut selected_layer_iter = selected.iter();
-            let mut current_selected_layer = selected_layer_iter.next();
-            // draw selection options
-            for target in document.layers.dfs_iter(|_| false).cdir::<BackToFore>() {
-                let mut selected_points_iter = current_selected_layer.as_ref().and_then(|selected_layer| (target == selected_layer.target).then(|| selected_layer.points.iter()));
-                let mut current_selected_point = selected_points_iter.as_mut().and_then(|it| it.next());
-                let layer = target.read();
-                if let Layer::Path(path) = &*layer {
-                    path.draw_selected(d, px_world_size);
-                    for (idx, pp) in path.points.iter().enumerate() {
-                        let is_point_selected = current_selected_point.is_some_and(|&s_idx| idx == s_idx);
-                        let is_selected = is_point_selected || selection_rec.is_some_and(|rec| rec.check_collision_point_rec(pp.p));
-                        let is_ctrls_vis = is_singular_selection && is_point_selected;
-                        pp.draw(d, px_world_size, path.settings.color, is_selected, is_ctrls_vis, is_ctrls_vis);
-                        if is_point_selected {
-                            current_selected_point = selected_points_iter.as_mut().and_then(|it| it.next());
-                        }
-                    }
-                }
-                if selected_points_iter.is_some() {
-                    current_selected_layer = selected_layer_iter.next();
-                }
-            }
-        } else if is_singular_selection {
-            // draw singular selection
-            let [SelectionPiece { target, points }] = selected else { panic!("singular selection should have exactly one item") };
-            let [idx] = points[..] else { panic!("singular selection should have exactly one item") };
-            let layer = target.read();
-            let Layer::Path(path) = &*layer else { panic!("point selection target must be path") };
-            path.draw_selected(d, px_world_size);
-            for (pp_idx, pp) in path.points.iter().enumerate() {
-                let is_selected = pp_idx == idx;
-                pp.draw(d, px_world_size, path.settings.color, is_selected,
-                    is_singular_selection && (is_selected || pp_idx.checked_sub(1).is_some_and(|prev| prev == idx)),
-                    is_singular_selection && (is_selected || pp_idx.checked_add(1).is_some_and(|next| next == idx)),
-                );
-            }
-        } else {
-            // draw current selection
-            for piece in selected {
-                let layer = piece.target.read();
-                let Layer::Path(path) = &*layer else { panic!("point selection target must be path") };
-                path.draw_selected(d, px_world_size);
-                let mut indices = piece.points.iter().copied();
-                let mut idx = indices.next();
-                for (pp_idx, pp) in path.points.iter().enumerate() {
-                    let is_selected = idx.is_some_and(|idx| pp_idx == idx);
-                    pp.draw(d, px_world_size, path.settings.color, is_selected,
-                        is_singular_selection && (is_selected || idx.is_some_and(|idx| pp_idx == idx)),
-                        is_singular_selection && (is_selected || idx.is_some_and(|idx| pp_idx == idx)),
-                    );
-                    if is_selected {
-                        idx = indices.next();
                     }
                 }
             }

@@ -1,7 +1,7 @@
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{iter::directed::*, rc::*};
-use crate::{layer::{group::Group, BackToFore, Layer}, vector_path::{path_point::PathPoint, VectorPath}, Change, Document};
+use crate::{layer::{group::Group, BackToFore, Layer, LayerType}, vector_path::{path_point::PathPoint, VectorPath}, Change, Document};
 use super::{DepthFirstIter, HOVER_RADIUS_SQR};
 
 struct EditMultiPointAction {
@@ -47,8 +47,39 @@ impl MultiSelect {
             })
     }
 
-    pub fn draw(&self, d: &mut impl RaylibDraw, document: &Document, mouse_world_pos: Vector2) {
-
+    pub fn draw(&self, d: &mut impl RaylibDraw, document: &Document, px_world_size: f32, selection_rec: Option<Rectangle>) {
+        if let Some(selection_rec) = selection_rec {
+            for (selected, target) in document.layers.shallow_iter().enumerate_selected_layers(&self) {
+                let layer = target.read();
+                if let Layer::Path(path) = &*layer {
+                    path.draw_selected(d, px_world_size);
+                    if let Some(selected) = selected {
+                        for (is_point_selected, pp) in path.enumerate_selected_points(selected) {
+                            let is_selected = is_point_selected || selection_rec.check_collision_point_rec(pp.p);
+                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false);
+                        }
+                    } else {
+                        for pp in path.points.iter() {
+                            let is_selected = selection_rec.check_collision_point_rec(pp.p);
+                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false);
+                        }
+                    }
+                }
+            }
+        } else {
+            for piece in &self.pieces {
+                let layer = piece.target.read();
+                let Layer::Path(path) = &*layer else { panic!("point selection target must be path") };
+                path.draw_selected(d, px_world_size);
+                let mut indices = piece.points.iter().copied();
+                let mut idx = indices.next();
+                for (pp_idx, pp) in path.points.iter().enumerate() {
+                    let is_selected = idx.is_some_and(|idx| pp_idx == idx);
+                    if is_selected { idx = indices.next(); }
+                    pp.draw(d, px_world_size, path.settings.color, is_selected, false, false);
+                }
+            }
+        }
     }
 }
 

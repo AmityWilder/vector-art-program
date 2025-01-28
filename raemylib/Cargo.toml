@@ -1,9 +1,0 @@
-[package]
-name = "raemylib"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-raylib = "5.0.2"
-amylib = { path = "../amylib" }
-amymath = { path = "../amymath" }

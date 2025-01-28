@@ -1,8 +1,8 @@
 use raylib::prelude::*;
 use amymath::prelude::*;
-use amylib::rc::*;
-use crate::{layer::Layer, vector_path::path_point::{CtrlPt1, CtrlPt2, PPPart, PathPoint}, Change, Document};
-use super::HOVER_RADIUS_SQR;
+use amylib::{prelude::DirectibleDoubleEndedIterator, rc::*};
+use crate::{layer::{BackToFore, Layer, LayerType}, vector_path::path_point::{CtrlPt1, CtrlPt2, PPPart, PathPoint}, Change, Document};
+use super::{multiple::{EnumerateSelectedPoints, SelectionPiece}, HOVER_RADIUS_SQR};
 
 struct EditSinglePointAction {
     target: StrongMut<Layer>,
@@ -82,7 +82,40 @@ impl SingleSelect {
             .then_some(PPPart::Anchor)
     }
 
-    pub fn draw(&self, d: &mut impl RaylibDraw, document: &Document, mouse_world_pos: Vector2) {
-
+    pub fn draw(&self, d: &mut impl RaylibDraw, document: &Document, px_world_size: f32, selection_rec: Option<Rectangle>) {
+        if let Some(selection_rec) = selection_rec {
+            // draw selection options
+            let piece = SelectionPiece { target: self.target.clone_mut(), points: vec![self.pt_idx] };
+            for target in document.layers.shallow_iter().cdir::<BackToFore>() {
+                let selected = (target == self.target).then(|| &piece);
+                let layer = target.read();
+                if let Layer::Path(path) = &*layer {
+                    path.draw_selected(d, px_world_size);
+                    if let Some(selected) = selected {
+                        for (is_point_selected, pp) in path.enumerate_selected_points(selected) {
+                            let is_selected = is_point_selected || selection_rec.check_collision_point_rec(pp.p);
+                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false);
+                        }
+                    } else {
+                        for pp in path.points.iter() {
+                            let is_selected = selection_rec.check_collision_point_rec(pp.p);
+                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false);
+                        }
+                    }
+                }
+            }
+        } else {
+            let layer = self.target.read();
+            let Layer::Path(path) = &*layer else { panic!("point selection target must be path") };
+            path.draw_selected(d, px_world_size);
+            let idx = self.pt_idx;
+            for (pp_idx, pp) in path.points.iter().enumerate() {
+                let is_selected = pp_idx == idx;
+                pp.draw(d, px_world_size, path.settings.color, is_selected,
+                    is_selected/* || pp_idx.checked_sub(1).is_some_and(|prev| prev == idx)*/,
+                    is_selected/* || pp_idx.checked_add(1).is_some_and(|next| next == idx)*/,
+                );
+            }
+        }
     }
 }
