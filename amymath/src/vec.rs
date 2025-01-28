@@ -49,8 +49,13 @@ pub trait DistanceSqr {
     /// Distance squared
     fn distance_sqr_to(&self, v: Self) -> f32;
 
-    /// Rectangular distance
+    /// Rectangular distance \
+    /// Radius to edge
     fn rec_distance_to(&self, v: Self) -> f32;
+
+    /// Diamond distance \
+    /// Radius to corner
+    fn dia_distance_to(&self, v: Self) -> f32;
 }
 
 impl DistanceSqr for Vector2 {
@@ -60,5 +65,9 @@ impl DistanceSqr for Vector2 {
 
     fn rec_distance_to(&self, v: Self) -> f32 {
         (self.x - v.x).abs().max((self.y - v.y).abs())
+    }
+
+    fn dia_distance_to(&self, v: Self) -> f32 {
+        (self.x - v.x).abs() + (self.y - v.y).abs()
     }
 }
