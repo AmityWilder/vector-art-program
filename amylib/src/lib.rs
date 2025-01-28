@@ -1,6 +1,7 @@
 pub mod collections;
 pub mod iter;
 pub mod io;
+pub mod ops;
 
 /// Wrappers for [`Rc<RefCell<T>>`] to enable finer tuning of mutability.
 ///

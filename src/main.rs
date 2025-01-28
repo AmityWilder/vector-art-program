@@ -117,18 +117,18 @@ fn main() {
         let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, document.camera);
 
         {
-            let is_zooming = rl.is_key_down(KeyboardKey::KEY_LEFT_ALT) || rl.get_gesture_pinch_vector().length_sqr() > 0.0;
+            let is_zooming = rl.is_key_down(KeyboardKey::KEY_LEFT_ALT);
 
             let mut pan = Vector2::zero();
             if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_MIDDLE) {
                 pan += mouse_screen_delta;
             }
             if !is_zooming {
-                pan += (if rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) {
-                    Vector2::new(1.0, 0.0)
-                } else {
-                    Vector2::new(0.0, 1.0)
-                }) * rl.get_mouse_wheel_move() * 20.0
+                let mut scroll_v: Vector2 = rl.get_mouse_wheel_move_v().into();
+                if rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) {
+                    (scroll_v.x, scroll_v.y) = (scroll_v.y, scroll_v.x);
+                }
+                pan += scroll_v * 20.0;
             }
             document.camera.target -= pan / document.camera.zoom;
 
@@ -137,8 +137,7 @@ fn main() {
 
             if is_zooming {
                 const ZOOM_SPEED: f32 = 1.5;
-                let scroll = rl.get_mouse_wheel_move();
-                let amount = if scroll != 0.0 { scroll } else { rl.get_gesture_pinch_vector().length() };
+                let amount = rl.get_mouse_wheel_move();
                 if amount > 0.0 && document.camera.zoom < MAX_ZOOM {
                     document.camera.zoom *= ZOOM_SPEED;
                 } else if amount < 0.0 && document.camera.zoom > MIN_ZOOM {
