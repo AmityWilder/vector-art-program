@@ -24,16 +24,24 @@ pub enum PPPart {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Ctrl2 {
-    /// Reflection of `c1` across `p`
+    // corner: G0 continuity
+
+    // todo: add G2 continuity option
+
+    /// Reflection of `c1` across `p` \
+    /// G1 continuity
     Reflect,
 
-    /// Reflection of `c1` across `p`, with a specific length
+    /// Reflection of `c1` across `p`, with a specific length \
+    /// G1 continuity
     Mirror(f32),
 
-    /// A transformation of the relative vector from `p` to `c1`
+    /// A transformation of the relative vector from `p` to `c1` \
+    /// G0 continuity
     Transformed(Matrix2x2),
 
-    /// A directly given position
+    /// A directly given position \
+    /// G0 continuity
     Exact(Vector2),
 }
 use Ctrl2::*;
