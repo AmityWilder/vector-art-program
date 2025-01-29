@@ -3,7 +3,7 @@ use raylib::prelude::*;
 use amylib::rc::*;
 use amymath::prelude::*;
 use crate::{layer::LayerType, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath}, Change, Document};
-use super::ToolType;
+use super::{point_selection::SNAP_VERT_RADIUS_SQR, ToolType};
 
 struct BrushAction {
     target: StrongMut<VectorPath>,
@@ -127,10 +127,26 @@ impl ToolType for VectorBrush {
                         let speed_out = (next - curr).length();
                         let t_hat = (next - prev).normalized();
                         let c_out = curr + t_hat * speed_out / 3.0;
-                        path.points[idx + 1].c = Some(Ctrl1 {
-                            c1: (Ctrl::Out, c_out),
-                            c2: Some(Ctrl2::Mirror(speed_in / 3.0)),
-                        });
+                        {
+                            let curr = &mut path.points[idx + 1].c;
+                            *curr = Some(Ctrl1 {
+                                c1: (Ctrl::Out, c_out),
+                                c2: Some(Ctrl2::Mirror(speed_in / 3.0)),
+                            });
+                        }
+                    }
+                    // join points confirmed to be no longer editing
+                    if let Some(idx) = path.points.len().checked_sub(4) {
+                        if path.points[idx].p.distance_sqr_to(path.points[idx + 1].p) < 0.001 {
+                            let b = path.points.remove(idx + 1).expect("checked sub should ensure element existence");
+                            let a = &mut path.points[idx];
+                            println!("merging points\n  {a:?}\n  {b:?}");
+                            if let Some((c_a, c_b)) = a.c.as_mut().zip(b.c) {
+                                assert_eq!((c_a.c1.0, c_b.c1.0), (Ctrl::Out, Ctrl::Out), "brush should be producing Out ctrl only");
+                                c_a.c1.1 = a.p + c_b.c1.1 - b.p; // merge output velocity, keep input velocity
+                            }
+                            println!("result:\n  {a:?}");
+                        }
                     }
                 }
 

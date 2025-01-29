@@ -27,7 +27,7 @@ fn main() {
         .resizable()
         .build();
 
-    // rl.set_target_fps(60);
+    rl.set_target_fps(60);
 
     let mut window_rect = Rect2 {
         xmin: 0.0,
@@ -257,7 +257,7 @@ fn main() {
             // Draw layers panel
             layers_panel.draw(&mut d, &document);
 
-            d.draw_fps(0, 0);
+            // d.draw_fps(0, 0);
         }
     }
 }
