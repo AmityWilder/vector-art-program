@@ -1,5 +1,3 @@
-use crate::rc::*;
-
 pub mod bfs;
 pub mod dfs;
 
@@ -14,74 +12,68 @@ pub trait Recursive: Sized {
     fn children_mut(node: &mut Self::Node) -> &mut Tree<Self>;
 }
 
-pub struct Iter<'a, T> {
-    iter: std::slice::Iter<'a, StrongMut<T>>,
+pub struct Iter<'a, T: 'a> {
+    iter: std::slice::Iter<'a, T>,
 }
 
-impl<'a, T: Recursive> Iter<'a, T> {
+impl<'a, T: 'a + Recursive> Iter<'a, T> {
     fn new(src: &'a Tree<T>) -> Self {
         Self { iter: src.0.iter() }
     }
 }
 
-impl<'a, T> Iterator for Iter<'a, T> {
-    type Item = Strong<T>;
+impl<'a, T: 'a> Iterator for Iter<'a, T> {
+    type Item = &'a T;
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|rc| rc.clone())
+        self.iter.next()
     }
 }
-impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
+impl<'a, T: 'a> DoubleEndedIterator for Iter<'a, T> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.iter.next_back().map(|rc| rc.clone())
+        self.iter.next_back()
     }
 }
-impl<'a, T> ExactSizeIterator for Iter<'a, T> {}
+impl<'a, T: 'a> ExactSizeIterator for Iter<'a, T> {}
 
-pub struct IterMut<'a, T> {
-    iter: std::slice::IterMut<'a, StrongMut<T>>,
+pub struct IterMut<'a, T: 'a> {
+    iter: std::slice::IterMut<'a, T>,
 }
 
-impl<'a, T: Recursive> IterMut<'a, T> {
+impl<'a, T: 'a + Recursive> IterMut<'a, T> {
     fn new(src: &'a mut Tree<T>) -> Self {
         Self { iter: src.0.iter_mut() }
     }
 }
 
-impl<'a, T> Iterator for IterMut<'a, T> {
-    type Item = StrongMut<T>;
+impl<'a, T: 'a> Iterator for IterMut<'a, T> {
+    type Item = &'a mut T;
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|rc| rc.clone_mut())
+        self.iter.next()
     }
 }
-impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
+impl<'a, T: 'a> DoubleEndedIterator for IterMut<'a, T> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.iter.next_back().map(|rc| rc.clone_mut())
+        self.iter.next_back()
     }
 }
-impl<'a, T> ExactSizeIterator for IterMut<'a, T> {}
+impl<'a, T: 'a> ExactSizeIterator for IterMut<'a, T> {}
 
-pub struct Tree<T: Recursive>(Vec<StrongMut<T>>);
+pub struct Tree<T: Recursive>(Vec<T>);
 
-impl<T: Recursive, V: Into<Vec<StrongMut<T>>>> From<V> for Tree<T> {
+impl<T: Recursive, V: Into<Vec<T>>> From<V> for Tree<T> {
     fn from(value: V) -> Self {
         Self(value.into())
     }
 }
 
-impl<T: Recursive> FromIterator<StrongMut<T>> for Tree<T> {
-    fn from_iter<I: IntoIterator<Item = StrongMut<T>>>(iter: I) -> Self {
-        Self(iter.into_iter().collect())
-    }
-}
-
 impl<T: Recursive> FromIterator<T> for Tree<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        Self(iter.into_iter().map(|x| StrongMut::new(x)).collect())
+        Self(Vec::from_iter(iter))
     }
 }
 
 impl<T: Recursive> std::ops::Index<usize> for Tree<T> {
-    type Output = StrongMut<T>;
+    type Output = T;
     fn index(&self, index: usize) -> &Self::Output {
         &self.0[index]
     }
@@ -128,22 +120,22 @@ impl<T: Recursive> Tree<T> {
     }
 
     #[inline]
-    pub fn push(&mut self, value: StrongMut<T>) {
+    pub fn push(&mut self, value: T) {
         self.0.push(value)
     }
 
     #[inline]
-    pub fn pop(&mut self) -> Option<StrongMut<T>> {
+    pub fn pop(&mut self) -> Option<T> {
         self.0.pop()
     }
 
     #[inline]
-    pub fn insert(&mut self, index: usize, element: StrongMut<T>) {
+    pub fn insert(&mut self, index: usize, element: T) {
         self.0.insert(index, element)
     }
 
     #[inline]
-    pub fn remove(&mut self, index: usize) -> StrongMut<T> {
+    pub fn remove(&mut self, index: usize) -> T {
         self.0.remove(index)
     }
 
@@ -160,11 +152,9 @@ impl<T: Recursive> Tree<T> {
     }
 }
 
-pub trait RecursiveIterator: Iterator<Item: Owned<Inner = Self::Inner>> {
-    type Inner: Recursive;
-
+pub trait RecursiveIterator: Iterator {
     /// Depth of the most recent item to have been returned by `next()`
-    fn last_depth(&self) -> usize;
+    fn depth(&self) -> usize;
 }
 
 pub struct EnumerateDepth<I> {
@@ -180,13 +170,13 @@ impl<I> EnumerateDepth<I> {
 impl<I: RecursiveIterator> Iterator for EnumerateDepth<I> {
     type Item = (usize, I::Item);
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|x| (self.iter.last_depth(), x))
+        self.iter.next().map(|x| (self.iter.depth(), x))
     }
 }
 
 impl<I: RecursiveIterator + DoubleEndedIterator> DoubleEndedIterator for EnumerateDepth<I> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.iter.next_back().map(|x| (self.iter.last_depth(), x))
+        self.iter.next_back().map(|x| (self.iter.depth(), x))
     }
 }
 
@@ -222,9 +212,9 @@ mod tests {
         Value(usize),
         Branch(char),
     }
-    impl From<Strong<Foo>> for Bar {
-        fn from(value: Strong<Foo>) -> Self {
-            match &*value.read() {
+    impl From<&Foo> for Bar {
+        fn from(value: &Foo) -> Self {
+            match value {
                 Foo::Value(n) => Bar::Value(*n),
                 Foo::Branch(id, _) => Bar::Branch(*id),
             }

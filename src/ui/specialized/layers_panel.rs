@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use crate::{layer::{group::Group, ui_iter::LayerUiIterEx, Layer}, Document};
+use crate::{layer::{group::Group, ui_iter::LayerUiIterEx, Layer, LayerEnum}, Document};
 use super::panel::Panel;
 
 pub struct LayersPanel {
@@ -15,10 +15,9 @@ impl LayersPanel {
 
     pub fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_screen_pos: Vector2) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-            for (mut layer, recs) in document.layers.ui_iter_mut(self.panel.rec_cache, self.panel.rec_cache.ymin) {
+            for (layer, recs) in document.layers.ui_iter_mut(self.panel.rec_cache, self.panel.rec_cache.ymin) {
                 if recs.slot_rec.check_collision_point_rec(mouse_screen_pos) {
-                    let mut layer = layer.write();
-                    if let Layer::Group(Group { is_expanded, .. }) = &mut *layer {
+                    if let LayerEnum::Group(Group { is_expanded, .. }) = &mut layer.data {
                         let expand_button_rec = recs.expand_button_rec.expect("group should always have expand button");
                         if expand_button_rec.check_collision_point_rec(mouse_screen_pos) {
                             *is_expanded = !*is_expanded;

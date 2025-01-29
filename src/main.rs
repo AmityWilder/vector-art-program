@@ -192,8 +192,8 @@ fn main() {
                     d.clear_background(Color::BLANK);
                     {
                         let mut d = d.begin_mode2D(document.camera);
-                        for layer in document.layers.dfs_iter(|g| !g.settings.is_hidden).cdir::<BackToFore>() {
-                            layer.read().draw_rendered(&mut d);
+                        for layer in document.layers.dfs_iter(|g| !g.settings.read().is_hidden).cdir::<BackToFore>() {
+                            layer.draw_rendered(&mut d);
                         }
                     }
                 }

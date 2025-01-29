@@ -1,30 +1,23 @@
+use amylib::rc::*;
 use raylib::prelude::*;
 
 use crate::layer::{LayerSettings, LayerType};
 
 pub struct Raster {
-    pub settings: LayerSettings,
+    pub settings: StrongMut<LayerSettings>,
     pub texture: Option<RenderTexture2D>,
 }
 
 impl Raster {
-    pub fn new(settings: LayerSettings) -> Self {
+    pub fn new(settings: &StrongMut<LayerSettings>) -> Self {
         Self {
-            settings,
+            settings: settings.clone_mut(),
             texture: None,
         }
     }
 }
 
 impl LayerType for Raster {
-    fn settings(&self) -> &LayerSettings {
-        &self.settings
-    }
-
-    fn settings_mut(&mut self) -> &mut LayerSettings {
-        &mut self.settings
-    }
-
     fn draw_rendered(&self, _d: &mut impl RaylibDraw) {
         // todo
     }

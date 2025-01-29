@@ -130,12 +130,10 @@ impl Document {
 
         // layers
         writer.write_le(layers.len())?;
-        for mut layer in layers.dfs_iter_mut(|_| true) {
-            let mut layer = layer.write();
-
+        for layer in layers.dfs_iter_mut(|_| true) {
             // settings
             {
-                let is_expanded = matches!(&*layer, Layer::Group(Group { is_expanded: true, .. }));
+                let is_expanded = matches!(&layer.data, LayerEnum::Group(Group { is_expanded: true, .. }));
 
                 let LayerSettings {
                     name,
@@ -148,7 +146,7 @@ impl Document {
                         mode: blend_mode,
                     },
                     artwork_bounds: _,
-                } = layer.settings_mut();
+                } = &mut *layer.settings.write();
 
                 name.retain(is_sterile);
                 write_str(&mut writer, &name)?;
@@ -169,8 +167,8 @@ impl Document {
             }
 
             // specializations
-            match &mut *layer {
-                Layer::Group(Group {
+            match &mut layer.data {
+                LayerEnum::Group(Group {
                     settings: _, // already handled
                     items,
                     is_expanded: _, // already handled
@@ -180,18 +178,12 @@ impl Document {
                     // actual items handled by containing loop
                 }
 
-                Layer::Path(VectorPath {
-                    settings: _, // already handled
-                    points,
-                    appearance: Appearance {
-                        items: style_items,
-                    },
-                    is_closed,
-                }) => {
-                    writer.write_all(&[b'p', *is_closed as u8])?; // todo: an entire byte for one bit? :c
+                LayerEnum::Path(path) => {
+                    let path = &mut *path.write();
+                    writer.write_all(&[b'p', path.is_closed as u8])?; // todo: an entire byte for one bit? :c
 
-                    writer.write_le(style_items.len())?;
-                    for style_item in style_items.iter_mut() {
+                    writer.write_le(path.appearance.items.len())?;
+                    for style_item in path.appearance.items.iter_mut() {
                         match style_item {
                             StyleItem::Stroke(stroke::Stroke {
                                 blend: Blending {
@@ -252,9 +244,9 @@ impl Document {
                         }
                     }
 
-                    writer.write_le(points.len())?;
+                    writer.write_le(path.points.len())?;
                     writer.write_all(
-                        &points.make_contiguous().chunks(2)
+                        &path.points.make_contiguous().chunks(2)
                             .map(|pair| {
                                 let mut byte = 0u8;
                                 debug_assert!(pair.len() <= 2);
@@ -277,7 +269,7 @@ impl Document {
                             .collect::<Box<[u8]>>()
                     )?;
 
-                    for pp in points.iter_mut() {
+                    for pp in path.points.iter_mut() {
                         write_vector2(&mut writer, &pp.p)?;
                         if let Some(CtrlPt1 { c1: (_, c1), c2 }) = pp.ctrls.as_ref() {
                             write_vector2(&mut writer, c1)?;
@@ -292,10 +284,7 @@ impl Document {
                     }
                 }
 
-                Layer::Raster(Raster {
-                    settings: _, // already handled
-                    texture: _, // TODO
-                }) => {
+                LayerEnum::Raster(_) => {
                     writer.write_le(b'r')?;
                     unimplemented!("not doing until supported")
                 }
@@ -366,7 +355,7 @@ impl Document {
                         let opacity_byte: u8 = reader.read_le()?;
                         let opacity = opacity_byte as f32 / 255.0;
 
-                        let settings = LayerSettings {
+                        let settings = StrongMut::new(LayerSettings {
                             name,
                             color,
                             is_hidden,
@@ -377,13 +366,14 @@ impl Document {
                                 mode: blend_mode,
                             },
                             artwork_bounds: Rectangle::default(),
-                        };
+                        });
 
                         let layer_type = reader.read_le()?;
-                        tree.push(StrongMut::new(
-                            match layer_type {
+                        tree.push(Layer {
+                            settings: settings.clone_mut(),
+                            data: match layer_type {
                                 b'g' => {
-                                    Layer::Group(Group {
+                                    LayerEnum::Group(Group {
                                         settings,
                                         is_expanded,
                                         items: read_layer_tree(reader)?,
@@ -488,12 +478,12 @@ impl Document {
                                         });
                                     }
 
-                                    Layer::Path(VectorPath {
+                                    LayerEnum::Path(StrongMut::new(VectorPath {
                                         settings,
                                         points,
                                         appearance: Appearance { items: style_items },
                                         is_closed,
-                                    })
+                                    }))
                                 },
 
                                 b'r' => {
@@ -502,7 +492,7 @@ impl Document {
 
                                 x => Err(io::Error::other(format!("unknown layer type: {x:?}")))?,
                             }
-                        ))
+                        });
                     }
 
                     Ok(tree)

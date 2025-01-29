@@ -1,16 +1,17 @@
+use amylib::rc::*;
 use raylib::prelude::*;
 use super::{LayerSettings, LayerTree, LayerType};
 
 pub struct Group {
-    pub settings: LayerSettings,
+    pub settings: StrongMut<LayerSettings>,
     pub items: LayerTree,
     pub is_expanded: bool,
 }
 
 impl Group {
-    pub fn new(layer: LayerSettings) -> Self {
+    pub fn new(settings: &StrongMut<LayerSettings>) -> Self {
         Self {
-            settings: layer,
+            settings: settings.clone_mut(),
             items: LayerTree::new(),
             is_expanded: false,
         }
@@ -18,23 +19,15 @@ impl Group {
 }
 
 impl LayerType for Group {
-    fn settings(&self) -> &LayerSettings {
-        &self.settings
-    }
-
-    fn settings_mut(&mut self) -> &mut LayerSettings {
-        &mut self.settings
-    }
-
     fn draw_rendered(&self, d: &mut impl RaylibDraw) {
         for item in self.items.shallow_iter() {
-            item.read().draw_rendered(d);
+            item.draw_rendered(d);
         }
     }
 
     fn draw_selected(&self, d: &mut impl RaylibDraw, px_world_size: f32) {
         for item in self.items.shallow_iter() {
-            item.read().draw_selected(d, px_world_size);
+            item.draw_selected(d, px_world_size);
         }
     }
 }

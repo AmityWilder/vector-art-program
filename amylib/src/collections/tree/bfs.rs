@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use crate::rc::*;
 use super::{EnumerateDepth, Recursive, RecursiveIterator, Tree};
 
 impl<T: Recursive> Tree<T> {
@@ -9,20 +8,16 @@ impl<T: Recursive> Tree<T> {
     }
 }
 
-pub struct BreadthFirstIter<T, P> {
-    queue: VecDeque<Strong<T>>,
+pub struct BreadthFirstIter<'a, T: 'a, P> {
+    queue: VecDeque<&'a T>,
     curr_depth_count: usize,
     curr_depth: usize,
     delve: P,
 }
 
-impl<T, P> BreadthFirstIter<T, P> {
-    fn new<'a, I>(root_layer: I, delve: P) -> Self
-    where
-        T: 'a,
-        I: DoubleEndedIterator<Item = &'a StrongMut<T>>,
-    {
-        let queue: VecDeque<_> = root_layer.map(|x| x.clone()).collect();
+impl<'a, T: 'a, P> BreadthFirstIter<'a, T, P> {
+    fn new(root_layer: std::slice::Iter<'a, T>, delve: P) -> Self {
+        let queue = VecDeque::from_iter(root_layer);
         let curr_depth_count = queue.len();
         Self { queue, curr_depth_count, curr_depth: 0, delve }
     }
@@ -33,8 +28,8 @@ impl<T, P> BreadthFirstIter<T, P> {
     }
 }
 
-impl<T: Recursive, P: Fn(&T::Node) -> bool> Iterator for BreadthFirstIter<T, P> {
-    type Item = Strong<T>;
+impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> Iterator for BreadthFirstIter<'a, T, P> {
+    type Item = &'a T;
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(item) = self.queue.pop_front() {
             if self.curr_depth_count == 0 {
@@ -43,9 +38,9 @@ impl<T: Recursive, P: Fn(&T::Node) -> bool> Iterator for BreadthFirstIter<T, P> 
             } else {
                 self.curr_depth_count -= 1;
             }
-            if let Some(node) = item.read().get_if_node() {
+            if let Some(node) = item.get_if_node() {
                 if (self.delve)(node) {
-                    self.queue.extend(T::children(node).0.iter().map(|x| x.clone()));
+                    self.queue.extend(T::children(node).0.iter());
                 }
             }
             return Some(item);
@@ -54,10 +49,9 @@ impl<T: Recursive, P: Fn(&T::Node) -> bool> Iterator for BreadthFirstIter<T, P> 
     }
 }
 
-impl<T: Recursive, P: Fn(&T::Node) -> bool> RecursiveIterator for BreadthFirstIter<T, P> {
-    type Inner = T;
+impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> RecursiveIterator for BreadthFirstIter<'a, T, P> {
     #[inline]
-    fn last_depth(&self) -> usize {
+    fn depth(&self) -> usize {
         self.curr_depth
     }
 }

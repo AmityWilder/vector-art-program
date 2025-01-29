@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use amylib::rc::*;
 use path_point::PathPoint;
 use raylib::prelude::*;
 use crate::{appearance::{Appearance, StyleItem}, layer::{LayerSettings, LayerType}};
@@ -10,16 +11,16 @@ pub mod stroke;
 pub mod fill;
 
 pub struct VectorPath {
-    pub settings: LayerSettings,
+    pub settings: StrongMut<LayerSettings>,
     pub points: VecDeque<PathPoint>,
     pub appearance: Appearance,
     pub is_closed: bool,
 }
 
 impl VectorPath {
-    pub fn new(settings: LayerSettings) -> Self {
+    pub fn new(settings: &StrongMut<LayerSettings>) -> Self {
         Self {
-            settings,
+            settings: settings.clone_mut(),
             points: VecDeque::new(),
             appearance: Appearance::default(),
             is_closed: false,
@@ -38,14 +39,6 @@ impl VectorPath {
 }
 
 impl LayerType for VectorPath {
-    fn settings(&self) -> &LayerSettings {
-        &self.settings
-    }
-
-    fn settings_mut(&mut self) -> &mut LayerSettings {
-        &mut self.settings
-    }
-
     fn draw_rendered(&self, d: &mut impl RaylibDraw) {
         for item in &self.appearance.items {
             match item {
@@ -76,7 +69,7 @@ impl LayerType for VectorPath {
     }
 
     fn draw_selected(&self, d: &mut impl RaylibDraw, px_world_size: f32) {
-        let color = self.settings.color;
+        let color = self.settings.read().color;
         for [a, b] in self.calculate().windows(2).map(|w| <[_; 2]>::try_from(w).unwrap()) {
             d.draw_spline_segment_bezier_cubic(a.1, a.2, b.0, b.1, px_world_size, color);
         }

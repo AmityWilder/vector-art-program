@@ -1,19 +1,18 @@
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{iter::directed::DirectibleDoubleEndedIterator, rc::*};
-use crate::{layer::{BackToFore, ForeToBack, Layer, LayerType}, vector_path::path_point::{Ctrl, CtrlPt1, CtrlPt2, PathPoint}, Change, Document};
+use crate::{layer::{BackToFore, ForeToBack, Layer, LayerEnum, LayerType}, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, PathPoint}, VectorPath}, Change, Document};
 use super::{point_selection::HOVER_RADIUS_SQR, ToolType};
 
 struct AddPointAction {
-    target: StrongMut<Layer>,
+    target: StrongMut<VectorPath>,
     side: Ctrl,
     pp: PathPoint,
 }
 
 impl Change for AddPointAction {
     fn redo(&mut self, _document: &mut Document) -> Result<(), String> {
-        let mut target = self.target.write();
-        let Layer::Path(path) = &mut *target else { panic!("`target` is required to be a vector path") };
+        let mut path = self.target.write();
         let pp = self.pp.clone();
         match self.side {
             Ctrl::In  => path.points.push_front(pp),
@@ -23,8 +22,7 @@ impl Change for AddPointAction {
     }
 
     fn undo(&mut self, _document: &mut Document) -> Result<(), String> {
-        let mut target = self.target.write();
-        let Layer::Path(path) = &mut *target else { panic!("`target` is required to be a vector path") };
+        let mut path = self.target.write();
         match self.side {
             Ctrl::In  => _ = path.points.pop_front(),
             Ctrl::Out => _ = path.points.pop_back (),
@@ -35,13 +33,13 @@ impl Change for AddPointAction {
 
 /// The pen tool, possibly waiting for a target
 pub enum Pen {
-    Inactive(Option<StrongMut<Layer>>),
+    Inactive(Option<StrongMut<VectorPath>>),
     Active {
         /// If [`Some`], continue seleted.
         /// If [`None`], find a hovered path or create a new path upon clicking.
         /// Must be a `VectorPath` layer.
         /// If there is a layer, it must not die before the pen dies.
-        target: StrongMut<Layer>,
+        target: StrongMut<VectorPath>,
 
         /// Whether we are modifying an existing point or creating a new one
         is_dragging: bool,
@@ -62,14 +60,15 @@ impl Pen {
         // starting a new path
         for layer in document.layers.dfs_iter_mut(|_| false).cdir::<ForeToBack>() {
             // find hovered endpoint
-            if let Layer::Path(path) = &*layer.read() {
+            if let LayerEnum::Path(target) = &layer.data {
+                let path = target.read();
                 if let Some(last_idx) = path.points.len().checked_sub(1) { // failure to subtract 1 implies an empty list
                     let search_options = [(0, &path.points[0]), (last_idx, &path.points[last_idx])]; // heap allocations are yucky, ew. all my homies use stack arrays
                     let search_in = if last_idx != 0 { &search_options } else { &search_options[..=0] }; // only check last if the first isn't the last
                     for (idx, pp) in search_in {
                         if pp.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR {
                             return Self::Active {
-                                target: layer.clone_mut(),
+                                target: target.clone_mut(),
                                 is_dragging: true,
                                 direction: if *idx == 0 { Ctrl::In } else { Ctrl::Out },
                             };
@@ -104,8 +103,7 @@ impl ToolType for Pen {
         }
 
         if let Self::Active { target, is_dragging, direction  } = self {
-            let mut layer = target.write();
-            let Layer::Path(path) = &mut *layer else { panic!("`target` is required to be a vector path") };
+            let mut path = target.write();
 
             if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
                 // already drawing

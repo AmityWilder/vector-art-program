@@ -1,5 +1,5 @@
-use std::collections::VecDeque;
-use crate::{collections::VecStack, rc::*};
+use std::ptr::{null, null_mut};
+use crate::collections::VecStack;
 use super::{EnumerateDepth, Recursive, RecursiveIterator, Tree};
 
 impl<T: Recursive> Tree<T> {
@@ -10,24 +10,35 @@ impl<T: Recursive> Tree<T> {
 
     #[inline]
     pub fn dfs_iter_mut<P: Fn(&T::Node) -> bool>(&mut self, delve: P) -> DepthFirstIterMut<T, P> {
-        DepthFirstIterMut::new(self.0.iter(), delve)
+        DepthFirstIterMut::new(self.0.iter_mut(), delve)
     }
 }
 
-pub struct DepthFirstIter<T, P> {
-    stack: VecStack<VecDeque<Strong<T>>>,
-    curr_depth: usize,
+pub struct DepthFirstIter<'a, T: 'a, P> {
+    /// ## Safety
+    /// We don't actually move our item when returning,
+    /// we just give the caller a reference to it.
+    ///
+    /// By holding onto a pointer, we are simply keeping
+    /// a reference to the memory that *won't get mutated*
+    /// by this iterator until the reference we returned is
+    /// dropped by the caller ...I think.
+    ///
+    /// I'm not sure how to specify "the mutable reference
+    /// must be within a scope that ends **before**
+    /// [`Iterator::next`] is called again"
+    ///
+    /// It definitely shouldn't get *dropped* before the
+    /// iterator uses it again at least, so there's that.
+    on_deck: *const T,
+    stack: VecStack<std::slice::Iter<'a, T>>,
     delve: P,
 }
 
-impl<T, P> DepthFirstIter<T, P> {
-    fn new<'a, I>(root_layer: I, delve: P) -> Self
-    where
-        T: 'a,
-        I: DoubleEndedIterator<Item = &'a StrongMut<T>>,
-    {
-        let stack = VecStack::from([root_layer.map(|x| x.clone()).collect()]);
-        Self { stack, curr_depth: 0, delve }
+impl<'a, T: 'a, P> DepthFirstIter<'a, T, P> {
+    fn new(root_layer: std::slice::Iter<'a, T>, delve: P) -> Self {
+        let stack = VecStack::from([root_layer]);
+        Self { on_deck: null(), stack, delve }
     }
 
     #[inline]
@@ -36,17 +47,21 @@ impl<T, P> DepthFirstIter<T, P> {
     }
 }
 
-impl<T: Recursive, P: Fn(&T::Node) -> bool> Iterator for DepthFirstIter<T, P> {
-    type Item = Strong<T>;
+impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> Iterator for DepthFirstIter<'a, T, P> {
+    type Item = &'a T;
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(layer) = self.stack.top_mut() {
-            if let Some(item) = layer.pop_front() {
-                self.curr_depth = self.stack.len() - 1; // safety: could not get here if stack.len was 0
-                if let Some(node) = item.read().get_if_node() {
-                    if (self.delve)(node) {
-                        self.stack.push(T::children(node).0.iter().map(|x| x.clone()).collect());
-                    }
+        if !self.on_deck.is_null() {
+            let item: &'a T = unsafe { &*self.on_deck };
+            self.on_deck = null_mut();
+            if let Some(node) = item.get_if_node() {
+                if (self.delve)(node) {
+                    self.stack.push(T::children(node).0.iter());
                 }
+            }
+        }
+        while let Some(layer) = self.stack.top_mut() {
+            if let Some(item) = layer.next() {
+                self.on_deck = item as *const T;
                 return Some(item);
             } else {
                 _ = self.stack.pop();
@@ -56,16 +71,20 @@ impl<T: Recursive, P: Fn(&T::Node) -> bool> Iterator for DepthFirstIter<T, P> {
     }
 }
 
-impl<T: Recursive, P: Fn(&T::Node) -> bool> DoubleEndedIterator for DepthFirstIter<T, P> {
+impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> DoubleEndedIterator for DepthFirstIter<'a, T, P> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        while let Some(layer) = self.stack.top_mut() {
-            if let Some(item) = layer.pop_back() {
-                self.curr_depth = self.stack.len() - 1; // safety: could not get here if stack.len was 0
-                if let Some(node) = item.read().get_if_node() {
-                    if (self.delve)(node) {
-                        self.stack.push(T::children(node).0.iter().map(|x| x.clone()).collect());
-                    }
+        if !self.on_deck.is_null() {
+            let item: &'a T = unsafe { &*self.on_deck };
+            self.on_deck = null();
+            if let Some(node) = item.get_if_node() {
+                if (self.delve)(node) {
+                    self.stack.push(T::children(node).0.iter());
                 }
+            }
+        }
+        while let Some(layer) = self.stack.top_mut() {
+            if let Some(item) = layer.next_back() {
+                self.on_deck = item as *const T;
                 return Some(item);
             } else {
                 _ = self.stack.pop();
@@ -75,28 +94,38 @@ impl<T: Recursive, P: Fn(&T::Node) -> bool> DoubleEndedIterator for DepthFirstIt
     }
 }
 
-impl<T: Recursive, P: Fn(&T::Node) -> bool> RecursiveIterator for DepthFirstIter<T, P> {
-    type Inner = T;
+impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> RecursiveIterator for DepthFirstIter<'a, T, P> {
     #[inline]
-    fn last_depth(&self) -> usize {
-        self.curr_depth
+    fn depth(&self) -> usize {
+        self.stack.len().saturating_sub(1)
     }
 }
 
-pub struct DepthFirstIterMut<T, P> {
-    stack: VecStack<VecDeque<StrongMut<T>>>,
-    curr_depth: usize,
+pub struct DepthFirstIterMut<'a, T: 'a, P> {
+    /// ## Safety
+    /// We don't actually move our item when returning,
+    /// we just give the caller a reference to it.
+    ///
+    /// By holding onto a pointer, we are simply keeping
+    /// a reference to the memory that *won't get mutated*
+    /// by this iterator until the reference we returned is
+    /// dropped by the caller ...I think.
+    ///
+    /// I'm not sure how to specify "the mutable reference
+    /// must be within a scope that ends **before**
+    /// [`Iterator::next`] is called again"
+    ///
+    /// It definitely shouldn't get *dropped* before the
+    /// iterator uses it again at least, so there's that.
+    on_deck: *mut T,
+    stack: VecStack<std::slice::IterMut<'a, T>>,
     delve: P,
 }
 
-impl<T, P> DepthFirstIterMut<T, P> {
-    fn new<'a, I>(root_layer: I, delve: P) -> Self
-    where
-        T: 'a,
-        I: DoubleEndedIterator<Item = &'a StrongMut<T>>,
-    {
-        let stack = VecStack::from([root_layer.map(|x| x.clone_mut()).collect()]);
-        Self { stack, curr_depth: 0, delve }
+impl<'a, T: 'a, P> DepthFirstIterMut<'a, T, P> {
+    fn new(root_layer: std::slice::IterMut<'a, T>, delve: P) -> Self {
+        let stack = VecStack::from([root_layer]);
+        Self { on_deck: null_mut(), stack, delve }
     }
 
     #[inline]
@@ -105,17 +134,21 @@ impl<T, P> DepthFirstIterMut<T, P> {
     }
 }
 
-impl<T: Recursive, P: Fn(&T::Node) -> bool> Iterator for DepthFirstIterMut<T, P> {
-    type Item = StrongMut<T>;
+impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> Iterator for DepthFirstIterMut<'a, T, P> {
+    type Item = &'a mut T;
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(layer) = self.stack.top_mut() {
-            if let Some(item) = layer.pop_front() {
-                self.curr_depth = self.stack.len() - 1; // safety: could not get here if stack.len was 0
-                if let Some(node) = item.read().get_if_node() {
-                    if (self.delve)(node) {
-                        self.stack.push(T::children(node).0.iter().map(|x| x.clone_mut()).collect());
-                    }
+        if !self.on_deck.is_null() {
+            let item: &'a mut T = unsafe { &mut *self.on_deck };
+            self.on_deck = null_mut();
+            if let Some(node) = item.get_if_node_mut() {
+                if (self.delve)(node) {
+                    self.stack.push(T::children_mut(node).0.iter_mut());
                 }
+            }
+        }
+        while let Some(layer) = self.stack.top_mut() {
+            if let Some(item) = layer.next() {
+                self.on_deck = item as *mut T;
                 return Some(item);
             } else {
                 _ = self.stack.pop();
@@ -125,16 +158,19 @@ impl<T: Recursive, P: Fn(&T::Node) -> bool> Iterator for DepthFirstIterMut<T, P>
     }
 }
 
-impl<T: Recursive, P: Fn(&T::Node) -> bool> DoubleEndedIterator for DepthFirstIterMut<T, P> {
+impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> DoubleEndedIterator for DepthFirstIterMut<'a, T, P> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        while let Some(layer) = self.stack.top_mut() {
-            if let Some(item) = layer.pop_back() {
-                self.curr_depth = self.stack.len() - 1; // safety: could not get here if stack.len was 0
-                if let Some(node) = item.read().get_if_node() {
-                    if (self.delve)(node) {
-                        self.stack.push(T::children(node).0.iter().map(|x| x.clone_mut()).collect());
-                    }
+        if !self.on_deck.is_null() {
+            let item: &'a mut T = unsafe { &mut *self.on_deck };
+            if let Some(node) = item.get_if_node_mut() {
+                if (self.delve)(node) {
+                    self.stack.push(T::children_mut(node).0.iter_mut());
                 }
+            }
+        }
+        while let Some(layer) = self.stack.top_mut() {
+            if let Some(item) = layer.next_back() {
+                self.on_deck = item as *mut T;
                 return Some(item);
             } else {
                 _ = self.stack.pop();
@@ -144,10 +180,9 @@ impl<T: Recursive, P: Fn(&T::Node) -> bool> DoubleEndedIterator for DepthFirstIt
     }
 }
 
-impl<T: Recursive, P: Fn(&T::Node) -> bool> RecursiveIterator for DepthFirstIterMut<T, P> {
-    type Inner = T;
+impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> RecursiveIterator for DepthFirstIterMut<'a, T, P> {
     #[inline]
-    fn last_depth(&self) -> usize {
-        self.curr_depth
+    fn depth(&self) -> usize {
+        self.stack.len().saturating_sub(1)
     }
 }

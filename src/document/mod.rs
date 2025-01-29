@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use amylib::collections::VecDestack;
-use layer::{ui_iter::LayerUiIterEx, LayerTree};
+use layer::{ui_iter::LayerUiIterEx, LayerEnum, LayerTree};
 use crate::{raster::Raster, ui::panel::Panel, vector_path::VectorPath};
 use amylib::rc::*;
 use raylib::prelude::*;
@@ -141,22 +141,33 @@ impl Document {
         LayerSettings::new(name, color)
     }
 
-    pub fn create_path(&mut self, name: Option<String>, color: Option<Color>) -> StrongMut<Layer> {
-        let path = StrongMut::new(Layer::Path(VectorPath::new(self.gen_layer_settings(name, color))));
-        self.layers.push(path.clone_mut());
+    pub fn create_path(&mut self, name: Option<String>, color: Option<Color>) -> StrongMut<VectorPath> {
+        let settings = StrongMut::new(self.gen_layer_settings(name, color));
+        let path = StrongMut::new(VectorPath::new(&settings));
+        self.layers.push(Layer {
+            data: LayerEnum::Path(path.clone_mut()),
+            settings,
+        });
         path
     }
 
-    pub fn create_raster(&mut self, name: Option<String>, color: Option<Color>) -> StrongMut<Layer> {
-        let path = StrongMut::new(Layer::Raster(Raster::new(self.gen_layer_settings(name, color))));
-        self.layers.push(path.clone_mut());
-        path
+    pub fn create_raster(&mut self, name: Option<String>, color: Option<Color>) -> StrongMut<Raster> {
+        let settings = StrongMut::new(self.gen_layer_settings(name, color));
+        let raster = StrongMut::new(Raster::new(&settings));
+        self.layers.push(Layer {
+            data: LayerEnum::Raster(raster.clone_mut()),
+            settings,
+        });
+        raster
     }
 
-    pub fn create_group(&mut self, name: Option<String>, color: Option<Color>) -> StrongMut<Layer> {
-        let path = StrongMut::new(Layer::Group(Group::new(self.gen_layer_settings(name, color))));
-        self.layers.push(path.clone_mut());
-        path
+    pub fn create_group(&mut self, name: Option<String>, color: Option<Color>) {
+        let settings = StrongMut::new(self.gen_layer_settings(name, color));
+        let layer = Layer {
+            data: LayerEnum::Group(Group::new(&settings)),
+            settings,
+        };
+        self.layers.push(layer);
     }
 
     /// Assumes `update_layer_tree_recs` is up to date
@@ -167,15 +178,14 @@ impl Document {
         let mut d = d.begin_scissor_mode(panel_rec.x as i32, panel_rec.y as i32, panel_rec.width as i32, panel_rec.height as i32);
         d.draw_rectangle_rec(panel_rec, panel.background);
         for (layer, recs) in self.layers.ui_iter(panel.rec_cache, panel.rec_cache.ymin) {
-            let layer = layer.read();
-            let settings = layer.settings();
+            let settings = layer.settings.read();
             let name = settings.name.as_str();
             d.draw_rectangle_rec(recs.slot_rec, SLOT_COLOR);
-            d.draw_rectangle_rec(recs.color_rec, layer.settings().color);
+            d.draw_rectangle_rec(recs.color_rec, layer.settings.read().color);
             d.draw_rectangle_rec(recs.thumbnail_rec, Color::GRAY);
             d.draw_text(name, recs.name_rec.x as i32, recs.name_rec.y as i32, 10, TEXT_COLOR);
             // expand icon
-            if let Layer::Group(Group { is_expanded, .. }) = &*layer {
+            if let LayerEnum::Group(Group { is_expanded, .. }) = &layer.data {
                 let expand_button_rec = recs.expand_button_rec.expect("group should always have expand button");
                 let p0 = Vector2::new(expand_button_rec.x, expand_button_rec.y);
                 let [p1, p2] = if *is_expanded {

@@ -46,8 +46,7 @@ impl Document {
             d.clear_background(background);
             {
                 let mut d = d.begin_mode2D(camera);
-                for layer in self.layers.dfs_iter(|g| !g.settings.is_hidden).cdir::<BackToFore>() {
-                    let layer = layer.read();
+                for layer in self.layers.dfs_iter(|g| !g.settings.read().is_hidden).cdir::<BackToFore>() {
                     layer.draw_rendered(&mut d);
                 }
             }

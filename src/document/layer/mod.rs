@@ -1,4 +1,4 @@
-use amylib::{collections::tree::*, iter::directed::*};
+use amylib::{collections::tree::*, iter::directed::*, rc::StrongMut};
 use raylib::prelude::*;
 use crate::{appearance::Blending, raster::Raster, vector_path::VectorPath};
 
@@ -36,16 +36,18 @@ impl LayerSettings {
     }
 }
 
-pub enum Layer {
+pub enum LayerEnum {
     Group(Group),
-    Path(VectorPath),
-    Raster(Raster),
+    Path(StrongMut<VectorPath>),
+    Raster(StrongMut<Raster>),
+}
+
+pub struct Layer {
+    pub settings: StrongMut<LayerSettings>,
+    pub data: LayerEnum,
 }
 
 pub trait LayerType {
-    fn settings(&self) -> &LayerSettings;
-    fn settings_mut(&mut self) -> &mut LayerSettings;
-
     /// Draw without helper visuals
     fn draw_rendered(&self, d: &mut impl RaylibDraw);
 
@@ -54,38 +56,22 @@ pub trait LayerType {
 }
 
 impl LayerType for Layer {
-    fn settings(&self) -> &LayerSettings {
-        match self {
-            Layer::Group(group) => group.settings(),
-            Layer::Path(path) => path.settings(),
-            Layer::Raster(raster) => raster.settings(),
-        }
-    }
-
-    fn settings_mut(&mut self) -> &mut LayerSettings {
-        match self {
-            Layer::Group(group) => group.settings_mut(),
-            Layer::Path(path) => path.settings_mut(),
-            Layer::Raster(raster) => raster.settings_mut(),
-        }
-    }
-
     fn draw_rendered(&self, d: &mut impl RaylibDraw) {
-        if !self.settings().is_hidden {
-            match self {
-                Layer::Group(group) => group.draw_rendered(d),
-                Layer::Path(path) => path.draw_rendered(d),
-                Layer::Raster(raster) => raster.draw_rendered(d),
+        if !self.settings.read().is_hidden {
+            match &self.data {
+                LayerEnum::Group(group) => group.draw_rendered(d),
+                LayerEnum::Path(path) => path.read().draw_rendered(d),
+                LayerEnum::Raster(raster) => raster.read().draw_rendered(d),
             }
         }
     }
 
     fn draw_selected(&self, d: &mut impl RaylibDraw, px_world_size: f32) {
-        if !self.settings().is_hidden {
-            match self {
-                Layer::Group(group) => group.draw_selected(d, px_world_size),
-                Layer::Path(path) => path.draw_selected(d, px_world_size),
-                Layer::Raster(raster) => raster.draw_selected(d, px_world_size),
+        if !self.settings.read().is_hidden {
+            match &self.data {
+                LayerEnum::Group(group) => group.draw_selected(d, px_world_size),
+                LayerEnum::Path(path) => path.read().draw_selected(d, px_world_size),
+                LayerEnum::Raster(raster) => raster.read().draw_selected(d, px_world_size),
             }
         }
     }
@@ -96,10 +82,16 @@ pub type LayerTree = Tree<Layer>;
 impl Recursive for Layer {
     type Node = Group;
     fn get_if_node(&self) -> Option<&Self::Node> {
-        if let Self::Group(group) = self { Some(group) } else { None }
+        match &self.data {
+            LayerEnum::Group(g) => Some(g),
+            _ => None,
+        }
     }
     fn get_if_node_mut(&mut self) -> Option<&mut Self::Node> {
-        if let Self::Group(group) = self { Some(group) } else { None }
+        match &mut self.data {
+            LayerEnum::Group(g) => Some(g),
+            _ => None,
+        }
     }
     fn children(node: &Self::Node) -> &Tree<Self> {
         &node.items

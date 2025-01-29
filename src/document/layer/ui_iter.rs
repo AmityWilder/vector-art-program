@@ -1,7 +1,7 @@
 use raylib::prelude::*;
 use crate::ui::panel::Rect2;
-use amylib::{collections::tree::*, iter::directed::*, rc::*};
-use super::{group::Group, Layer, LayerTree, TopToBot};
+use amylib::{collections::tree::*, iter::directed::*};
+use super::{group::Group, Layer, LayerEnum, LayerTree, TopToBot};
 
 pub const INSET: f32 = 2.0;
 pub const GAP: f32 = 2.0;
@@ -64,7 +64,7 @@ pub struct LayerUiIter<I: RecursiveIterator + DoubleEndedIterator> {
     slot: Rectangle,
 }
 
-impl<I: RecursiveIterator<Inner = Layer> + DoubleEndedIterator> Iterator for LayerUiIter<I> {
+impl<I: RecursiveIterator<Item = Layer> + DoubleEndedIterator> Iterator for LayerUiIter<I> {
     type Item = (I::Item, LayerUI);
     fn next(&mut self) -> Option<Self::Item> {
         let container = &self.container;
@@ -83,7 +83,7 @@ impl<I: RecursiveIterator<Inner = Layer> + DoubleEndedIterator> Iterator for Lay
             self.slot.x = container.x + indentation;
             self.slot.width = container.width - indentation;
             if self.slot.check_collision_recs(container) {
-                let is_group = matches!(&*layer.read(), Layer::Group(_));
+                let is_group = matches!(&layer.data, LayerEnum::Group(_));
                 let recs = LayerUI::generate(self.slot, is_group);
                 self.slot.y = bottom;
                 return Some((layer, recs));
@@ -120,7 +120,10 @@ impl LayerUiIterEx for LayerTree {
     fn ui_iter_mut(&mut self, container: Rect2, top: f32) -> LayerUiIter<DepthFirstIterMut<Layer, impl Fn(&Group) -> bool>> {
         let container = container.into();
         LayerUiIter {
-            tree_iter: self.dfs_iter_mut(|group| group.is_expanded).enumerate_depth().cdir::<TopToBot>(),
+            tree_iter: self
+                .dfs_iter_mut(|group| group.is_expanded)
+                .enumerate_depth()
+                .cdir::<TopToBot>(),
             container,
             slot: Rectangle {
                 x: container.x,
