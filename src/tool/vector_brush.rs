@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use raylib::prelude::*;
 use amylib::rc::*;
 use amymath::prelude::*;
-use crate::{layer::LayerType, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, PathPoint}, VectorPath}, Change, Document};
+use crate::{layer::LayerType, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath}, Change, Document};
 use super::ToolType;
 
 struct BrushAction {
@@ -68,7 +68,7 @@ impl ToolType for VectorBrush {
                 trail.push(mouse_world_pos);
                 let mut path = target.write();
                 for _ in 0..2 {
-                    path.points.push_back(PathPoint { p: mouse_world_pos, ctrls: None });
+                    path.points.push_back(PathPoint { p: mouse_world_pos, c: None });
                 }
             }
 
@@ -127,9 +127,9 @@ impl ToolType for VectorBrush {
                         let speed_out = (next - curr).length();
                         let t_hat = (next - prev).normalized();
                         let c_out = curr + t_hat * speed_out / 3.0;
-                        path.points[idx + 1].ctrls = Some(CtrlPt1 {
+                        path.points[idx + 1].c = Some(Ctrl1 {
                             c1: (Ctrl::Out, c_out),
-                            c2: Some(CtrlPt2::Mirror(speed_in / 3.0)),
+                            c2: Some(Ctrl2::Mirror(speed_in / 3.0)),
                         });
                     }
                 }
@@ -138,7 +138,7 @@ impl ToolType for VectorBrush {
                     let pos = last_failing.take().unwrap_or(new_pos);
                     trail.push(pos);
 
-                    target.write().points.push_back(PathPoint { p: new_pos, ctrls: None });
+                    target.write().points.push_back(PathPoint { p: new_pos, c: None });
                 } else if !is_too_close {
                     *last_failing = Some(new_pos);
                 }
@@ -156,7 +156,7 @@ impl ToolType for VectorBrush {
                     }
 
                     if let Some(p) = trail.last().copied() {
-                        path.points.push_back(PathPoint { p, ctrls: None });
+                        path.points.push_back(PathPoint { p, c: None });
                     }
 
                     path.points.clone()
@@ -177,7 +177,7 @@ impl ToolType for VectorBrush {
             let px_world_size = document.camera.zoom.recip();
             let path = target.read();
             path.draw_selected(d, px_world_size);
-            let color = path.settings.read().color;
+            let color = path.settings.color;
             for pp in &path.points {
                 pp.draw(d, px_world_size, color, false, true, true);
             }

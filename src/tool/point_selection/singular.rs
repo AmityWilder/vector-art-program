@@ -1,7 +1,7 @@
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{prelude::DirectibleDoubleEndedIterator, rc::*};
-use crate::{document::layer::LayerData, layer::{BackToFore, LayerType}, vector_path::{path_point::{CtrlPt1, CtrlPt2, PPPart, PathPoint}, VectorPath}, Change, Document};
+use crate::{document::layer::Layer, layer::{BackToFore, LayerType}, vector_path::{path_point::{Ctrl1, Ctrl2, PPPart, PathPoint}, VectorPath}, Change, Document};
 use super::{multiple::{EnumerateSelectedPoints, SelectionPiece}, HOVER_RADIUS, HOVER_RADIUS_SQR};
 
 struct EditSinglePointAction {
@@ -41,15 +41,14 @@ impl SingleSelect {
             }
 
             PPPart::Ctrl(side) => {
-                let CtrlPt1 { c1: (ref c1_side, c1), c2 } = pp.ctrls.as_mut().expect("should not select corner");
+                let Ctrl1 { c1: (ref c1_side, c1), c2 } = pp.c.as_mut().expect("should not select corner");
                 if c1_side == side {
                     *c1 += delta;
                 } else {
                     let c2 = c2.as_mut().expect("should not select corner");
                     match c2 {
-                        CtrlPt2::Exact(c2) => *c2 += delta,
-                        CtrlPt2::Mirror(ref s2) => *c2 = CtrlPt2::Exact(c1.reflected_to(pp.p, *s2) + delta),
-                        CtrlPt2::Smooth => *c2 = CtrlPt2::Exact(c1.reflected_over(pp.p) + delta),
+                        Ctrl2::Exact(c2) => *c2 += delta,
+                        _ => *c2 = Ctrl2::Exact(c2.calculate(pp.p, *c1) + delta),
                     }
                 }
             }
@@ -59,15 +58,11 @@ impl SingleSelect {
     pub fn get_selected(&mut self, mouse_world_pos: Vector2) -> Option<PPPart> {
         let path = self.target.read();
         let pp = &path.points[self.pt_idx];
-        if let Some(CtrlPt1 { c1: (c1_side, c1), c2 }) = pp.ctrls {
+        if let Some(Ctrl1 { c1: (c1_side, c1), c2 }) = pp.c {
             if c1.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR {
                 return Some(PPPart::Ctrl(c1_side));
             } else if let Some(c2) = c2 {
-                let c2 = match c2 {
-                    CtrlPt2::Exact(c2)  => c2,
-                    CtrlPt2::Smooth     => c1.reflected_over(pp.p),
-                    CtrlPt2::Mirror(s2) => c1.reflected_to(pp.p, s2),
-                };
+                let c2 = c2.calculate(pp.p, c1);
                 if c2.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR {
                     let c2_side = c1_side.opposite();
                     return Some(PPPart::Ctrl(c2_side));
@@ -83,19 +78,19 @@ impl SingleSelect {
             // draw selection options
             let piece = SelectionPiece { target: self.target.clone_mut(), points: vec![self.pt_idx] };
             for layer in document.layers.shallow_iter().cdir::<BackToFore>() {
-                if let LayerData::Path(path) = &layer.data {
+                if let Layer::Path(path) = layer {
                     let selected = (path == &self.target).then(|| &piece);
                     let path = path.read();
                     path.draw_selected(d, px_world_size);
                     if let Some(selected) = selected {
                         for (is_point_selected, pp) in path.enumerate_selected_points(selected) {
                             let is_selected = is_point_selected || selection_rec.check_collision_point_rec(pp.p);
-                            pp.draw(d, px_world_size, path.settings.read().color, is_selected, false, false);
+                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false);
                         }
                     } else {
                         for pp in path.points.iter() {
                             let is_selected = selection_rec.check_collision_point_rec(pp.p);
-                            pp.draw(d, px_world_size, path.settings.read().color, is_selected, false, false);
+                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false);
                         }
                     }
                 }
@@ -106,7 +101,7 @@ impl SingleSelect {
             let idx = self.pt_idx;
             for (pp_idx, pp) in path.points.iter().enumerate() {
                 let is_selected = pp_idx == idx;
-                pp.draw(d, px_world_size, path.settings.read().color, is_selected,
+                pp.draw(d, px_world_size, path.settings.color, is_selected,
                     // dont implement this until i can click and drag them directly
                     is_selected/* || pp_idx.checked_sub(1).is_some_and(|prev| prev == idx)*/,
                     is_selected/* || pp_idx.checked_add(1).is_some_and(|next| next == idx)*/,

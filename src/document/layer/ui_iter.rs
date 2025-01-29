@@ -2,7 +2,7 @@ use amymath::prelude::Rect2;
 use raylib::prelude::*;
 use crate::document::Document;
 use amylib::iter::directed::*;
-use super::{Layer, LayerData, TopToBot};
+use super::{Layer, TopToBot};
 
 pub const INSET: f32 = 2.0;
 pub const GAP: f32 = 2.0;
@@ -71,13 +71,13 @@ trait IsGroup {
 impl IsGroup for &Layer {
     #[inline]
     fn is_group(&self) -> bool {
-        matches!(&self.data, LayerData::Group(_))
+        matches!(self, Layer::Group(_))
     }
 }
 impl IsGroup for &mut Layer {
     #[inline]
     fn is_group(&self) -> bool {
-        matches!(&self.data, LayerData::Group(_))
+        matches!(self, Layer::Group(_))
     }
 }
 

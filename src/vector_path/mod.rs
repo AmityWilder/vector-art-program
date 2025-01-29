@@ -11,16 +11,16 @@ pub mod stroke;
 pub mod fill;
 
 pub struct VectorPath {
-    pub settings: StrongMut<LayerSettings>,
+    pub settings: LayerSettings,
     pub points: VecDeque<PathPoint>,
     pub appearance: Appearance,
     pub is_closed: bool,
 }
 
 impl VectorPath {
-    pub fn new(settings: &StrongMut<LayerSettings>) -> Self {
+    pub fn new(settings: LayerSettings) -> Self {
         Self {
-            settings: settings.clone_mut(),
+            settings,
             points: VecDeque::new(),
             appearance: Appearance::default(),
             is_closed: false,
@@ -69,7 +69,7 @@ impl LayerType for VectorPath {
     }
 
     fn draw_selected(&self, d: &mut impl RaylibDraw, px_world_size: f32) {
-        let color = self.settings.read().color;
+        let color = self.settings.color;
         for [a, b] in self.calculate().windows(2).map(|w| <[_; 2]>::try_from(w).unwrap()) {
             d.draw_spline_segment_bezier_cubic(a.1, a.2, b.0, b.1, px_world_size, color);
         }

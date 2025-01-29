@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use crate::{layer::{group::Group, LayerData}, Document};
+use crate::{layer::{group::Group, Layer}, Document};
 use super::panel::Panel;
 
 pub struct LayersPanel {
@@ -17,7 +17,7 @@ impl LayersPanel {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             for (layer, recs) in document.ui_iter_mut(self.panel.rec_cache, self.panel.rec_cache.ymin) {
                 if recs.slot_rec.check_collision_point_rec(mouse_screen_pos) {
-                    if let LayerData::Group(Group { is_expanded, .. }) = &mut layer.data {
+                    if let Layer::Group(Group { is_expanded, .. }) = layer {
                         let expand_button_rec = recs.expand_button_rec.expect("group should always have expand button");
                         if expand_button_rec.check_collision_point_rec(mouse_screen_pos) {
                             *is_expanded = !*is_expanded;

@@ -1,7 +1,7 @@
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{iter::directed::DirectibleDoubleEndedIterator, rc::*};
-use crate::{layer::{BackToFore, ForeToBack, LayerData, LayerType}, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, PathPoint}, VectorPath}, Change, Document};
+use crate::{layer::{BackToFore, ForeToBack, Layer, LayerType}, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath}, Change, Document};
 use super::{point_selection::HOVER_RADIUS_SQR, ToolType};
 
 struct AddPointAction {
@@ -60,7 +60,7 @@ impl Pen {
         // starting a new path
         for layer in document.layers.dfs_iter_mut(|_| false).cdir::<ForeToBack>() {
             // find hovered endpoint
-            if let LayerData::Path(target) = &layer.data {
+            if let Layer::Path(target) = layer {
                 let path = target.read();
                 if let Some(last_idx) = path.points.len().checked_sub(1) { // failure to subtract 1 implies an empty list
                     let search_options = [(0, &path.points[0]), (last_idx, &path.points[last_idx])]; // heap allocations are yucky, ew. all my homies use stack arrays
@@ -126,22 +126,22 @@ impl ToolType for Pen {
                         Ctrl::Out => path.points.back_mut(),
                     }.expect("shouldn't have been able to select a path that had no points originally");
 
-                    if let Some(CtrlPt1 { c1: (c1_side, c1), c2 }) = pp.ctrls.as_mut() {
+                    if let Some(Ctrl1 { c1: (c1_side, c1), c2 }) = pp.c.as_mut() {
                         // modifying existing controls
                         if c1_side == direction {
                             *c1 = mouse_world_pos;
                         } else {
-                            *c2 = Some(CtrlPt2::Exact(mouse_world_pos));
+                            *c2 = Some(Ctrl2::Exact(mouse_world_pos));
                         }
                     } else {
                         // no existing controls
-                        pp.ctrls = Some(CtrlPt1 { c1: (*direction, mouse_world_pos), c2: Some(CtrlPt2::Smooth) });
+                        pp.c = Some(Ctrl1 { c1: (*direction, mouse_world_pos), c2: Some(Ctrl2::Reflect) });
                     }
                 } else {
                     // creating a new point
                     let pp = PathPoint {
                         p: mouse_world_pos,
-                        ctrls: None,
+                        c: None,
                     };
                     match direction {
                         Ctrl::Out => {
@@ -182,7 +182,7 @@ impl ToolType for Pen {
             Self::Active { target, .. } | Self::Inactive(Some(target)) => {
                 let path = target.read();
                 path.draw_selected(d, px_world_size);
-                let color = path.settings.read().color;
+                let color = path.settings.color;
 
                 if let Self::Active { direction, .. } = self {
                     match direction {
@@ -210,9 +210,9 @@ impl ToolType for Pen {
             Self::Inactive(None) => {
                 // show selectable
                 for layer in document.layers.shallow_iter().cdir::<BackToFore>() {
-                    if let LayerData::Path(path) = &layer.data {
+                    if let Layer::Path(path) = layer {
                         let path = path.read();
-                        let color = path.settings.read().color;
+                        let color = path.settings.color;
                         if path.points.iter().any(|pp| pp.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR) {
                             path.draw_selected(d, px_world_size);
                         }

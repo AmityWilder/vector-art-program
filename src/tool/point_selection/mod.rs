@@ -1,7 +1,7 @@
 use amymath::prelude::*;
 use raylib::prelude::*;
 use amylib::{collections::tree::*, iter::directed::*};
-use crate::{document::layer::LayerData, layer::{BackToFore, ForeToBack, LayerType}, vector_path::path_point::PPPart, Document};
+use crate::{document::layer::Layer, layer::{BackToFore, ForeToBack, LayerType}, vector_path::path_point::PPPart, Document};
 use super::ToolType;
 
 pub const HOVER_RADIUS: f32 = 3.0;
@@ -75,7 +75,7 @@ impl PointSelection {
             .shallow_iter_mut()
             .cdir::<ForeToBack>()
             .find_map(|layer| {
-                if let LayerData::Path(path) = &layer.data {
+                if let Layer::Path(path) = layer {
                     let idx = path.read().points.iter()
                         .position(|pp| pp.p.rec_distance_to(mouse_world_pos) <= HOVER_RADIUS);
                     if let Some(idx) = idx {
@@ -112,7 +112,7 @@ impl PointSelection {
             let selected = document.layers
                 .shallow_iter_mut()
                 .filter_map(|layer| {
-                    if let LayerData::Path(path) = &layer.data {
+                    if let Layer::Path(path) = layer {
                         let points = path.read().points.iter()
                             .enumerate()
                             .filter_map(|(idx, pp)|
@@ -189,12 +189,12 @@ impl ToolType for PointSelection {
             None => {
                 // draw selection options
                 for layer in document.layers.shallow_iter().cdir::<BackToFore>() {
-                    if let LayerData::Path(path) = &layer.data {
+                    if let Layer::Path(path) = layer {
                         let path = path.read();
                         path.draw_selected(d, px_world_size);
                         for pp in path.points.iter() {
                             let is_selected = selection_rec.is_some_and(|rec| rec.check_collision_point_rec(pp.p));
-                            pp.draw(d, px_world_size, path.settings.read().color, is_selected, false, false);
+                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false);
                         }
                     }
                 }
@@ -313,7 +313,7 @@ impl ToolType for PointSelection {
 //                             }
 
 //                             PathPoint { ctrls: ctrls @ None, .. } => {
-//                                 *ctrls = Some(CtrlPt1 { c1: (Ctrl::Out, mouse_world_pos), c2: Some(CtrlPt2::Smooth) });
+//                                 *ctrls = Some(CtrlPt1 { c1: (Ctrl::Out, mouse_world_pos), c2: Some(CtrlPt2::Reflect) });
 //                                 *part = PPPart::Ctrl(Ctrl::Out);
 //                             }
 
@@ -342,10 +342,10 @@ impl ToolType for PointSelection {
 //         let pp = &mut path.points[*point];
 
 //         if let PPPart::Ctrl(part) = part {
-//             fn snap_to_smooth_or_mirror(pp: &mut PathPoint, side_self: Ctrl, c_self: Vector2, c_opp: Vector2, snap_vert_radius_sqr: f32) {
+//             fn snap_to_reflect_or_mirror(pp: &mut PathPoint, side_self: Ctrl, c_self: Vector2, c_opp: Vector2, snap_vert_radius_sqr: f32) {
 //                 if c_self.distance_sqr_to(c_opp.reflected_over(pp.p)) <= snap_vert_radius_sqr {
-//                     // snap to smooth
-//                     pp.ctrls = Some(CtrlPt1 { c1: (side_self.opposite(), c_opp), c2: Some(CtrlPt2::Smooth) });
+//                     // snap to reflect
+//                     pp.ctrls = Some(CtrlPt1 { c1: (side_self.opposite(), c_opp), c2: Some(CtrlPt2::Reflect) });
 //                 } else {
 //                     // snap to mirror
 //                     let mirror_dir = (pp.p - c_opp).normalized();
@@ -366,12 +366,12 @@ impl ToolType for PointSelection {
 //                     } else { None };
 //                 } else if let Some(CtrlPt2::Exact(c2)) = c2 {
 //                     let (c_self, c_opp) = (*c1, *c2);
-//                     snap_to_smooth_or_mirror(pp, *part, c_self, c_opp, snap_vert_radius_sqr);
+//                     snap_to_reflect_or_mirror(pp, *part, c_self, c_opp, snap_vert_radius_sqr);
 //                 }
 //             } else {
 //                 let Some(CtrlPt2::Exact(c2)) = c2.as_ref() else { panic!("should not drag corner, it should have been made exact when clicked") };
 //                 let (c_self, c_opp) = (*c2, *c1);
-//                 snap_to_smooth_or_mirror(pp, *part, c_self, c_opp, snap_vert_radius_sqr);
+//                 snap_to_reflect_or_mirror(pp, *part, c_self, c_opp, snap_vert_radius_sqr);
 //             };
 //         }
 //     }
@@ -519,16 +519,16 @@ impl ToolType for PointSelection {
 //                                 }
 //                                 PPPart::Ctrl(part) => {
 //                                     let mut draw_ctrl_exact = |mut c_self: Vector2, c_opp: Option<&CtrlPt2>| {
-//                                         // preview snapping to smooth/corner
+//                                         // preview snapping to reflect/corner
 //                                         if let Some(CtrlPt2::Exact(c_opp)) = c_opp {
-//                                             let c_self_smooth = c_opp.reflected_over(p);
+//                                             let c_self_reflect = c_opp.reflected_over(p);
 //                                             let mirror_dir = (p - *c_opp).normalized();
 //                                             let c_self_mirror = p + mirror_dir * (c_self - p).dot(mirror_dir);
-//                                             d.draw_line_v(p, c_self_smooth, Color::DODGERBLUE.alpha(0.5));
-//                                             d.draw_ring(c_self_smooth, (SNAP_VERT_RADIUS - 2.0) * px_world_size, SNAP_VERT_RADIUS * px_world_size, 0.0, 360.0, 10, Color::DODGERBLUE.alpha(0.5));
+//                                             d.draw_line_v(p, c_self_reflect, Color::DODGERBLUE.alpha(0.5));
+//                                             d.draw_ring(c_self_reflect, (SNAP_VERT_RADIUS - 2.0) * px_world_size, SNAP_VERT_RADIUS * px_world_size, 0.0, 360.0, 10, Color::DODGERBLUE.alpha(0.5));
 //                                             d.draw_ring(c_self_mirror, (SNAP_VERT_RADIUS - 1.0) * px_world_size, SNAP_VERT_RADIUS * px_world_size, 0.0, 360.0, 10, Color::BLUEVIOLET.alpha(0.5));
-//                                             if c_self.distance_sqr_to(c_self_smooth) <= snap_vert_radius_sqr {
-//                                                 c_self = c_self_smooth;
+//                                             if c_self.distance_sqr_to(c_self_reflect) <= snap_vert_radius_sqr {
+//                                                 c_self = c_self_reflect;
 //                                             } else if c_self.distance_sqr_to(c_self_mirror) <= snap_vert_radius_sqr {
 //                                                 c_self = c_self_mirror;
 //                                             }
@@ -542,14 +542,14 @@ impl ToolType for PointSelection {
 //                                     } else {
 //                                         let c2 = c2.as_ref().expect("should not hover ctrl of corner");
 //                                         match c2 {
-//                                             CtrlPt2::Smooth => {
-//                                                 let c_self_smooth = c1.reflected_over(p);
-//                                                 d.draw_circle_v(c_self_smooth, if !is_dragging { HOVER_RADIUS } else { SNAP_VERT_RADIUS } * px_world_size, Color::DODGERBLUE);
+//                                             CtrlPt2::Reflect => {
+//                                                 let c_self_reflect = c1.reflected_over(p);
+//                                                 d.draw_circle_v(c_self_reflect, if !is_dragging { HOVER_RADIUS } else { SNAP_VERT_RADIUS } * px_world_size, Color::DODGERBLUE);
 //                                             }
 
 //                                             CtrlPt2::Mirror(s2) => {
-//                                                 let c_self_smooth = c1.reflected_to(p, *s2);
-//                                                 d.draw_circle_v(c_self_smooth, if !is_dragging { HOVER_RADIUS } else { SNAP_VERT_RADIUS } * px_world_size, Color::DODGERBLUE);
+//                                                 let c_self_reflect = c1.reflected_to(p, *s2);
+//                                                 d.draw_circle_v(c_self_reflect, if !is_dragging { HOVER_RADIUS } else { SNAP_VERT_RADIUS } * px_world_size, Color::DODGERBLUE);
 //                                             }
 
 //                                             CtrlPt2::Exact(c2) => {

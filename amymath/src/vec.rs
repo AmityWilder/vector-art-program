@@ -24,6 +24,7 @@ impl CrossProduct for Vector2 {
 
 pub trait ReflectVector {
     fn reflected_over(&self, across: Self) -> Self;
+    fn reflected_at(&self, across: Self, scale: f32) -> Self;
     fn reflected_to(&self, across: Self, length: f32) -> Self;
 }
 
@@ -32,6 +33,14 @@ impl ReflectVector for Vector2 {
         Self {
             x: across.x * 2.0 - self.x,
             y: across.y * 2.0 - self.y,
+        }
+    }
+
+    fn reflected_at(&self, across: Self, scale: f32) -> Self {
+        let delta = *self - across;
+        Self {
+            x: across.x - scale * delta.x,
+            y: across.y - scale * delta.y,
         }
     }
 

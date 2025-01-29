@@ -3,15 +3,15 @@ use raylib::prelude::*;
 use super::{LayerSettings, LayerTree, LayerType};
 
 pub struct Group {
-    pub settings: StrongMut<LayerSettings>,
+    pub settings: LayerSettings,
     pub items: LayerTree,
     pub is_expanded: bool,
 }
 
 impl Group {
-    pub fn new(settings: &StrongMut<LayerSettings>) -> Self {
+    pub fn new(settings: LayerSettings) -> Self {
         Self {
-            settings: settings.clone_mut(),
+            settings,
             items: LayerTree::new(),
             is_expanded: false,
         }

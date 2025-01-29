@@ -4,14 +4,14 @@ use raylib::prelude::*;
 use crate::layer::{LayerSettings, LayerType};
 
 pub struct Raster {
-    pub settings: StrongMut<LayerSettings>,
+    pub settings: LayerSettings,
     pub texture: Option<RenderTexture2D>,
 }
 
 impl Raster {
-    pub fn new(settings: &StrongMut<LayerSettings>) -> Self {
+    pub fn new(settings: LayerSettings) -> Self {
         Self {
-            settings: settings.clone_mut(),
+            settings,
             texture: None,
         }
     }

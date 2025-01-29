@@ -1,4 +1,4 @@
-use std::{cell::{Ref, RefCell, RefMut}, fmt, rc::{self, Rc}};
+use std::{cell::{self, RefCell, RefMut}, fmt, rc::{self, Rc}};
 
 // --- Owned ---
 
@@ -40,7 +40,7 @@ impl<T> Strong<T> {
 }
 
 impl<T: ?Sized> Strong<T> {
-    pub fn read(&self) -> Ref<'_, T> {
+    pub fn read(&self) -> cell::Ref<'_, T> {
         self.0.borrow()
     }
 
@@ -56,7 +56,7 @@ impl<T: ?Sized> Strong<T> {
 impl<T: ?Sized> Owned for Strong<T> {
     type Inner = T;
     type Downgraded = Weak<T>;
-    type Read<'a> = Ref<'a, T> where Self: 'a;
+    type Read<'a> = cell::Ref<'a, T> where Self: 'a;
     type Cloned = Self;
 
     #[inline]
@@ -118,7 +118,7 @@ impl<T> StrongMut<T> {
 }
 
 impl<T: ?Sized> StrongMut<T> {
-    pub fn read(&self) -> Ref<'_, T> {
+    pub fn read(&self) -> cell::Ref<'_, T> {
         self.0.borrow()
     }
     pub fn write(&mut self) -> RefMut<'_, T> {
@@ -160,7 +160,7 @@ impl<'a, T: ?Sized> AsConst for &'a StrongMut<T> {
 impl<T: ?Sized> Owned for StrongMut<T> {
     type Inner = T;
     type Downgraded = WeakMut<T>;
-    type Read<'a> = Ref<'a, T> where Self: 'a;
+    type Read<'a> = cell::Ref<'a, T> where Self: 'a;
     type Cloned = Strong<T>;
 
     #[inline]

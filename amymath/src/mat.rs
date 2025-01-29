@@ -42,6 +42,13 @@ impl Matrix2x2 {
             m10: self.m01, m11: self.m11,
         }
     }
+
+    pub fn mul(&self, rhs: Vector2) -> Vector2 {
+        Vector2 {
+            x: self.m00 * rhs.x + self.m01 * rhs.y,
+            y: self.m10 * rhs.x + self.m11 * rhs.y,
+        }
+    }
 }
 
 impl std::ops::Add for Matrix2x2 {

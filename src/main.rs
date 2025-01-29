@@ -12,8 +12,6 @@ mod raster;
 mod appearance;
 mod document;
 mod tool;
-mod engine;
-mod editor;
 mod ui;
 
 use self::{document::*, tool::*};
@@ -29,7 +27,7 @@ fn main() {
         .resizable()
         .build();
 
-    rl.set_target_fps(60);
+    // rl.set_target_fps(60);
 
     let mut window_rect = Rect2 {
         xmin: 0.0,
@@ -193,7 +191,7 @@ fn main() {
                     d.clear_background(Color::BLANK);
                     {
                         let mut d = d.begin_mode2D(document.camera);
-                        for layer in document.layers.dfs_iter(|g| !g.settings.read().is_hidden).cdir::<BackToFore>() {
+                        for layer in document.layers.dfs_iter(|g| !g.settings.is_hidden).cdir::<BackToFore>() {
                             layer.draw_rendered(&mut d);
                         }
                     }
@@ -258,6 +256,8 @@ fn main() {
 
             // Draw layers panel
             layers_panel.draw(&mut d, &document);
+
+            d.draw_fps(0, 0);
         }
     }
 }

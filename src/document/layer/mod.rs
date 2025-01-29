@@ -7,6 +7,7 @@ pub mod group;
 
 use group::Group;
 
+#[derive(Default)]
 pub struct LayerSettings {
     /// Name of the layer in the layers panel
     pub name: String,
@@ -36,28 +37,89 @@ impl LayerSettings {
     }
 }
 
-pub enum LayerData {
+pub enum LayerSettingsRef<'a> {
+    Group(&'a Group),
+    Path(std::cell::Ref<'a, VectorPath>),
+    Raster(std::cell::Ref<'a, Raster>),
+}
+
+impl std::ops::Deref for LayerSettingsRef<'_> {
+    type Target = LayerSettings;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Group(group) => &group.settings,
+            Self::Path(path) => &path.settings,
+            Self::Raster(raster) => &raster.settings,
+        }
+    }
+}
+
+pub enum LayerSettingsRefMut<'a> {
+    Group(&'a mut Group),
+    Path(std::cell::RefMut<'a, VectorPath>),
+    Raster(std::cell::RefMut<'a, Raster>),
+}
+
+impl std::ops::Deref for LayerSettingsRefMut<'_> {
+    type Target = LayerSettings;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Group(group) => &group.settings,
+            Self::Path(path) => &path.settings,
+            Self::Raster(raster) => &raster.settings,
+        }
+    }
+}
+
+impl std::ops::DerefMut for LayerSettingsRefMut<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            Self::Group(group) => &mut group.settings,
+            Self::Path(path) => &mut path.settings,
+            Self::Raster(raster) => &mut raster.settings,
+        }
+    }
+}
+
+pub enum Layer {
     Group(Group),
     Path(StrongMut<VectorPath>),
     Raster(StrongMut<Raster>),
 }
 
-pub struct Layer {
-    pub settings: StrongMut<LayerSettings>,
-    pub data: LayerData,
+impl Layer {
+    pub fn settings(&self) -> LayerSettingsRef<'_> {
+        match self {
+            Layer::Group(group) => LayerSettingsRef::Group(group),
+            Layer::Path(path) => LayerSettingsRef::Path(path.read()),
+            Layer::Raster(raster) => LayerSettingsRef::Raster(raster.read()),
+        }
+    }
+
+    pub fn settings_mut(&mut self) -> LayerSettingsRefMut<'_> {
+        match self {
+            Layer::Group(group) => LayerSettingsRefMut::Group(group),
+            Layer::Path(path) => LayerSettingsRefMut::Path(path.write()),
+            Layer::Raster(raster) => LayerSettingsRefMut::Raster(raster.write()),
+        }
+    }
 }
 
-impl Layer {
-    pub fn new_group(settings: LayerSettings, items: LayerTree, is_expanded: bool) -> Self {
-        let settings = StrongMut::new(settings);
-        Self {
-            data: LayerData::Group(Group {
-                settings: settings.clone_mut(),
-                items,
-                is_expanded,
-            }),
-            settings,
-        }
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test0() {
+        let layer = Layer::Path(StrongMut::new(VectorPath::new(LayerSettings {
+            name: "hello world".to_owned(),
+            ..Default::default()
+        })));
+        let settings = layer.settings();
+        let x = settings.name.as_str();
+        assert_eq!(x, "hello world");
     }
 }
 
@@ -71,21 +133,21 @@ pub trait LayerType {
 
 impl LayerType for Layer {
     fn draw_rendered(&self, d: &mut impl RaylibDraw) {
-        if !self.settings.read().is_hidden {
-            match &self.data {
-                LayerData::Group(group) => group.draw_rendered(d),
-                LayerData::Path(path) => path.read().draw_rendered(d),
-                LayerData::Raster(raster) => raster.read().draw_rendered(d),
+        if !self.settings().is_hidden {
+            match self {
+                Layer::Group(group) => group.draw_rendered(d),
+                Layer::Path(path) => path.read().draw_rendered(d),
+                Layer::Raster(raster) => raster.read().draw_rendered(d),
             }
         }
     }
 
     fn draw_selected(&self, d: &mut impl RaylibDraw, px_world_size: f32) {
-        if !self.settings.read().is_hidden {
-            match &self.data {
-                LayerData::Group(group) => group.draw_selected(d, px_world_size),
-                LayerData::Path(path) => path.read().draw_selected(d, px_world_size),
-                LayerData::Raster(raster) => raster.read().draw_selected(d, px_world_size),
+        if !self.settings().is_hidden {
+            match self {
+                Layer::Group(group) => group.draw_selected(d, px_world_size),
+                Layer::Path(path) => path.read().draw_selected(d, px_world_size),
+                Layer::Raster(raster) => raster.read().draw_selected(d, px_world_size),
             }
         }
     }
@@ -95,21 +157,29 @@ pub type LayerTree = Tree<Layer>;
 
 impl Recursive for Layer {
     type Node = Group;
+    #[inline]
+    fn is_node(&self) -> bool {
+        matches!(self, Layer::Group(_))
+    }
+    #[inline]
     fn if_node(&self) -> Option<&Self::Node> {
-        match &self.data {
-            LayerData::Group(g) => Some(g),
+        match self {
+            Layer::Group(g) => Some(g),
             _ => None,
         }
     }
+    #[inline]
     fn if_node_mut(&mut self) -> Option<&mut Self::Node> {
-        match &mut self.data {
-            LayerData::Group(g) => Some(g),
+        match self {
+            Layer::Group(g) => Some(g),
             _ => None,
         }
     }
+    #[inline]
     fn children(node: &Self::Node) -> &Tree<Self> {
         &node.items
     }
+    #[inline]
     fn children_mut(node: &mut Self::Node) -> &mut Tree<Self> {
         &mut node.items
     }

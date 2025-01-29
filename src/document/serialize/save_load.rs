@@ -1,5 +1,5 @@
 use std::{collections::VecDeque, fs::File, io::{self, BufRead, BufReader, BufWriter, Read, Write}, path::Path};
-use amymath::prelude::IntRect2;
+use amymath::prelude::{IntRect2, Matrix2x2};
 use raylib::prelude::*;
 use amylib::{io::*, rc::*};
 use crate::{
@@ -133,7 +133,7 @@ impl Document {
         for layer in layers.dfs_iter_mut(|_| true) {
             // settings
             {
-                let is_expanded = matches!(&layer.data, LayerData::Group(Group { is_expanded: true, .. }));
+                let is_expanded = matches!(layer, Layer::Group(Group { is_expanded: true, .. }));
 
                 let LayerSettings {
                     name,
@@ -146,7 +146,11 @@ impl Document {
                         mode: blend_mode,
                     },
                     artwork_bounds: _,
-                } = &mut *layer.settings.write();
+                } = match layer {
+                    Layer::Group(group) => &mut group.settings,
+                    Layer::Path(path) => &mut path.write().settings,
+                    Layer::Raster(raster) => &mut raster.write().settings,
+                };
 
                 name.retain(is_sterile);
                 write_str(&mut writer, &name)?;
@@ -167,8 +171,8 @@ impl Document {
             }
 
             // specializations
-            match &mut layer.data {
-                LayerData::Group(Group {
+            match layer {
+                Layer::Group(Group {
                     settings: _, // already handled
                     items,
                     is_expanded: _, // already handled
@@ -178,7 +182,7 @@ impl Document {
                     // actual items handled by containing loop
                 }
 
-                LayerData::Path(path) => {
+                Layer::Path(path) => {
                     let path = &mut *path.write();
                     writer.write_all(&[b'p', path.is_closed as u8])?; // todo: an entire byte for one bit? :c
 
@@ -251,18 +255,27 @@ impl Document {
                                 let mut byte = 0u8;
                                 debug_assert!(pair.len() <= 2);
                                 for i in 0..pair.len() {
-                                    byte |= match pair[i].ctrls.as_ref() {
-                                        None => 0,
-                                        Some(CtrlPt1 { c1: (side, _), c2 }) => (match side {
-                                            Ctrl::In  => 0b0000,
-                                            Ctrl::Out => 0b1000,
-                                        }) | (match c2 {
-                                            None                     => 0b001,
-                                            Some(CtrlPt2::Smooth)    => 0b011,
-                                            Some(CtrlPt2::Mirror(_)) => 0b101,
-                                            Some(CtrlPt2::Exact(_))  => 0b111,
-                                        })
-                                    } << (4 * i);
+                                    // written out explicitly for clarity
+                                    #[allow(unreachable_patterns)]
+                                    let nibble = match pair[i].c.as_ref() {
+                                        None                                                                => 0b0000,
+                                        Some(Ctrl1 { c1: (Ctrl::In,  _), c2: None                        }) => 0b0001,
+                                        Some(Ctrl1 { c1: (Ctrl::In,  _), c2: Some(Ctrl2::Reflect       ) }) => 0b0010,
+                                        Some(Ctrl1 { c1: (Ctrl::In,  _), c2: Some(Ctrl2::Mirror     (_)) }) => 0b0011,
+                                        Some(Ctrl1 { c1: (Ctrl::In,  _), c2: Some(Ctrl2::Transformed(_)) }) => 0b0100,
+                                      //Some(Ctrl1 { c1: (Ctrl::In,  _), c2: Some(                     ) }) => 0b0101, // reserved
+                                      //Some(Ctrl1 { c1: (Ctrl::In,  _), c2: Some(                     ) }) => 0b0110, // reserved
+                                        Some(Ctrl1 { c1: (Ctrl::In,  _), c2: Some(Ctrl2::Exact      (_)) }) => 0b0111,
+                                      //None              Ctrl::Out                                         => 0b1000, // invalid
+                                        Some(Ctrl1 { c1: (Ctrl::Out, _), c2: None                        }) => 0b1001,
+                                        Some(Ctrl1 { c1: (Ctrl::Out, _), c2: Some(Ctrl2::Reflect       ) }) => 0b1010,
+                                        Some(Ctrl1 { c1: (Ctrl::Out, _), c2: Some(Ctrl2::Mirror     (_)) }) => 0b1011,
+                                        Some(Ctrl1 { c1: (Ctrl::Out, _), c2: Some(Ctrl2::Transformed(_)) }) => 0b1100,
+                                      //Some(Ctrl1 { c1: (Ctrl::Out, _), c2: Some(                     ) }) => 0b1101, // reserved
+                                      //Some(Ctrl1 { c1: (Ctrl::Out, _), c2: Some(                     ) }) => 0b1110, // reserved
+                                        Some(Ctrl1 { c1: (Ctrl::Out, _), c2: Some(Ctrl2::Exact      (_)) }) => 0b1111,
+                                    };
+                                    byte |= nibble << (4 * i);
                                 }
                                 byte
                             })
@@ -271,20 +284,21 @@ impl Document {
 
                     for pp in path.points.iter_mut() {
                         write_vector2(&mut writer, &pp.p)?;
-                        if let Some(CtrlPt1 { c1: (_, c1), c2 }) = pp.ctrls.as_ref() {
+                        if let Some(Ctrl1 { c1: (_, c1), c2 }) = pp.c.as_ref() {
                             write_vector2(&mut writer, c1)?;
                             if let Some(c2) = c2.as_ref() {
                                 match c2 {
-                                    Smooth => (),
-                                    Mirror(s2) => writer.write_le(*s2)?,
-                                    Exact(c2) => write_vector2(&mut writer, c2)?,
+                                    Ctrl2::Reflect => (),
+                                    Ctrl2::Mirror(s2) => writer.write_le(*s2)?,
+                                    Ctrl2::Transformed(m2) => writer.write_le_arr([m2.m00, m2.m01, m2.m10, m2.m11])?,
+                                    Ctrl2::Exact(c2) => write_vector2(&mut writer, c2)?,
                                 }
                             }
                         }
                     }
                 }
 
-                LayerData::Raster(_) => {
+                Layer::Raster(_) => {
                     writer.write_le(b'r')?;
                     unimplemented!("not doing until supported")
                 }
@@ -355,7 +369,7 @@ impl Document {
                         let opacity_byte: u8 = reader.read_le()?;
                         let opacity = opacity_byte as f32 / 255.0;
 
-                        let settings = StrongMut::new(LayerSettings {
+                        let settings = LayerSettings {
                             name,
                             color,
                             is_hidden,
@@ -366,132 +380,139 @@ impl Document {
                                 mode: blend_mode,
                             },
                             artwork_bounds: Rectangle::default(),
-                        });
+                        };
 
                         let layer_type = reader.read_le()?;
-                        tree.push(Layer {
-                            settings: settings.clone_mut(),
-                            data: match layer_type {
-                                b'g' => {
-                                    LayerData::Group(Group {
-                                        settings,
-                                        is_expanded,
-                                        items: read_layer_tree(reader)?,
-                                    })
-                                },
+                        tree.push(match layer_type {
+                            b'g' => {
+                                Layer::Group(Group {
+                                    settings,
+                                    is_expanded,
+                                    items: read_layer_tree(reader)?,
+                                })
+                            },
 
-                                b'p' => {
-                                    let is_closed = reader.read_le()?;
-                                    let num_style_items = reader.read_le()?;
-                                    let mut style_items = Vec::with_capacity(num_style_items);
-                                    for _ in 0..num_style_items {
-                                        let style_item_type = reader.read_le()?;
-                                        style_items.push(match style_item_type {
-                                            b's' => {
-                                                let [flags, opacity_byte]: [u8; 2] = reader.read_le_arr()?;
-                                                let opacity = opacity_byte as f32 / 255.0;
-                                                let is_gradient = (flags >> 6) & 1 != 0;
-                                                let is_variable_thickness = (flags >> 5) & 1 != 0;
-                                                let align = match (flags >> 3) & 0b11 {
-                                                    0 => stroke::Align::Inside,
-                                                    1 => stroke::Align::Middle,
-                                                    2 => stroke::Align::Outside,
-                                                    _ => unreachable!("bitmask restricts possible cases"),
-                                                };
-                                                let blend_mode = extract_blend_mode(flags);
+                            b'p' => {
+                                let is_closed = reader.read_le()?;
+                                let num_style_items = reader.read_le()?;
+                                let mut style_items = Vec::with_capacity(num_style_items);
+                                for _ in 0..num_style_items {
+                                    let style_item_type = reader.read_le()?;
+                                    style_items.push(match style_item_type {
+                                        b's' => {
+                                            let [flags, opacity_byte]: [u8; 2] = reader.read_le_arr()?;
+                                            let opacity = opacity_byte as f32 / 255.0;
+                                            let is_gradient = (flags >> 6) & 1 != 0;
+                                            let is_variable_thickness = (flags >> 5) & 1 != 0;
+                                            let align = match (flags >> 3) & 0b11 {
+                                                0 => stroke::Align::Inside,
+                                                1 => stroke::Align::Middle,
+                                                2 => stroke::Align::Outside,
+                                                _ => unreachable!("bitmask restricts possible cases"),
+                                            };
+                                            let blend_mode = extract_blend_mode(flags);
 
-                                                let pattern = if !is_gradient {
-                                                    stroke::Pattern::Solid(read_color_rgba(reader)?)
-                                                } else {
-                                                    unimplemented!("not doing until supported")
-                                                };
+                                            let pattern = if !is_gradient {
+                                                stroke::Pattern::Solid(read_color_rgba(reader)?)
+                                            } else {
+                                                unimplemented!("not doing until supported")
+                                            };
 
-                                                let thick = if !is_variable_thickness {
-                                                    stroke::WidthProfile::Constant(reader.read_le()?)
-                                                } else {
-                                                    unimplemented!("not doing until supported")
-                                                };
+                                            let thick = if !is_variable_thickness {
+                                                stroke::WidthProfile::Constant(reader.read_le()?)
+                                            } else {
+                                                unimplemented!("not doing until supported")
+                                            };
 
-                                                StyleItem::Stroke(stroke::Stroke {
-                                                    blend: Blending {
-                                                        opacity,
-                                                        mode: blend_mode,
-                                                    },
-                                                    pattern,
-                                                    thick,
-                                                    align,
-                                                })
-                                            }
-
-                                            b'f' => {
-                                                let [flags, opacity_byte]: [u8; 2] = reader.read_le_arr()?;
-                                                let opacity = opacity_byte as f32 / 255.0;
-                                                let is_gradient = (flags >> 3) & 1 != 0;
-                                                let blend_mode = extract_blend_mode(flags);
-                                                let pattern = if !is_gradient {
-                                                    fill::Pattern::Solid(read_color_rgba(reader)?)
-                                                } else {
-                                                    unimplemented!("not doing until supported")
-                                                };
-                                                StyleItem::Fill(fill::Fill {
-                                                    blend: Blending {
-                                                        opacity,
-                                                        mode: blend_mode,
-                                                    },
-                                                    pattern,
-                                                })
-                                            }
-
-                                            x => Err(io::Error::other(format!("unknown style type: {x:?}")))?,
-                                        });
-                                    }
-
-                                    let num_points = reader.read_le()?;
-                                    let flags = {
-                                        let mut mashed_flags = vec![0u8; num_points / 2 + num_points % 2];
-                                        reader.read_exact(mashed_flags.as_mut_slice())?;
-                                        let mut flags = Vec::with_capacity(num_points);
-                                        for byte in mashed_flags.iter() {
-                                            flags.push(byte & 0b1111);
-                                            if flags.len() < flags.capacity() {
-                                                flags.push((byte >> 4) & 0b1111);
-                                            }
+                                            StyleItem::Stroke(stroke::Stroke {
+                                                blend: Blending {
+                                                    opacity,
+                                                    mode: blend_mode,
+                                                },
+                                                pattern,
+                                                thick,
+                                                align,
+                                            })
                                         }
-                                        flags
-                                    };
-                                    let mut points = VecDeque::with_capacity(num_points);
-                                    for byte in flags {
-                                        points.push_back(PathPoint {
-                                            p: read_vector2(reader)?,
-                                            ctrls: if byte & 0b001 != 0 {
-                                                Some(CtrlPt1 {
-                                                    c1: (if byte & 0b1000 != 0 { Ctrl::Out } else { Ctrl::In }, read_vector2(reader)?),
-                                                    c2: match byte & 0b111 {
-                                                        0b001 => None,
-                                                        0b011 => Some(CtrlPt2::Smooth),
-                                                        0b101 => Some(CtrlPt2::Mirror(reader.read_le()?)),
-                                                        0b111 => Some(CtrlPt2::Exact(read_vector2(reader)?)),
-                                                        _ => unreachable!("we did a lot of bitmasks to get here"),
-                                                    },
-                                                })
-                                            } else { None },
-                                        });
+
+                                        b'f' => {
+                                            let [flags, opacity_byte]: [u8; 2] = reader.read_le_arr()?;
+                                            let opacity = opacity_byte as f32 / 255.0;
+                                            let is_gradient = (flags >> 3) & 1 != 0;
+                                            let blend_mode = extract_blend_mode(flags);
+                                            let pattern = if !is_gradient {
+                                                fill::Pattern::Solid(read_color_rgba(reader)?)
+                                            } else {
+                                                unimplemented!("not doing until supported")
+                                            };
+                                            StyleItem::Fill(fill::Fill {
+                                                blend: Blending {
+                                                    opacity,
+                                                    mode: blend_mode,
+                                                },
+                                                pattern,
+                                            })
+                                        }
+
+                                        x => Err(io::Error::other(format!("unknown style type: {x:?}")))?,
+                                    });
+                                }
+
+                                let num_points = reader.read_le()?;
+                                let flags = {
+                                    let mut mashed_flags = vec![0u8; num_points / 2 + num_points % 2];
+                                    reader.read_exact(mashed_flags.as_mut_slice())?;
+                                    let mut flags = Vec::with_capacity(num_points);
+                                    for byte in mashed_flags.iter() {
+                                        flags.push(byte & 0b1111);
+                                        if flags.len() < flags.capacity() {
+                                            flags.push((byte >> 4) & 0b1111);
+                                        }
                                     }
+                                    flags
+                                };
+                                let mut points = VecDeque::with_capacity(num_points);
+                                for nibble in flags {
+                                    #[allow(unreachable_patterns)]
+                                    points.push_back(PathPoint {
+                                        p: read_vector2(reader)?,
+                                        c:
+                                        // written out explicitly for clarity
+                                        match nibble & 0b1111 {
+                                            0b0000 => None,
+                                            0b0001 => Some(Ctrl1 { c1: (Ctrl::In, read_vector2(reader)?), c2: None }),
+                                            0b0010 => Some(Ctrl1 { c1: (Ctrl::In, read_vector2(reader)?), c2: Some(Ctrl2::Reflect) }),
+                                            0b0011 => Some(Ctrl1 { c1: (Ctrl::In, read_vector2(reader)?), c2: Some(Ctrl2::Mirror(reader.read_le()?)) }),
+                                            0b0100 => Some(Ctrl1 { c1: (Ctrl::In, read_vector2(reader)?), c2: Some(Ctrl2::Transformed(reader.read_le_arr().map(|[m00, m01, m10, m11]| Matrix2x2 { m00, m01, m10, m11 })?)) }),
+                                            0b0101 => Err(io::Error::other("reserved"))?,
+                                            0b0110 => Err(io::Error::other("reserved"))?,
+                                            0b0111 => Some(Ctrl1 { c1: (Ctrl::In, read_vector2(reader)?), c2: Some(Ctrl2::Exact(read_vector2(reader)?)) }),
+                                            0b1000 => Err(io::Error::other("invalid"))?,
+                                            0b1001 => Some(Ctrl1 { c1: (Ctrl::Out, read_vector2(reader)?), c2: None }),
+                                            0b1010 => Some(Ctrl1 { c1: (Ctrl::Out, read_vector2(reader)?), c2: Some(Ctrl2::Reflect) }),
+                                            0b1011 => Some(Ctrl1 { c1: (Ctrl::Out, read_vector2(reader)?), c2: Some(Ctrl2::Mirror(reader.read_le()?)) }),
+                                            0b1100 => Some(Ctrl1 { c1: (Ctrl::Out, read_vector2(reader)?), c2: Some(Ctrl2::Transformed(reader.read_le_arr().map(|[m00, m01, m10, m11]| Matrix2x2 { m00, m01, m10, m11 })?)) }),
+                                            0b1101 => Err(io::Error::other("reserved"))?,
+                                            0b1110 => Err(io::Error::other("reserved"))?,
+                                            0b1111 => Some(Ctrl1 { c1: (Ctrl::Out, read_vector2(reader)?), c2: Some(Ctrl2::Exact(read_vector2(reader)?)) }),
+                                            0b1111..=u8::MAX => unreachable!("bitmask restricts cases"),
+                                        },
+                                    });
+                                }
 
-                                    LayerData::Path(StrongMut::new(VectorPath {
-                                        settings,
-                                        points,
-                                        appearance: Appearance { items: style_items },
-                                        is_closed,
-                                    }))
-                                },
+                                Layer::Path(StrongMut::new(VectorPath {
+                                    settings,
+                                    points,
+                                    appearance: Appearance { items: style_items },
+                                    is_closed,
+                                }))
+                            },
 
-                                b'r' => {
-                                    unimplemented!("not doing until supported")
-                                },
+                            b'r' => {
+                                unimplemented!("not doing until supported")
+                            },
 
-                                x => Err(io::Error::other(format!("unknown layer type: {x:?}")))?,
-                            }
+                            x => Err(io::Error::other(format!("unknown layer type: {x:?}")))?,
                         });
                     }
 

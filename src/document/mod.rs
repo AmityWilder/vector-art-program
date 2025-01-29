@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use amylib::collections::VecDestack;
 use amymath::prelude::IntRect2;
-use layer::{LayerData, LayerTree};
+use layer::{Layer, LayerTree};
 use crate::{raster::Raster, ui::panel::Panel, vector_path::VectorPath};
 use amylib::rc::*;
 use raylib::prelude::*;
@@ -14,7 +14,6 @@ use self::{
     artboard::ArtBoard,
     layer::{
         group::Group,
-        Layer,
         LayerSettings,
     }
 };
@@ -139,37 +138,28 @@ impl Document {
     }
 
     pub fn create_path(&mut self, name: Option<String>, color: Option<Color>) -> &mut StrongMut<VectorPath> {
-        let settings = StrongMut::new(self.gen_layer_settings(name, color));
-        self.layers.push(Layer {
-            data: LayerData::Path(StrongMut::new(VectorPath::new(&settings))),
-            settings,
-        });
+        let settings = self.gen_layer_settings(name, color);
+        self.layers.push(Layer::Path(StrongMut::new(VectorPath::new(settings))));
         match self.layers.last_mut() {
-            Some(Layer { data: LayerData::Path(path), .. }) => path,
+            Some(Layer::Path(path)) => path,
             _ => unreachable!("vector path layer should exist when one is pushed"),
         }
     }
 
     pub fn create_raster(&mut self, name: Option<String>, color: Option<Color>) -> &mut StrongMut<Raster> {
-        let settings = StrongMut::new(self.gen_layer_settings(name, color));
-        self.layers.push(Layer {
-            data: LayerData::Raster(StrongMut::new(Raster::new(&settings))),
-            settings,
-        });
+        let settings = self.gen_layer_settings(name, color);
+        self.layers.push(Layer::Raster(StrongMut::new(Raster::new(settings))));
         match self.layers.last_mut() {
-            Some(Layer { data: LayerData::Raster(raster), .. }) => raster,
+            Some(Layer::Raster(raster)) => raster,
             _ => unreachable!("raster layer should exist when one is pushed"),
         }
     }
 
     pub fn create_group(&mut self, name: Option<String>, color: Option<Color>) -> &mut Group {
-        let settings = StrongMut::new(self.gen_layer_settings(name, color));
-        self.layers.push(Layer {
-            data: LayerData::Group(Group::new(&settings)),
-            settings,
-        });
+        let settings = self.gen_layer_settings(name, color);
+        self.layers.push(Layer::Group(Group::new(settings)));
         match self.layers.last_mut() {
-            Some(Layer { data: LayerData::Group(group), .. }) => group,
+            Some(Layer::Group(group)) => group,
             _ => unreachable!("group layer should exist when one is pushed"),
         }
     }
@@ -182,14 +172,18 @@ impl Document {
         let mut d = d.begin_scissor_mode(panel_rec.x as i32, panel_rec.y as i32, panel_rec.width as i32, panel_rec.height as i32);
         d.draw_rectangle_rec(panel_rec, panel.background);
         for (layer, recs) in self.ui_iter(panel.rec_cache, panel.rec_cache.ymin) {
-            let settings = layer.settings.read();
-            let name = settings.name.as_str();
+            let name = match layer {
+                Layer::Group(group) => &group.settings.name,
+                Layer::Path(path) => &path.read().settings.name,
+                Layer::Raster(raster) => &raster.read().settings.name,
+            };
+            let color = layer.settings().color;
             d.draw_rectangle_rec(recs.slot_rec, SLOT_COLOR);
-            d.draw_rectangle_rec(recs.color_rec, layer.settings.read().color);
+            d.draw_rectangle_rec(recs.color_rec, color);
             d.draw_rectangle_rec(recs.thumbnail_rec, Color::GRAY);
             d.draw_text(name, recs.name_rec.x as i32, recs.name_rec.y as i32, 10, TEXT_COLOR);
             // expand icon
-            if let LayerData::Group(Group { is_expanded, .. }) = &layer.data {
+            if let Layer::Group(Group { is_expanded, .. }) = layer {
                 let expand_button_rec = recs.expand_button_rec.expect("group should always have expand button");
                 let p0 = Vector2::new(expand_button_rec.x, expand_button_rec.y);
                 let [p1, p2] = if *is_expanded {
