@@ -130,9 +130,8 @@ fn main() {
                 }
                 pan += scroll_v * 20.0;
             }
-            document.camera.target -= pan / document.camera.zoom;
 
-            document.camera.target += mouse_screen_delta / document.camera.zoom;
+            document.camera.target += (mouse_screen_delta - pan) / document.camera.zoom;
             document.camera.offset += mouse_screen_delta; // = rl.get_mouse_position()
 
             if is_zooming {
