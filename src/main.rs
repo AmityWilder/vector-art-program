@@ -27,6 +27,8 @@ fn main() {
         .resizable()
         .build();
 
+    rl.set_window_state(WindowState::set_window_maximized(rl.get_window_state(), true));
+
     rl.set_target_fps(60);
 
     let mut window_rect = Rect2 {
@@ -109,8 +111,7 @@ fn main() {
             window_rect.xmax = width  as f32;
             window_rect.ymax = height as f32;
             layers_panel.panel.update_rec(&window_rect);
-            trim_rtex = rl.load_render_texture(&thread, width as u32, height as u32)
-                .expect("failed to load new render texture");
+            trim_rtex = rl.load_render_texture(&thread, width as u32, height as u32).unwrap();
         }
 
         let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, document.camera);
@@ -161,6 +162,7 @@ fn main() {
 
         if rl.is_key_pressed(KeyboardKey::KEY_T) {
             is_trim_view = !is_trim_view;
+            println!("toggled trim view");
         }
 
         if (rl.is_key_down(KeyboardKey::KEY_LEFT_CONTROL) || rl.is_key_down(KeyboardKey::KEY_RIGHT_CONTROL)) && rl.is_key_pressed(KeyboardKey::KEY_Z) {

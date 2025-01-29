@@ -1,3 +1,5 @@
+use std::fmt;
+
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{prelude::DirectibleDoubleEndedIterator, rc::*};
@@ -9,6 +11,12 @@ struct EditSinglePointAction {
     idx: usize,
     pre: PathPoint,
     post: PathPoint,
+}
+
+impl fmt::Debug for EditSinglePointAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EditSinglePointAction").finish()
+    }
 }
 
 impl Change for EditSinglePointAction {

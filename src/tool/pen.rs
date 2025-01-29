@@ -1,3 +1,4 @@
+use std::fmt;
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{iter::directed::DirectibleDoubleEndedIterator, rc::*};
@@ -8,6 +9,12 @@ struct AddPointAction {
     target: StrongMut<VectorPath>,
     side: Ctrl,
     pp: PathPoint,
+}
+
+impl fmt::Debug for AddPointAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AddPointAction").finish()
+    }
 }
 
 impl Change for AddPointAction {

@@ -176,7 +176,7 @@ impl PathPoint {
                     match c2_ty {
                         Ctrl2::Exact(_) => {
                             d.draw_line_v(self.p, c2, color);
-                            d.draw_circle_v(c2, 3.5 * px_world_size, color);
+                            d.draw_circle_sector(c2, 3.5 * px_world_size, 0.0, 360.0, 10, color);
                         }
 
                         Ctrl2::Mirror(_) => {

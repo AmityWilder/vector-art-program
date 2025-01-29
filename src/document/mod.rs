@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{fmt, path::PathBuf};
 use amylib::collections::VecDestack;
 use amymath::prelude::IntRect2;
 use layer::{Layer, LayerTree};
@@ -18,7 +18,7 @@ use self::{
     }
 };
 
-pub trait Change {
+pub trait Change: fmt::Debug {
     fn redo(&mut self, document: &mut Document) -> Result<(), String>;
     fn undo(&mut self, document: &mut Document) -> Result<(), String>;
 }
@@ -104,6 +104,7 @@ impl Document {
 
     pub fn undo(&mut self) -> Result<Option<()>, String> {
         if let Some(mut change) = self.history.pop() {
+            println!("undo: {change:?}");
             change.undo(self)?;
             self.future.push_no_resize(change);
             Ok(Some(()))
@@ -114,6 +115,7 @@ impl Document {
 
     pub fn redo(&mut self) -> Result<Option<()>, String> {
         if let Some(mut change) = self.future.pop() {
+            println!("redo: {change:?}");
             change.redo(self)?;
             self.history.push_no_resize(change);
             Ok(Some(()))

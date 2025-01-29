@@ -1,3 +1,5 @@
+use std::fmt;
+
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::rc::*;
@@ -6,6 +8,12 @@ use super::HOVER_RADIUS;
 
 struct EditMultiPointAction {
 
+}
+
+impl fmt::Debug for EditMultiPointAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EditMultiPointAction").finish()
+    }
 }
 
 impl Change for EditMultiPointAction {

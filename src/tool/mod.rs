@@ -34,18 +34,22 @@ impl Default for Tool {
 // todo: have direct selection set pen/brush target
 impl Tool {
     pub fn switch_to_basic_selection(&mut self) {
+        println!("switched to basic selection");
         *self = Self::BasicSelection(BasicSelection::new());
     }
 
     pub fn switch_to_point_selection(&mut self) {
+        println!("switched to point selection");
         *self = Self::PointSelection(PointSelection::new());
     }
 
     pub fn switch_to_pen(&mut self) {
+        println!("switched to pen");
         *self = Self::Pen(Pen::new());
     }
 
     pub fn switch_to_brush(&mut self) {
+        println!("switched to brush");
         *self = Self::Brush(VectorBrush::new());
     }
 }

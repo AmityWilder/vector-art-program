@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, fmt};
 use raylib::prelude::*;
 use amylib::rc::*;
 use amymath::prelude::*;
@@ -8,6 +8,12 @@ use super::{point_selection::SNAP_VERT_RADIUS_SQR, ToolType};
 struct BrushAction {
     target: StrongMut<VectorPath>,
     stroke: VecDeque<PathPoint>,
+}
+
+impl fmt::Debug for BrushAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BrushAction").finish()
+    }
 }
 
 impl Change for BrushAction {
