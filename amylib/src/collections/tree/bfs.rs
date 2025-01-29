@@ -38,7 +38,7 @@ impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> Iterator for BreadthFirstIt
             } else {
                 self.curr_depth_count -= 1;
             }
-            if let Some(node) = item.get_if_node() {
+            if let Some(node) = item.if_node() {
                 if (self.delve)(node) {
                     self.queue.extend(T::children(node).0.iter());
                 }

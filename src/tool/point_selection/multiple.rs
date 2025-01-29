@@ -1,7 +1,7 @@
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{iter::directed::*, rc::*};
-use crate::{layer::{group::Group, BackToFore, Layer, LayerType}, vector_path::{path_point::PathPoint, VectorPath}, Change, Document};
+use crate::{document::layer::LayerData, layer::{group::Group, BackToFore, Layer, LayerType}, vector_path::{path_point::PathPoint, VectorPath}, Change, Document};
 use super::{DepthFirstIter, HOVER_RADIUS, HOVER_RADIUS_SQR};
 
 struct EditMultiPointAction {
@@ -19,7 +19,7 @@ impl Change for EditMultiPointAction {
 }
 
 pub struct SelectionPiece {
-    pub target: StrongMut<Layer>,
+    pub target: StrongMut<VectorPath>,
     pub points: Vec<usize>,
 }
 
@@ -30,8 +30,7 @@ pub struct MultiSelect {
 impl MultiSelect {
     pub fn drag(&mut self, delta: Vector2) {
         for SelectionPiece { target, ref points } in &mut self.pieces {
-            let mut layer = target.write();
-            let Layer::Path(path) = &mut *layer else { panic!("point selection must target path") };
+            let mut path = target.write();
             for idx in points {
                 path.points[*idx].move_point(delta);
             }
@@ -41,42 +40,40 @@ impl MultiSelect {
     pub fn is_selected(&self, mouse_world_pos: Vector2) -> bool {
         self.pieces.iter()
             .any(|SelectionPiece { target, points }| {
-                let layer = target.read();
-                let Layer::Path(path) = &*layer else { panic!("point selection must target path") };
+                let path = target.read();
                 points.iter().any(|&idx| path.points[idx].p.rec_distance_to(mouse_world_pos) <= HOVER_RADIUS)
             })
     }
 
     pub fn draw(&self, d: &mut impl RaylibDraw, document: &Document, px_world_size: f32, selection_rec: Option<Rectangle>) {
         if let Some(selection_rec) = selection_rec {
-            for (selected, target) in document.layers.shallow_iter().enumerate_selected_layers(&self) {
-                let layer = target.read();
-                if let Layer::Path(path) = &*layer {
+            for (selected, layer) in document.layers.shallow_iter().enumerate_selected_layers(&self) {
+                if let LayerData::Path(path) = &layer.data {
+                    let path = path.read();
                     path.draw_selected(d, px_world_size);
                     if let Some(selected) = selected {
                         for (is_point_selected, pp) in path.enumerate_selected_points(selected) {
                             let is_selected = is_point_selected || selection_rec.check_collision_point_rec(pp.p);
-                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false);
+                            pp.draw(d, px_world_size, path.settings.read().color, is_selected, false, false);
                         }
                     } else {
                         for pp in path.points.iter() {
                             let is_selected = selection_rec.check_collision_point_rec(pp.p);
-                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false);
+                            pp.draw(d, px_world_size, path.settings.read().color, is_selected, false, false);
                         }
                     }
                 }
             }
         } else {
             for piece in &self.pieces {
-                let layer = piece.target.read();
-                let Layer::Path(path) = &*layer else { panic!("point selection target must be path") };
+                let path = piece.target.read();
                 path.draw_selected(d, px_world_size);
                 let mut indices = piece.points.iter().copied();
                 let mut idx = indices.next();
                 for (pp_idx, pp) in path.points.iter().enumerate() {
                     let is_selected = idx.is_some_and(|idx| pp_idx == idx);
                     if is_selected { idx = indices.next(); }
-                    pp.draw(d, px_world_size, path.settings.color, is_selected, false, false);
+                    pp.draw(d, px_world_size, path.settings.read().color, is_selected, false, false);
                 }
             }
         }
@@ -112,15 +109,19 @@ impl<'a, I> LayerSelection<'a, I> {
     }
 }
 
-impl<'a, I: Iterator<Item = Strong<Layer>>> Iterator for LayerSelection<'a, I> {
+impl<'a, I: Iterator<Item = &'a Layer>> Iterator for LayerSelection<'a, I> {
     type Item = (Option<&'a SelectionPiece>, I::Item);
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().and_then(|item| {
-            let selected_points = self.awaiting_match.and_then(|selected_layer| (item == selected_layer.target).then_some(selected_layer));
-            if selected_points.is_some() {
-                self.awaiting_match = self.selected_iter.next();
+            if let LayerData::Path(path) = &item.data {
+                let selected_points = self.awaiting_match.and_then(|selected_layer| (path == &selected_layer.target).then_some(selected_layer));
+                if selected_points.is_some() {
+                    self.awaiting_match = self.selected_iter.next();
+                }
+                Some((selected_points, item))
+            } else {
+                None
             }
-            Some((selected_points, item))
         })
     }
 }

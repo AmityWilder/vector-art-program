@@ -6,8 +6,15 @@ pub use dfs::*;
 
 pub trait Recursive: Sized {
     type Node;
-    fn get_if_node(&self) -> Option<&Self::Node>;
-    fn get_if_node_mut(&mut self) -> Option<&mut Self::Node>;
+
+    #[inline]
+    fn is_node(&self) -> bool {
+        self.if_node().is_some()
+    }
+
+    fn if_node(&self) -> Option<&Self::Node>;
+    fn if_node_mut(&mut self) -> Option<&mut Self::Node>;
+
     fn children(node: &Self::Node) -> &Tree<Self>;
     fn children_mut(node: &mut Self::Node) -> &mut Tree<Self>;
 }
@@ -139,6 +146,26 @@ impl<T: Recursive> Tree<T> {
         self.0.remove(index)
     }
 
+    #[inline]
+    pub fn first(&self) -> Option<&T> {
+        self.0.first()
+    }
+
+    #[inline]
+    pub fn first_mut(&mut self) -> Option<&mut T> {
+        self.0.first_mut()
+    }
+
+    #[inline]
+    pub fn last(&self) -> Option<&T> {
+        self.0.last()
+    }
+
+    #[inline]
+    pub fn last_mut(&mut self) -> Option<&mut T> {
+        self.0.last_mut()
+    }
+
     /// Iterate over only the topmost layer
     #[inline]
     pub fn shallow_iter<'a>(&'a self) -> Iter<'a, T> {
@@ -191,13 +218,13 @@ mod tests {
     }
     impl Recursive for Foo {
         type Node = Tree<Self>;
-        fn get_if_node(&self) -> Option<&Self::Node> {
+        fn if_node(&self) -> Option<&Self::Node> {
             match self {
                 Foo::Value(_) => None,
                 Foo::Branch(_, tree) => Some(tree),
             }
         }
-        fn get_if_node_mut(&mut self) -> Option<&mut Self::Node> {
+        fn if_node_mut(&mut self) -> Option<&mut Self::Node> {
             match self {
                 Foo::Value(_) => None,
                 Foo::Branch(_, tree) => Some(tree),

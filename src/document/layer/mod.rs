@@ -36,7 +36,7 @@ impl LayerSettings {
     }
 }
 
-pub enum LayerEnum {
+pub enum LayerData {
     Group(Group),
     Path(StrongMut<VectorPath>),
     Raster(StrongMut<Raster>),
@@ -44,7 +44,21 @@ pub enum LayerEnum {
 
 pub struct Layer {
     pub settings: StrongMut<LayerSettings>,
-    pub data: LayerEnum,
+    pub data: LayerData,
+}
+
+impl Layer {
+    pub fn new_group(settings: LayerSettings, items: LayerTree, is_expanded: bool) -> Self {
+        let settings = StrongMut::new(settings);
+        Self {
+            data: LayerData::Group(Group {
+                settings: settings.clone_mut(),
+                items,
+                is_expanded,
+            }),
+            settings,
+        }
+    }
 }
 
 pub trait LayerType {
@@ -59,9 +73,9 @@ impl LayerType for Layer {
     fn draw_rendered(&self, d: &mut impl RaylibDraw) {
         if !self.settings.read().is_hidden {
             match &self.data {
-                LayerEnum::Group(group) => group.draw_rendered(d),
-                LayerEnum::Path(path) => path.read().draw_rendered(d),
-                LayerEnum::Raster(raster) => raster.read().draw_rendered(d),
+                LayerData::Group(group) => group.draw_rendered(d),
+                LayerData::Path(path) => path.read().draw_rendered(d),
+                LayerData::Raster(raster) => raster.read().draw_rendered(d),
             }
         }
     }
@@ -69,9 +83,9 @@ impl LayerType for Layer {
     fn draw_selected(&self, d: &mut impl RaylibDraw, px_world_size: f32) {
         if !self.settings.read().is_hidden {
             match &self.data {
-                LayerEnum::Group(group) => group.draw_selected(d, px_world_size),
-                LayerEnum::Path(path) => path.read().draw_selected(d, px_world_size),
-                LayerEnum::Raster(raster) => raster.read().draw_selected(d, px_world_size),
+                LayerData::Group(group) => group.draw_selected(d, px_world_size),
+                LayerData::Path(path) => path.read().draw_selected(d, px_world_size),
+                LayerData::Raster(raster) => raster.read().draw_selected(d, px_world_size),
             }
         }
     }
@@ -81,15 +95,15 @@ pub type LayerTree = Tree<Layer>;
 
 impl Recursive for Layer {
     type Node = Group;
-    fn get_if_node(&self) -> Option<&Self::Node> {
+    fn if_node(&self) -> Option<&Self::Node> {
         match &self.data {
-            LayerEnum::Group(g) => Some(g),
+            LayerData::Group(g) => Some(g),
             _ => None,
         }
     }
-    fn get_if_node_mut(&mut self) -> Option<&mut Self::Node> {
+    fn if_node_mut(&mut self) -> Option<&mut Self::Node> {
         match &mut self.data {
-            LayerEnum::Group(g) => Some(g),
+            LayerData::Group(g) => Some(g),
             _ => None,
         }
     }

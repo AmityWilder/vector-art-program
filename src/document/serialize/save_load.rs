@@ -133,7 +133,7 @@ impl Document {
         for layer in layers.dfs_iter_mut(|_| true) {
             // settings
             {
-                let is_expanded = matches!(&layer.data, LayerEnum::Group(Group { is_expanded: true, .. }));
+                let is_expanded = matches!(&layer.data, LayerData::Group(Group { is_expanded: true, .. }));
 
                 let LayerSettings {
                     name,
@@ -168,7 +168,7 @@ impl Document {
 
             // specializations
             match &mut layer.data {
-                LayerEnum::Group(Group {
+                LayerData::Group(Group {
                     settings: _, // already handled
                     items,
                     is_expanded: _, // already handled
@@ -178,7 +178,7 @@ impl Document {
                     // actual items handled by containing loop
                 }
 
-                LayerEnum::Path(path) => {
+                LayerData::Path(path) => {
                     let path = &mut *path.write();
                     writer.write_all(&[b'p', path.is_closed as u8])?; // todo: an entire byte for one bit? :c
 
@@ -284,7 +284,7 @@ impl Document {
                     }
                 }
 
-                LayerEnum::Raster(_) => {
+                LayerData::Raster(_) => {
                     writer.write_le(b'r')?;
                     unimplemented!("not doing until supported")
                 }
@@ -373,7 +373,7 @@ impl Document {
                             settings: settings.clone_mut(),
                             data: match layer_type {
                                 b'g' => {
-                                    LayerEnum::Group(Group {
+                                    LayerData::Group(Group {
                                         settings,
                                         is_expanded,
                                         items: read_layer_tree(reader)?,
@@ -478,7 +478,7 @@ impl Document {
                                         });
                                     }
 
-                                    LayerEnum::Path(StrongMut::new(VectorPath {
+                                    LayerData::Path(StrongMut::new(VectorPath {
                                         settings,
                                         points,
                                         appearance: Appearance { items: style_items },

@@ -4,11 +4,11 @@ use crate::Document;
 pub mod basic_selection;
 pub mod point_selection;
 pub mod pen;
-pub mod brush;
+pub mod vector_brush;
 
 use self::{
     basic_selection::BasicSelection,
-    brush::Brush,
+    vector_brush::VectorBrush,
     point_selection::PointSelection,
     pen::Pen,
 };
@@ -22,7 +22,7 @@ pub enum Tool {
     BasicSelection(BasicSelection),
     PointSelection(PointSelection),
     Pen(Pen),
-    Brush(Brush),
+    Brush(VectorBrush),
 }
 
 impl Default for Tool {
@@ -46,7 +46,7 @@ impl Tool {
     }
 
     pub fn switch_to_brush(&mut self) {
-        *self = Self::Brush(Brush::new());
+        *self = Self::Brush(VectorBrush::new());
     }
 }
 

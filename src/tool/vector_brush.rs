@@ -2,38 +2,34 @@ use std::collections::VecDeque;
 use raylib::prelude::*;
 use amylib::rc::*;
 use amymath::prelude::*;
-use crate::{layer::{Layer, LayerType}, vector_path::path_point::{Ctrl, CtrlPt1, CtrlPt2, PathPoint}, Change, Document};
+use crate::{layer::{Layer, LayerType}, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, PathPoint}, VectorPath}, Change, Document};
 use super::ToolType;
 
 struct BrushAction {
-    target: StrongMut<Layer>,
+    target: StrongMut<VectorPath>,
     stroke: VecDeque<PathPoint>,
 }
 
 impl Change for BrushAction {
     fn redo(&mut self, _document: &mut Document) -> Result<(), String> {
-        let mut target = self.target.write();
-        let Layer::Path(path) = &mut *target else { panic!("brush target should be a path") };
-        path.points.clone_from(&self.stroke);
+        self.target.write().points.clone_from(&self.stroke);
         Ok(())
     }
 
     fn undo(&mut self, _document: &mut Document) -> Result<(), String> {
-        let mut target = self.target.write();
-        let Layer::Path(path) = &mut *target else { panic!("brush target should be a path") };
-        path.points.clear();
+        self.target.write().points.clear();
         Ok(())
     }
 }
 
-pub enum Brush {
-    Inactive(Option<StrongMut<Layer>>),
+pub enum VectorBrush {
+    Inactive(Option<StrongMut<VectorPath>>),
     Active {
         /// If [`Some`], continue seleted.
         /// If [`None`], find a hovered path or create a new path upon clicking.
         /// Must be a `VectorPath` layer.
         /// If there is a layer, it must not die before the pen dies.
-        target: StrongMut<Layer>,
+        target: StrongMut<VectorPath>,
 
         /// History of confirmed positions
         trail: Vec<Vector2>,
@@ -43,7 +39,7 @@ pub enum Brush {
     }
 }
 
-impl Brush {
+impl VectorBrush {
     pub fn new() -> Self {
         Self::Inactive(None)
     }
@@ -56,12 +52,12 @@ const MIN_OPP_LENGTH_SQR: f32 = MIN_OPP_LENGTH * MIN_OPP_LENGTH;
 const MIN_OPP_LENGTH_SQR_CHANGE: f32 = 1.0;
 const IS_CURVATURE_SUPPORTED: bool = false;
 
-impl ToolType for Brush {
+impl ToolType for VectorBrush {
     fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) && matches!(self, Self::Inactive(_)) {
             // create a new path
             *self = Self::Active {
-                target: document.create_path(None, None),
+                target: document.create_path(None, None).clone_mut(),
                 trail: Vec::new(),
                 last_failing: None,
             };
@@ -70,10 +66,7 @@ impl ToolType for Brush {
         if let Self::Active { target, trail, last_failing } = self {
             if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
                 trail.push(mouse_world_pos);
-
-                let mut layer = target.write();
-                let Layer::Path(path) = &mut *layer else { panic!("brush target should be a path") };
-
+                let mut path = target.write();
                 for _ in 0..2 {
                     path.points.push_back(PathPoint { p: mouse_world_pos, ctrls: None });
                 }
@@ -123,8 +116,7 @@ impl ToolType for Brush {
                 }
 
                 {
-                    let mut layer = target.write();
-                    let Layer::Path(path) = &mut *layer else { panic!("brush target should be a path") };
+                    let mut path = target.write();
 
                     if let Some(back) = path.points.back_mut() {
                         back.p = new_pos;
@@ -146,9 +138,7 @@ impl ToolType for Brush {
                     let pos = last_failing.take().unwrap_or(new_pos);
                     trail.push(pos);
 
-                    let mut layer = target.write();
-                    let Layer::Path(path) = &mut *layer else { panic!("brush target should be a path") };
-                    path.points.push_back(PathPoint { p: new_pos, ctrls: None });
+                    target.write().points.push_back(PathPoint { p: new_pos, ctrls: None });
                 } else if !is_too_close {
                     *last_failing = Some(new_pos);
                 }
@@ -156,9 +146,8 @@ impl ToolType for Brush {
 
             // stroke complete
             if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
-                {
-                    let mut layer = target.write();
-                    let Layer::Path(path) = &mut *layer else { panic!("brush target should be a path") };
+                let stroke = {
+                    let mut path = target.write();
 
                     if let Some(last) = trail.last() {
                         if last.distance_sqr_to(mouse_world_pos) > MIN_DISTANCE_SQR {
@@ -169,15 +158,15 @@ impl ToolType for Brush {
                     if let Some(p) = trail.last().copied() {
                         path.points.push_back(PathPoint { p, ctrls: None });
                     }
-                    let stroke = path.points.clone();
-                    drop(layer);
-                    document.push_change(
-                        Box::new(BrushAction {
-                            target: target.clone_mut(),
-                            stroke,
-                        })
-                    );
-                }
+
+                    path.points.clone()
+                };
+                document.push_change(
+                    Box::new(BrushAction {
+                        target: target.clone_mut(),
+                        stroke,
+                    })
+                );
                 *self = Self::Inactive(None);
             }
         }
@@ -186,11 +175,11 @@ impl ToolType for Brush {
     fn draw(&self, d: &mut impl RaylibDraw, document: &Document, _mouse_world_pos: Vector2) {
         if let Self::Active { target, .. } = self {
             let px_world_size = document.camera.zoom.recip();
-            let layer = target.read();
-            let Layer::Path(path) = &*layer else { panic!("Brush target must be a path") };
+            let path = target.read();
             path.draw_selected(d, px_world_size);
+            let color = path.settings.read().color;
             for pp in &path.points {
-                pp.draw(d, px_world_size, path.settings.color, false, true, true);
+                pp.draw(d, px_world_size, color, false, true, true);
             }
         }
     }

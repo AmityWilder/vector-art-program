@@ -1,7 +1,7 @@
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{iter::directed::DirectibleDoubleEndedIterator, rc::*};
-use crate::{layer::{BackToFore, ForeToBack, Layer, LayerEnum, LayerType}, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, PathPoint}, VectorPath}, Change, Document};
+use crate::{layer::{BackToFore, ForeToBack, LayerData, LayerType}, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, PathPoint}, VectorPath}, Change, Document};
 use super::{point_selection::HOVER_RADIUS_SQR, ToolType};
 
 struct AddPointAction {
@@ -60,7 +60,7 @@ impl Pen {
         // starting a new path
         for layer in document.layers.dfs_iter_mut(|_| false).cdir::<ForeToBack>() {
             // find hovered endpoint
-            if let LayerEnum::Path(target) = &layer.data {
+            if let LayerData::Path(target) = &layer.data {
                 let path = target.read();
                 if let Some(last_idx) = path.points.len().checked_sub(1) { // failure to subtract 1 implies an empty list
                     let search_options = [(0, &path.points[0]), (last_idx, &path.points[last_idx])]; // heap allocations are yucky, ew. all my homies use stack arrays
@@ -79,9 +79,8 @@ impl Pen {
         }
 
         // no luck? create a new path
-        let new_path = document.create_path(None, None);
         Self::Active {
-            target: new_path,
+            target: document.create_path(None, None).clone_mut(),
             is_dragging: false,
             direction: Ctrl::Out,
         }
@@ -164,7 +163,7 @@ impl ToolType for Pen {
                     Ctrl::In  => path.points.front(),
                     Ctrl::Out => path.points.back(),
                 }.cloned().expect("point should have been created to have been dragging it");
-                drop(layer);
+                drop(path);
                 document.push_change(Box::new(AddPointAction {
                     target: target.clone_mut(),
                     side: *direction,
@@ -181,28 +180,27 @@ impl ToolType for Pen {
         let px_world_size = document.camera.zoom.recip();
         match self {
             Self::Active { target, .. } | Self::Inactive(Some(target)) => {
-                let target = target.read();
-                if let Layer::Path(path) = &*target {
-                    path.draw_selected(d, px_world_size);
+                let path = target.read();
+                path.draw_selected(d, px_world_size);
+                let color = path.settings.read().color;
 
-                    if let Self::Active { direction, .. } = self {
-                        match direction {
-                            Ctrl::In => {
-                                let mut iter = path.points.iter();
-                                if let Some(pp_latest) = iter.next() {
-                                    pp_latest.draw(d, px_world_size, path.settings.color, true, true, true);
-                                    for pp in iter {
-                                        pp.draw(d, px_world_size, path.settings.color, false, false, false);
-                                    }
+                if let Self::Active { direction, .. } = self {
+                    match direction {
+                        Ctrl::In => {
+                            let mut iter = path.points.iter();
+                            if let Some(pp_latest) = iter.next() {
+                                pp_latest.draw(d, px_world_size, color, true, true, true);
+                                for pp in iter {
+                                    pp.draw(d, px_world_size, color, false, false, false);
                                 }
                             }
-                            Ctrl::Out => {
-                                let mut iter = path.points.iter().rev();
-                                if let Some(pp_latest) = iter.next() {
-                                    pp_latest.draw(d, px_world_size, path.settings.color, true, true, true);
-                                    for pp in iter {
-                                        pp.draw(d, px_world_size, path.settings.color, false, false, false);
-                                    }
+                        }
+                        Ctrl::Out => {
+                            let mut iter = path.points.iter().rev();
+                            if let Some(pp_latest) = iter.next() {
+                                pp_latest.draw(d, px_world_size, color, true, true, true);
+                                for pp in iter {
+                                    pp.draw(d, px_world_size, color, false, false, false);
                                 }
                             }
                         }
@@ -212,16 +210,18 @@ impl ToolType for Pen {
             Self::Inactive(None) => {
                 // show selectable
                 for layer in document.layers.shallow_iter().cdir::<BackToFore>() {
-                    if let Layer::Path(path) = &*layer.read() {
+                    if let LayerData::Path(path) = &layer.data {
+                        let path = path.read();
+                        let color = path.settings.read().color;
                         if path.points.iter().any(|pp| pp.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR) {
                             path.draw_selected(d, px_world_size);
                         }
                         if let Some(last_idx) = path.points.len().checked_sub(1) {
                             let pp = &path.points[last_idx];
-                            pp.draw(d, px_world_size, path.settings.color, false, false, false);
+                            pp.draw(d, px_world_size, color, false, false, false);
                             if path.points.len() > 1 {
                                 let pp = &path.points[0];
-                                pp.draw(d, px_world_size, path.settings.color, false, false, false);
+                                pp.draw(d, px_world_size, color, false, false, false);
                             }
                         }
                     }

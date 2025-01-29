@@ -49,11 +49,12 @@ impl<'a, T: 'a, P> DepthFirstIter<'a, T, P> {
 
 impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> Iterator for DepthFirstIter<'a, T, P> {
     type Item = &'a T;
+
     fn next(&mut self) -> Option<Self::Item> {
         if !self.on_deck.is_null() {
             let item: &'a T = unsafe { &*self.on_deck };
             self.on_deck = null_mut();
-            if let Some(node) = item.get_if_node() {
+            if let Some(node) = item.if_node() {
                 if (self.delve)(node) {
                     self.stack.push(T::children(node).0.iter());
                 }
@@ -76,7 +77,7 @@ impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> DoubleEndedIterator for Dep
         if !self.on_deck.is_null() {
             let item: &'a T = unsafe { &*self.on_deck };
             self.on_deck = null();
-            if let Some(node) = item.get_if_node() {
+            if let Some(node) = item.if_node() {
                 if (self.delve)(node) {
                     self.stack.push(T::children(node).0.iter());
                 }
@@ -94,7 +95,7 @@ impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> DoubleEndedIterator for Dep
     }
 }
 
-impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> RecursiveIterator for DepthFirstIter<'a, T, P> {
+impl<'a, T: 'a, P> RecursiveIterator for DepthFirstIter<'a, T, P> where Self: Iterator {
     #[inline]
     fn depth(&self) -> usize {
         self.stack.len().saturating_sub(1)
@@ -136,11 +137,12 @@ impl<'a, T: 'a, P> DepthFirstIterMut<'a, T, P> {
 
 impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> Iterator for DepthFirstIterMut<'a, T, P> {
     type Item = &'a mut T;
+
     fn next(&mut self) -> Option<Self::Item> {
         if !self.on_deck.is_null() {
             let item: &'a mut T = unsafe { &mut *self.on_deck };
             self.on_deck = null_mut();
-            if let Some(node) = item.get_if_node_mut() {
+            if let Some(node) = item.if_node_mut() {
                 if (self.delve)(node) {
                     self.stack.push(T::children_mut(node).0.iter_mut());
                 }
@@ -162,7 +164,7 @@ impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> DoubleEndedIterator for Dep
     fn next_back(&mut self) -> Option<Self::Item> {
         if !self.on_deck.is_null() {
             let item: &'a mut T = unsafe { &mut *self.on_deck };
-            if let Some(node) = item.get_if_node_mut() {
+            if let Some(node) = item.if_node_mut() {
                 if (self.delve)(node) {
                     self.stack.push(T::children_mut(node).0.iter_mut());
                 }
@@ -180,7 +182,7 @@ impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> DoubleEndedIterator for Dep
     }
 }
 
-impl<'a, T: 'a + Recursive, P: Fn(&T::Node) -> bool> RecursiveIterator for DepthFirstIterMut<'a, T, P> {
+impl<'a, T: 'a, P> RecursiveIterator for DepthFirstIterMut<'a, T, P> where Self: Iterator {
     #[inline]
     fn depth(&self) -> usize {
         self.stack.len().saturating_sub(1)

@@ -1,7 +1,7 @@
 use amymath::prelude::*;
 use raylib::prelude::*;
 use amylib::{collections::tree::*, iter::directed::*, rc::*};
-use crate::{layer::{BackToFore, ForeToBack, Layer, LayerType}, ui::panel::Rect2, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, PPPart, PathPoint}, VectorPath}, Change, Document};
+use crate::{document::layer::LayerData, layer::{BackToFore, ForeToBack, Layer, LayerType}, ui::panel::Rect2, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, PPPart, PathPoint}, VectorPath}, Change, Document};
 use super::ToolType;
 
 pub const HOVER_RADIUS: f32 = 3.0;
@@ -74,14 +74,12 @@ impl PointSelection {
         let hovered_point = document.layers
             .shallow_iter_mut()
             .cdir::<ForeToBack>()
-            .find_map(|target| {
-                let layer = target.read();
-                if let Layer::Path(path) = &*layer {
-                    let idx = path.points.iter()
+            .find_map(|layer| {
+                if let LayerData::Path(path) = &layer.data {
+                    let idx = path.read().points.iter()
                         .position(|pp| pp.p.rec_distance_to(mouse_world_pos) <= HOVER_RADIUS);
                     if let Some(idx) = idx {
-                        drop(layer);
-                        return Some((target, idx));
+                        return Some((path, idx));
                     }
                 }
                 None
@@ -90,7 +88,7 @@ impl PointSelection {
         if let Some((hovered_target, hovered_idx)) = hovered_point {
             self.state = Some(SelectionState {
                 selection: Selection::Singular(SingleSelect {
-                    target: hovered_target,
+                    target: hovered_target.clone_mut(),
                     pt_idx: hovered_idx,
                     part: PPPart::Anchor,
                 }),
@@ -113,10 +111,9 @@ impl PointSelection {
 
             let selected = document.layers
                 .shallow_iter_mut()
-                .filter_map(|target| {
-                    let layer = target.read();
-                    if let Layer::Path(path) = &*layer {
-                        let points = path.points.iter()
+                .filter_map(|layer| {
+                    if let LayerData::Path(path) = &layer.data {
+                        let points = path.read().points.iter()
                             .enumerate()
                             .filter_map(|(idx, pp)|
                                 selection_rec.check_collision_point_rec(pp.p)
@@ -124,8 +121,7 @@ impl PointSelection {
                             .collect::<Vec<usize>>();
 
                         if !points.is_empty() {
-                            drop(layer);
-                            return Some(SelectionPiece { target, points, });
+                            return Some(SelectionPiece { target: path.clone_mut(), points, });
                         }
                     }
                     None
@@ -192,13 +188,13 @@ impl ToolType for PointSelection {
 
             None => {
                 // draw selection options
-                for target in document.layers.shallow_iter().cdir::<BackToFore>() {
-                    let layer = target.read();
-                    if let Layer::Path(path) = &*layer {
+                for layer in document.layers.shallow_iter().cdir::<BackToFore>() {
+                    if let LayerData::Path(path) = &layer.data {
+                        let path = path.read();
                         path.draw_selected(d, px_world_size);
                         for pp in path.points.iter() {
                             let is_selected = selection_rec.is_some_and(|rec| rec.check_collision_point_rec(pp.p));
-                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false);
+                            pp.draw(d, px_world_size, path.settings.read().color, is_selected, false, false);
                         }
                     }
                 }
