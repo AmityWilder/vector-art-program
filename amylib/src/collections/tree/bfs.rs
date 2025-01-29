@@ -1,12 +1,5 @@
 use std::collections::VecDeque;
-use super::{EnumerateDepth, Recursive, RecursiveIterator, Tree};
-
-impl<T: Recursive> Tree<T> {
-    #[inline]
-    pub fn bfs_iter<P: Fn(&T::Node) -> bool>(&self, delve: P) -> BreadthFirstIter<T, P> {
-        BreadthFirstIter::new(self.0.iter(), delve)
-    }
-}
+use super::{EnumerateDepth, Recursive, RecursiveIterator};
 
 pub struct BreadthFirstIter<'a, T: 'a, P> {
     queue: VecDeque<&'a T>,
@@ -16,7 +9,7 @@ pub struct BreadthFirstIter<'a, T: 'a, P> {
 }
 
 impl<'a, T: 'a, P> BreadthFirstIter<'a, T, P> {
-    fn new(root_layer: std::slice::Iter<'a, T>, delve: P) -> Self {
+    pub(super) fn new(root_layer: std::slice::Iter<'a, T>, delve: P) -> Self {
         let queue = VecDeque::from_iter(root_layer);
         let curr_depth_count = queue.len();
         Self { queue, curr_depth_count, curr_depth: 0, delve }

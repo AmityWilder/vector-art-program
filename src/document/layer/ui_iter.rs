@@ -1,7 +1,8 @@
+use amymath::prelude::Rect2;
 use raylib::prelude::*;
-use crate::{document::Document, ui::panel::Rect2};
-use amylib::{collections::tree::*, iter::directed::*};
-use super::{group::Group, Layer, LayerData, LayerTree, TopToBot};
+use crate::document::Document;
+use amylib::iter::directed::*;
+use super::{Layer, LayerData, TopToBot};
 
 pub const INSET: f32 = 2.0;
 pub const GAP: f32 = 2.0;

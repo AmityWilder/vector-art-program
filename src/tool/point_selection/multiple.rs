@@ -1,8 +1,8 @@
 use raylib::prelude::*;
 use amymath::prelude::*;
-use amylib::{iter::directed::*, rc::*};
-use crate::{document::layer::LayerData, layer::{group::Group, BackToFore, Layer, LayerType}, vector_path::{path_point::PathPoint, VectorPath}, Change, Document};
-use super::{DepthFirstIter, HOVER_RADIUS, HOVER_RADIUS_SQR};
+use amylib::rc::*;
+use crate::{document::layer::LayerData, layer::{Layer, LayerType}, vector_path::{path_point::PathPoint, VectorPath}, Change, Document};
+use super::HOVER_RADIUS;
 
 struct EditMultiPointAction {
 

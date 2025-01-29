@@ -1,18 +1,6 @@
 use std::ptr::{null, null_mut};
 use crate::collections::VecStack;
-use super::{EnumerateDepth, Recursive, RecursiveIterator, Tree};
-
-impl<T: Recursive> Tree<T> {
-    #[inline]
-    pub fn dfs_iter<P: Fn(&T::Node) -> bool>(&self, delve: P) -> DepthFirstIter<T, P> {
-        DepthFirstIter::new(self.0.iter(), delve)
-    }
-
-    #[inline]
-    pub fn dfs_iter_mut<P: Fn(&T::Node) -> bool>(&mut self, delve: P) -> DepthFirstIterMut<T, P> {
-        DepthFirstIterMut::new(self.0.iter_mut(), delve)
-    }
-}
+use super::{EnumerateDepth, Recursive, RecursiveIterator};
 
 pub struct DepthFirstIter<'a, T: 'a, P> {
     /// ## Safety
@@ -36,7 +24,7 @@ pub struct DepthFirstIter<'a, T: 'a, P> {
 }
 
 impl<'a, T: 'a, P> DepthFirstIter<'a, T, P> {
-    fn new(root_layer: std::slice::Iter<'a, T>, delve: P) -> Self {
+    pub(super) fn new(root_layer: std::slice::Iter<'a, T>, delve: P) -> Self {
         let stack = VecStack::from([root_layer]);
         Self { on_deck: null(), stack, delve }
     }
@@ -124,7 +112,7 @@ pub struct DepthFirstIterMut<'a, T: 'a, P> {
 }
 
 impl<'a, T: 'a, P> DepthFirstIterMut<'a, T, P> {
-    fn new(root_layer: std::slice::IterMut<'a, T>, delve: P) -> Self {
+    pub(super) fn new(root_layer: std::slice::IterMut<'a, T>, delve: P) -> Self {
         let stack = VecStack::from([root_layer]);
         Self { on_deck: null_mut(), stack, delve }
     }

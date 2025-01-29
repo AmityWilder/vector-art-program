@@ -1,7 +1,7 @@
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{prelude::DirectibleDoubleEndedIterator, rc::*};
-use crate::{document::layer::LayerData, layer::{BackToFore, Layer, LayerType}, vector_path::{path_point::{CtrlPt1, CtrlPt2, PPPart, PathPoint}, VectorPath}, Change, Document};
+use crate::{document::layer::LayerData, layer::{BackToFore, LayerType}, vector_path::{path_point::{CtrlPt1, CtrlPt2, PPPart, PathPoint}, VectorPath}, Change, Document};
 use super::{multiple::{EnumerateSelectedPoints, SelectionPiece}, HOVER_RADIUS, HOVER_RADIUS_SQR};
 
 struct EditSinglePointAction {

@@ -19,52 +19,6 @@ pub trait Recursive: Sized {
     fn children_mut(node: &mut Self::Node) -> &mut Tree<Self>;
 }
 
-pub struct Iter<'a, T: 'a> {
-    iter: std::slice::Iter<'a, T>,
-}
-
-impl<'a, T: 'a + Recursive> Iter<'a, T> {
-    fn new(src: &'a Tree<T>) -> Self {
-        Self { iter: src.0.iter() }
-    }
-}
-
-impl<'a, T: 'a> Iterator for Iter<'a, T> {
-    type Item = &'a T;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next()
-    }
-}
-impl<'a, T: 'a> DoubleEndedIterator for Iter<'a, T> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.iter.next_back()
-    }
-}
-impl<'a, T: 'a> ExactSizeIterator for Iter<'a, T> {}
-
-pub struct IterMut<'a, T: 'a> {
-    iter: std::slice::IterMut<'a, T>,
-}
-
-impl<'a, T: 'a + Recursive> IterMut<'a, T> {
-    fn new(src: &'a mut Tree<T>) -> Self {
-        Self { iter: src.0.iter_mut() }
-    }
-}
-
-impl<'a, T: 'a> Iterator for IterMut<'a, T> {
-    type Item = &'a mut T;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next()
-    }
-}
-impl<'a, T: 'a> DoubleEndedIterator for IterMut<'a, T> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.iter.next_back()
-    }
-}
-impl<'a, T: 'a> ExactSizeIterator for IterMut<'a, T> {}
-
 pub struct Tree<T: Recursive>(Vec<T>);
 
 impl<T: Recursive, V: Into<Vec<T>>> From<V> for Tree<T> {
@@ -168,14 +122,29 @@ impl<T: Recursive> Tree<T> {
 
     /// Iterate over only the topmost layer
     #[inline]
-    pub fn shallow_iter<'a>(&'a self) -> Iter<'a, T> {
-        Iter::new(self)
+    pub fn shallow_iter<'a>(&'a self) -> std::slice::Iter<'a, T> {
+        self.0.iter()
     }
 
     /// Iterate over only the topmost layer
     #[inline]
-    pub fn shallow_iter_mut<'a>(&'a mut self) -> IterMut<'a, T> {
-        IterMut::new(self)
+    pub fn shallow_iter_mut<'a>(&'a mut self) -> std::slice::IterMut<'a, T> {
+        self.0.iter_mut()
+    }
+
+    #[inline]
+    pub fn dfs_iter<P: Fn(&T::Node) -> bool>(&self, delve: P) -> DepthFirstIter<T, P> {
+        DepthFirstIter::new(self.0.iter(), delve)
+    }
+
+    #[inline]
+    pub fn dfs_iter_mut<P: Fn(&T::Node) -> bool>(&mut self, delve: P) -> DepthFirstIterMut<T, P> {
+        DepthFirstIterMut::new(self.0.iter_mut(), delve)
+    }
+
+    #[inline]
+    pub fn bfs_iter<P: Fn(&T::Node) -> bool>(&self, delve: P) -> BreadthFirstIter<T, P> {
+        BreadthFirstIter::new(self.0.iter(), delve)
     }
 }
 

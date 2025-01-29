@@ -1,15 +1,15 @@
 use std::{collections::VecDeque, fs::File, io::{self, BufRead, BufReader, BufWriter, Read, Write}, path::Path};
+use amymath::prelude::IntRect2;
 use raylib::prelude::*;
-use amylib::{collections::tree::*, io::*, rc::*};
+use amylib::{io::*, rc::*};
 use crate::{
     document::{
-        artboard::{ArtBoard, IntRect2},
+        artboard::ArtBoard,
         layer::*,
         Document,
     },
     appearance::*,
     layer::group::Group,
-    raster::Raster,
     vector_path::{
         fill,
         path_point::*,

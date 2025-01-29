@@ -1,7 +1,7 @@
 use amymath::prelude::*;
 use raylib::prelude::*;
-use amylib::{collections::tree::*, iter::directed::*, rc::*};
-use crate::{document::layer::LayerData, layer::{BackToFore, ForeToBack, Layer, LayerType}, ui::panel::Rect2, vector_path::{path_point::{Ctrl, CtrlPt1, CtrlPt2, PPPart, PathPoint}, VectorPath}, Change, Document};
+use amylib::{collections::tree::*, iter::directed::*};
+use crate::{document::layer::LayerData, layer::{BackToFore, ForeToBack, LayerType}, vector_path::path_point::PPPart, Document};
 use super::ToolType;
 
 pub const HOVER_RADIUS: f32 = 3.0;

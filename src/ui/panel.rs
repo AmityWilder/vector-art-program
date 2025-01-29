@@ -1,41 +1,5 @@
+use amymath::prelude::Rect2;
 use raylib::prelude::*;
-
-#[derive(Clone, Copy)]
-pub struct Rect2 {
-    pub xmin: f32,
-    pub ymin: f32,
-    pub xmax: f32,
-    pub ymax: f32,
-}
-
-impl Rect2 {
-    pub fn is_overlapping_point(&self, point: Vector2) -> bool {
-        self.xmin <= point.x && point.x < self.xmax &&
-        self.ymin <= point.y && point.y < self.ymax
-    }
-}
-
-impl From<Rectangle> for Rect2 {
-    fn from(Rectangle { x, y, width, height }: Rectangle) -> Self {
-        Self {
-            xmin: x,
-            ymin: y,
-            xmax: x + width,
-            ymax: y + height,
-        }
-    }
-}
-
-impl From<Rect2> for Rectangle {
-    fn from(Rect2 { xmin, ymin, xmax, ymax }: Rect2) -> Self {
-        Self {
-            x: xmin,
-            y: ymin,
-            width:  xmax - xmin,
-            height: ymax - ymin,
-        }
-    }
-}
 
 pub enum UIAxis {
     /// Fill container

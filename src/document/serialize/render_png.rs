@@ -1,7 +1,8 @@
 use std::{io, path::Path};
+use amymath::prelude::IntRect2;
 use raylib::prelude::*;
-use amylib::{collections::tree::*, iter::directed::DirectibleDoubleEndedIterator, rc::*};
-use crate::{artboard::IntRect2, document::Document, layer::{BackToFore, LayerType}};
+use amylib::iter::directed::DirectibleDoubleEndedIterator;
+use crate::{document::Document, layer::{BackToFore, LayerType}};
 
 #[derive(Debug, Clone, Copy)]
 pub enum DownscaleAlgorithm {

@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use amylib::collections::VecDestack;
+use amymath::prelude::IntRect2;
 use layer::{LayerData, LayerTree};
 use crate::{raster::Raster, ui::panel::Panel, vector_path::VectorPath};
 use amylib::rc::*;
@@ -10,15 +11,11 @@ pub mod artboard;
 pub mod serialize;
 
 use self::{
-    artboard::{
-        ArtBoard,
-        IntRect2,
-    },
+    artboard::ArtBoard,
     layer::{
         group::Group,
         Layer,
         LayerSettings,
-        LayerType,
     }
 };
 

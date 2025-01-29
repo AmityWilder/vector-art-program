@@ -1,5 +1,3 @@
-use std::collections::{LinkedList, VecDeque};
-
 pub trait Stack<T>: FromIterator<T> {
     fn new() -> Self;
     fn push(&mut self, value: T);

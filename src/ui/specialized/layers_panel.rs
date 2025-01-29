@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use crate::{layer::{group::Group, Layer, LayerData}, Document};
+use crate::{layer::{group::Group, LayerData}, Document};
 use super::panel::Panel;
 
 pub struct LayersPanel {
