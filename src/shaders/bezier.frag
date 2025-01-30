@@ -14,6 +14,8 @@ out vec4 finalColor;
 // in pixels
 uniform float thickness = 1.0;
 
+uniform vec2 points[4] = { vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0) };
+
 void main()
 {
     // Texel color fetching from texture sampler

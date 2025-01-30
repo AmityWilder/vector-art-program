@@ -80,3 +80,23 @@ impl DistanceSqr for Vector2 {
         (self.x - v.x).abs() + (self.y - v.y).abs()
     }
 }
+
+pub trait SnapTo {
+    fn snap_to_segment(&self, start: Self, end: Self) -> Self;
+    fn distance_sqr_to_segment(&self, start: Self, end: Self) -> f32;
+}
+
+impl SnapTo for Vector2 {
+    fn snap_to_segment(&self, start: Self, end: Self) -> Self {
+        let delta = end - start;
+        let p_delta = *self - start;
+        let delta_sqr = delta * delta;
+        let p_delta_delta = p_delta * delta;
+        let t = (p_delta_delta.x + p_delta_delta.y) / (delta_sqr.x + delta_sqr.y);
+        start * (1.0 - t) + *self * t
+    }
+
+    fn distance_sqr_to_segment(&self, start: Self, end: Self) -> f32 {
+        self.distance_sqr_to(self.snap_to_segment(start, end))
+    }
+}

@@ -30,13 +30,8 @@ impl ShaderTable {
         d.draw_texture_pro(&self.uv_tex, SRC_REC, dest_rec, Vector2::zero(), 0.0, tint);
     }
 
+    #[inline]
     pub fn draw_uv_tex(&self, d: &mut impl RaylibDraw, position: Vector2, radius: f32, tint: Color) {
-        let dest_rec = Rectangle::new(
-            position.x - radius,
-            position.y - radius,
-            radius * 2.0,
-            radius * 2.0,
-        );
-        d.draw_texture_pro(&self.uv_tex, SRC_REC, dest_rec, Vector2::zero(), 0.0, tint);
+        self.draw_uv_tex_ex(d, position, Vector2::new(radius, radius), tint);
     }
 }
