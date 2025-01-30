@@ -2,7 +2,7 @@ use std::{collections::VecDeque, fmt};
 use raylib::prelude::*;
 use amylib::rc::*;
 use amymath::prelude::*;
-use crate::{layer::LayerType, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath}, Change, Document};
+use crate::{layer::LayerType, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath}, Change, Document};
 use super::{point_selection::SNAP_VERT_RADIUS_SQR, ToolType};
 
 struct BrushAction {
@@ -194,14 +194,14 @@ impl ToolType for VectorBrush {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, _mouse_world_pos: Vector2) {
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, _mouse_world_pos: Vector2, shader_table: &ShaderTable) {
         if let Self::Active { target, .. } = self {
             let px_world_size = document.camera.zoom.recip();
             let path = target.read();
             path.draw_selected(d, px_world_size);
             let color = path.settings.color;
             for pp in &path.points {
-                pp.draw(d, px_world_size, color, false, true, true);
+                pp.draw(d, px_world_size, color, false, true, true, shader_table);
             }
         }
     }

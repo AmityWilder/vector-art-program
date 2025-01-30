@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use crate::Document;
+use crate::{shaders::ShaderTable, Document};
 
 pub mod basic_selection;
 pub mod point_selection;
@@ -15,7 +15,7 @@ use self::{
 
 pub trait ToolType {
     fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2);
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, mouse_world_pos: Vector2);
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, mouse_world_pos: Vector2, shader_table: &ShaderTable);
 }
 
 pub enum Tool {
@@ -59,17 +59,17 @@ impl ToolType for Tool {
         match self {
             Tool::BasicSelection(tool) => tool.tick(rl, document, mouse_world_pos),
             Tool::PointSelection(tool) => tool.tick(rl, document, mouse_world_pos),
-            Tool::Pen(tool) => tool.tick(rl, document, mouse_world_pos),
-            Tool::Brush(tool) => tool.tick(rl, document, mouse_world_pos),
+            Tool::Pen           (tool) => tool.tick(rl, document, mouse_world_pos),
+            Tool::Brush         (tool) => tool.tick(rl, document, mouse_world_pos),
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, mouse_world_pos: Vector2) {
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, mouse_world_pos: Vector2, shader_table: &ShaderTable) {
         match self {
-            Tool::BasicSelection(tool) => tool.draw(d, document, mouse_world_pos),
-            Tool::PointSelection(tool) => tool.draw(d, document, mouse_world_pos),
-            Tool::Pen(tool) => tool.draw(d, document, mouse_world_pos),
-            Tool::Brush(tool) => tool.draw(d, document, mouse_world_pos),
+            Tool::BasicSelection(tool) => tool.draw(d, document, mouse_world_pos, shader_table),
+            Tool::PointSelection(tool) => tool.draw(d, document, mouse_world_pos, shader_table),
+            Tool::Pen           (tool) => tool.draw(d, document, mouse_world_pos, shader_table),
+            Tool::Brush         (tool) => tool.draw(d, document, mouse_world_pos, shader_table),
         }
     }
 }

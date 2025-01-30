@@ -46,6 +46,8 @@ pub enum Ctrl2 {
 }
 use Ctrl2::*;
 
+use crate::shaders::ShaderTable;
+
 impl Ctrl2 {
     pub const fn is_reflect(&self) -> bool {
         matches!(self, Reflect)
@@ -69,13 +71,13 @@ impl Ctrl2 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Ctrl1 {
     pub c1: (Ctrl, Vector2),
     pub c2: Option<Ctrl2>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct PathPoint {
     pub p: Vector2,
     pub c: Option<Ctrl1>,
@@ -166,6 +168,7 @@ impl PathPoint {
         is_selected: bool,
         is_c_in_vis: bool,
         is_c_out_vis: bool,
+        shader_table: &ShaderTable,
     ) {
         if let Some(Ctrl1 { c1: (c1_side, c1), c2 }) = self.c.as_ref() {
             let (is_c1_vis, is_c2_vis) = match c1_side {
@@ -175,7 +178,7 @@ impl PathPoint {
 
             if is_c1_vis {
                 d.draw_line_v(self.p, *c1, color);
-                d.draw_circle_v(*c1, 3.5 * px_world_size, color);
+                shader_table.draw_uv_tex(&mut d.begin_shader_mode(&shader_table.circle), *c1, 3.5 * px_world_size, color);
             }
 
             if is_c2_vis {
@@ -184,7 +187,7 @@ impl PathPoint {
                     match c2_ty {
                         Ctrl2::Exact(_) => {
                             d.draw_line_v(self.p, c2, color);
-                            d.draw_circle_sector(c2, 3.5 * px_world_size, 0.0, 360.0, 10, color);
+                            shader_table.draw_uv_tex(&mut d.begin_shader_mode(&shader_table.circle), c2, 3.5 * px_world_size, color);
                         }
 
                         Ctrl2::Mirror(_) => {

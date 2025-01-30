@@ -1,6 +1,7 @@
 use raylib::prelude::*;
 use crate::vector_path::{fill::Fill, stroke::Stroke};
 
+#[derive(Clone, Copy)]
 pub struct Blending {
     pub opacity: f32,
     pub mode: BlendMode,

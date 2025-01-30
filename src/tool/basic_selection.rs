@@ -1,4 +1,5 @@
 use raylib::prelude::*;
+use crate::shaders::ShaderTable;
 use super::ToolType;
 
 pub enum BasicSelection {
@@ -17,7 +18,7 @@ impl ToolType for BasicSelection {
         todo!()
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &crate::Document, mouse_world_pos: Vector2) {
+    fn draw(&self, d: &mut impl RaylibDraw, document: &crate::Document, mouse_world_pos: Vector2, shader_table: &ShaderTable) {
         todo!()
     }
 }

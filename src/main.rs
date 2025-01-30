@@ -4,9 +4,11 @@ use amymath::prelude::Rect2;
 use layer::{BackToFore, LayerType};
 use raylib::prelude::*;
 use serialize::render_png::DownscaleAlgorithm;
+use shaders::ShaderTable;
 // use rand::prelude::*;
 use ui::{panel::*, specialized::layers_panel::*};
 
+mod shaders;
 mod vector_path;
 mod raster;
 mod appearance;
@@ -30,6 +32,8 @@ fn main() {
     rl.set_window_state(WindowState::set_window_maximized(rl.get_window_state(), true));
 
     rl.set_target_fps(60);
+
+    let shader_table = ShaderTable::new(&mut rl, &thread).unwrap();
 
     let mut window_rect = Rect2 {
         xmin: 0.0,
@@ -249,10 +253,9 @@ fn main() {
                     ], Color::BLACK);
                 }
 
-                // todo: make all ui elements draw without 2D mode
                 let mut d = d.begin_mode2D(document.camera);
 
-                current_tool.draw(&mut d, &document, mouse_world_pos);
+                current_tool.draw(&mut d, &document, mouse_world_pos, &shader_table);
             }
 
             // Draw layers panel

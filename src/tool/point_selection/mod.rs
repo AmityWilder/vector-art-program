@@ -1,7 +1,7 @@
 use amymath::prelude::*;
 use raylib::prelude::*;
 use amylib::{collections::tree::*, iter::directed::*};
-use crate::{document::layer::Layer, layer::{BackToFore, ForeToBack, LayerType}, vector_path::path_point::PPPart, Document};
+use crate::{document::layer::Layer, layer::{BackToFore, ForeToBack, LayerType}, shaders::ShaderTable, vector_path::path_point::PPPart, Document};
 use super::ToolType;
 
 pub const HOVER_RADIUS: f32 = 3.0;
@@ -163,7 +163,7 @@ impl ToolType for PointSelection {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, mouse_world_pos: Vector2) {
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, mouse_world_pos: Vector2, shader_table: &ShaderTable) {
         let px_world_size = document.camera.zoom.recip();
 
         let selection_rec = self.selection_start.as_ref().map(|&selection_start|
@@ -179,11 +179,11 @@ impl ToolType for PointSelection {
 
         match self.state.as_ref() {
             Some(SelectionState { selection: Selection::Singular(selected), .. }) => {
-                selected.draw(d, document, px_world_size, selection_rec);
+                selected.draw(d, document, px_world_size, selection_rec, shader_table);
             }
 
             Some(SelectionState { selection: Selection::Multiple(selected), .. }) => {
-                selected.draw(d, document, px_world_size, selection_rec);
+                selected.draw(d, document, px_world_size, selection_rec, shader_table);
             }
 
             None => {
@@ -194,7 +194,7 @@ impl ToolType for PointSelection {
                         path.draw_selected(d, px_world_size);
                         for pp in path.points.iter() {
                             let is_selected = selection_rec.is_some_and(|rec| rec.check_collision_point_rec(pp.p));
-                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false);
+                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false, shader_table);
                         }
                     }
                 }

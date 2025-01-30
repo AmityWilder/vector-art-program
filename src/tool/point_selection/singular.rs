@@ -3,7 +3,7 @@ use std::fmt;
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{prelude::DirectibleDoubleEndedIterator, rc::*};
-use crate::{document::layer::Layer, layer::{BackToFore, LayerType}, vector_path::{path_point::{Ctrl1, Ctrl2, PPPart, PathPoint}, VectorPath}, Change, Document};
+use crate::{document::layer::Layer, layer::{BackToFore, LayerType}, shaders::ShaderTable, vector_path::{path_point::{Ctrl1, Ctrl2, PPPart, PathPoint}, VectorPath}, Change, Document};
 use super::{multiple::{EnumerateSelectedPoints, SelectionPiece}, HOVER_RADIUS, HOVER_RADIUS_SQR};
 
 struct EditSinglePointAction {
@@ -81,7 +81,7 @@ impl SingleSelect {
             .then_some(PPPart::Anchor)
     }
 
-    pub fn draw(&self, d: &mut impl RaylibDraw, document: &Document, px_world_size: f32, selection_rec: Option<Rectangle>) {
+    pub fn draw(&self, d: &mut impl RaylibDraw, document: &Document, px_world_size: f32, selection_rec: Option<Rectangle>, shader_table: &ShaderTable) {
         if let Some(selection_rec) = selection_rec {
             // draw selection options
             let piece = SelectionPiece { target: self.target.clone_mut(), points: vec![self.pt_idx] };
@@ -93,12 +93,12 @@ impl SingleSelect {
                     if let Some(selected) = selected {
                         for (is_point_selected, pp) in path.enumerate_selected_points(selected) {
                             let is_selected = is_point_selected || selection_rec.check_collision_point_rec(pp.p);
-                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false);
+                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false, shader_table);
                         }
                     } else {
                         for pp in path.points.iter() {
                             let is_selected = selection_rec.check_collision_point_rec(pp.p);
-                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false);
+                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false, shader_table);
                         }
                     }
                 }
@@ -113,6 +113,7 @@ impl SingleSelect {
                     // dont implement this until i can click and drag them directly
                     is_selected/* || pp_idx.checked_sub(1).is_some_and(|prev| prev == idx)*/,
                     is_selected/* || pp_idx.checked_add(1).is_some_and(|next| next == idx)*/,
+                    shader_table,
                 );
             }
         }

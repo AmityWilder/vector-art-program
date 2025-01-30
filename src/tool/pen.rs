@@ -2,7 +2,7 @@ use std::fmt;
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{iter::directed::DirectibleDoubleEndedIterator, rc::*};
-use crate::{layer::{BackToFore, ForeToBack, Layer, LayerType}, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath}, Change, Document};
+use crate::{layer::{BackToFore, ForeToBack, Layer, LayerType}, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath}, Change, Document};
 use super::{point_selection::HOVER_RADIUS_SQR, ToolType};
 
 struct AddPointAction {
@@ -183,7 +183,7 @@ impl ToolType for Pen {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, mouse_world_pos: Vector2) {
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, mouse_world_pos: Vector2, shader_table: &ShaderTable) {
         let px_world_size = document.camera.zoom.recip();
         match self {
             Self::Active { target, .. } | Self::Inactive(Some(target)) => {
@@ -196,18 +196,18 @@ impl ToolType for Pen {
                         Ctrl::In => {
                             let mut iter = path.points.iter();
                             if let Some(pp_latest) = iter.next() {
-                                pp_latest.draw(d, px_world_size, color, true, true, true);
+                                pp_latest.draw(d, px_world_size, color, true, true, true, shader_table);
                                 for pp in iter {
-                                    pp.draw(d, px_world_size, color, false, false, false);
+                                    pp.draw(d, px_world_size, color, false, false, false, shader_table);
                                 }
                             }
                         }
                         Ctrl::Out => {
                             let mut iter = path.points.iter().rev();
                             if let Some(pp_latest) = iter.next() {
-                                pp_latest.draw(d, px_world_size, color, true, true, true);
+                                pp_latest.draw(d, px_world_size, color, true, true, true, shader_table);
                                 for pp in iter {
-                                    pp.draw(d, px_world_size, color, false, false, false);
+                                    pp.draw(d, px_world_size, color, false, false, false, shader_table);
                                 }
                             }
                         }
@@ -225,10 +225,10 @@ impl ToolType for Pen {
                         }
                         if let Some(last_idx) = path.points.len().checked_sub(1) {
                             let pp = &path.points[last_idx];
-                            pp.draw(d, px_world_size, color, false, false, false);
+                            pp.draw(d, px_world_size, color, false, false, false, shader_table);
                             if path.points.len() > 1 {
                                 let pp = &path.points[0];
-                                pp.draw(d, px_world_size, color, false, false, false);
+                                pp.draw(d, px_world_size, color, false, false, false, shader_table);
                             }
                         }
                     }
