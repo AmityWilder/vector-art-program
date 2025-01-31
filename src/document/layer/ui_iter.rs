@@ -1,5 +1,4 @@
 use amymath::prelude::Rect2;
-use raylib::prelude::*;
 use crate::document::Document;
 use amylib::iter::directed::*;
 use super::{Layer, TopToBot};
@@ -16,37 +15,37 @@ pub const EXPAND_COLLAPSE_SIZE: f32 = 10.0;
 
 #[derive(Default)]
 pub struct LayerUI {
-    pub slot_rec: Rectangle,
-    pub color_rec: Rectangle,
-    pub thumbnail_rec: Rectangle,
-    pub name_rec: Rectangle,
-    pub expand_button_rec: Option<Rectangle>,
+    pub slot_rec: Rect2,
+    pub color_rec: Rect2,
+    pub thumbnail_rec: Rect2,
+    pub name_rec: Rect2,
+    pub expand_button_rec: Option<Rect2>,
 }
 
 impl LayerUI {
-    pub fn generate(mut rec: Rectangle, is_group: bool) -> Self {
-        let width = rec.width;
+    pub fn generate(mut rec: Rect2, is_group: bool) -> Self {
+        let width = rec.width();
         let slot_rec = rec;
         let color_rec = {
-            rec.width = LAYER_COLOR_WIDTH;
+            rec.xmax = rec.xmin + LAYER_COLOR_WIDTH;
             rec
         };
         let thumbnail_rec = {
-            rec.x += LAYER_COLOR_WIDTH + THUMBNAIL_INSET;
-            rec.y += THUMBNAIL_INSET;
-            (rec.width, rec.height) = (THUMBNAIL_SIZE, THUMBNAIL_SIZE);
+            rec.xmin += LAYER_COLOR_WIDTH + THUMBNAIL_INSET;
+            rec.ymin += THUMBNAIL_INSET;
+            (rec.xmax, rec.ymax) = (rec.xmin + THUMBNAIL_SIZE, rec.ymin + THUMBNAIL_SIZE);
             rec
         };
         let name_rec = {
-            rec.x += THUMBNAIL_SIZE + THUMBNAIL_INSET;
-            rec.height = TEXT_FONT_SIZE;
-            rec.width = width - LAYER_COLOR_WIDTH + THUMBNAIL_INSET - THUMBNAIL_SIZE;
+            rec.xmin += THUMBNAIL_SIZE + THUMBNAIL_INSET;
+            rec.ymax = rec.ymin + TEXT_FONT_SIZE;
+            rec.xmax = rec.xmin + width - LAYER_COLOR_WIDTH + THUMBNAIL_INSET - THUMBNAIL_SIZE;
             rec
         };
         let expand_button_rec = is_group.then(|| {
-            rec.y += TEXT_FONT_SIZE + 2.0;
-            rec.width  = EXPAND_COLLAPSE_SIZE;
-            rec.height = EXPAND_COLLAPSE_SIZE;
+            rec.ymin += TEXT_FONT_SIZE + INSET;
+            rec.xmax = rec.xmin + EXPAND_COLLAPSE_SIZE;
+            rec.ymax = rec.ymin + EXPAND_COLLAPSE_SIZE;
             rec
         });
         LayerUI {
@@ -61,8 +60,8 @@ impl LayerUI {
 
 pub struct LayerUiIter<I> {
     tree_iter: I,
-    container: Rectangle,
-    slot: Rectangle,
+    container: Rect2,
+    slot: Rect2,
 }
 
 trait IsGroup {
@@ -86,27 +85,26 @@ impl<'a, L: IsGroup, I: Iterator<Item = (usize, L)>> Iterator for LayerUiIter<I>
 
     fn next(&mut self) -> Option<Self::Item> {
         let container = &self.container;
-        let container_bottom = container.y + container.height;
         while let Some((depth, layer)) = self.tree_iter.next() {
-            let y = self.slot.y;
-            if y >= container_bottom {
+            let ymin = self.slot.ymin;
+            if ymin >= container.ymax {
                 return None; // no more are going to be visible
             }
-            let bottom = self.slot.y + LAYER_HEIGHT + GAP;
-            if bottom < container.y {
-                self.slot.y = bottom;
+            let bottom = self.slot.ymin + LAYER_HEIGHT + GAP;
+            if bottom < container.ymin {
+                self.slot.ymin = bottom;
                 continue; // sprint to first visible
             }
             let indentation = depth as f32 * INDENT;
-            self.slot.x = container.x + indentation;
-            self.slot.width = container.width - indentation;
-            if self.slot.check_collision_recs(container) {
+            self.slot.xmin = container.xmin + indentation;
+            self.slot.xmax = container.xmax - indentation;
+            if self.slot.is_overlapping(container) {
                 let is_group = layer.is_group();
                 let recs = LayerUI::generate(self.slot, is_group);
-                self.slot.y = bottom;
+                self.slot.ymin = bottom;
                 return Some((layer, recs));
             } else {
-                self.slot.y = bottom;
+                self.slot.ymin = bottom;
             }
         }
         None
@@ -123,29 +121,28 @@ impl Document {
                 .enumerate_depth()
                 .cdir::<TopToBot>(),
             container,
-            slot: Rectangle {
-                x: container.x,
-                y: top + INSET,
-                width: container.width,
-                height: LAYER_HEIGHT,
+            slot: Rect2 {
+                xmin: container.xmin,
+                ymin: top + INSET,
+                xmax: container.xmax,
+                ymax: top + INSET + LAYER_HEIGHT,
             },
         }
     }
 
     /// Iterate over each expanded layer panel item mutably, overlapping `container`, with the first item's y-value being `top`
     pub fn ui_iter_mut(&mut self, container: Rect2, top: f32) -> impl Iterator<Item = (&mut Layer, LayerUI)> {
-        let container = container.into();
         LayerUiIter {
             tree_iter: self.layers
                 .dfs_iter_mut(|group| group.is_expanded)
                 .enumerate_depth()
                 .cdir::<TopToBot>(),
             container,
-            slot: Rectangle {
-                x: container.x,
-                y: top + INSET,
-                width: container.width,
-                height: LAYER_HEIGHT,
+            slot: Rect2 {
+                xmin: container.xmin,
+                ymin: top + INSET,
+                xmax: container.xmax,
+                ymax: top + INSET + LAYER_HEIGHT,
             },
         }
     }

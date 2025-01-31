@@ -1,8 +1,9 @@
 use std::{fmt, path::PathBuf};
+use amygui::panel::Panel;
 use amylib::collections::VecDestack;
 use amymath::prelude::IntRect2;
 use layer::{Layer, LayerTree};
-use crate::{raster::Raster, ui::panel::Panel, vector_path::VectorPath};
+use crate::{raster::Raster, vector_path::VectorPath};
 use amylib::rc::*;
 use raylib::prelude::*;
 
@@ -183,31 +184,31 @@ impl Document {
             d.draw_rectangle_rec(recs.slot_rec, SLOT_COLOR);
             d.draw_rectangle_rec(recs.color_rec, color);
             d.draw_rectangle_rec(recs.thumbnail_rec, Color::GRAY);
-            d.draw_text(name, recs.name_rec.x as i32, recs.name_rec.y as i32, 10, TEXT_COLOR);
+            d.draw_text(name, recs.name_rec.xmin as i32, recs.name_rec.ymin as i32, 10, TEXT_COLOR);
             // expand icon
             if let Layer::Group(Group { is_expanded, .. }) = layer {
                 let expand_button_rec = recs.expand_button_rec.expect("group should always have expand button");
-                let p0 = Vector2::new(expand_button_rec.x, expand_button_rec.y);
+                let p0 = Vector2::new(expand_button_rec.xmin as f32, expand_button_rec.ymin as f32);
                 let [p1, p2] = if *is_expanded {
                     [
                         Vector2::new(
-                            expand_button_rec.x + 5.0,
-                            expand_button_rec.y + 6.0,
+                            expand_button_rec.xmin as f32 + 5.0,
+                            expand_button_rec.ymin as f32 + 6.0,
                         ),
                         Vector2::new(
-                            expand_button_rec.x + expand_button_rec.height,
-                            expand_button_rec.y,
+                            expand_button_rec.xmin as f32 + expand_button_rec.ymax as f32 - expand_button_rec.ymin as f32,
+                            expand_button_rec.ymin as f32,
                         ),
                     ]
                 } else {
                     [
                         Vector2::new(
-                            expand_button_rec.x,
-                            expand_button_rec.y + expand_button_rec.height,
+                            expand_button_rec.xmin as f32,
+                            expand_button_rec.ymax as f32,
                         ),
                         Vector2::new(
-                            expand_button_rec.x + 6.0,
-                            expand_button_rec.y + 5.0,
+                            expand_button_rec.xmin as f32 + 6.0,
+                            expand_button_rec.ymin as f32 + 5.0,
                         ),
                     ]
                 };

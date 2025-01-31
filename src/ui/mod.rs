@@ -1,3 +1,2 @@
-pub mod panel;
 pub mod number_input;
-pub mod specialized;
+pub mod layers_panel;

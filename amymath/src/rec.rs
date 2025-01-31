@@ -15,7 +15,7 @@ impl MinMaxRectangle for Vector2 {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Rect2 {
     pub xmin: f32,
     pub ymin: f32,
@@ -27,6 +27,19 @@ impl Rect2 {
     pub fn is_overlapping_point(&self, point: Vector2) -> bool {
         self.xmin <= point.x && point.x < self.xmax &&
         self.ymin <= point.y && point.y < self.ymax
+    }
+
+    pub fn is_overlapping(&self, rec: &Self) -> bool {
+        self.xmin < rec.xmax && rec.xmin < self.xmax &&
+        self.ymin < rec.ymax && rec.ymin < self.ymax
+    }
+
+    pub fn width(&self) -> f32 {
+        self.xmax - self.xmin
+    }
+
+    pub fn height(&self) -> f32 {
+        self.ymax - self.ymin
     }
 }
 
@@ -42,6 +55,17 @@ impl From<Rectangle> for Rect2 {
 }
 
 impl From<Rect2> for Rectangle {
+    fn from(Rect2 { xmin, ymin, xmax, ymax }: Rect2) -> Self {
+        Self {
+            x: xmin,
+            y: ymin,
+            width:  xmax - xmin,
+            height: ymax - ymin,
+        }
+    }
+}
+
+impl From<Rect2> for ffi::Rectangle {
     fn from(Rect2 { xmin, ymin, xmax, ymax }: Rect2) -> Self {
         Self {
             x: xmin,

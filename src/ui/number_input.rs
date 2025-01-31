@@ -1,5 +1,5 @@
+use amygui::panel::Panel;
 use amylib::ops::AnyRange;
-use crate::Panel;
 
 pub trait NumericInput {
     type Value;

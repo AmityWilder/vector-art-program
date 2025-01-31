@@ -1,4 +1,5 @@
 use std::{path::Path, time::Instant};
+use amygui::{panel::Panel, rec::UIRect};
 use amylib::iter::directed::DirectibleDoubleEndedIterator;
 use amymath::prelude::Rect2;
 use layer::{BackToFore, LayerType};
@@ -6,7 +7,7 @@ use raylib::prelude::*;
 use serialize::render_png::DownscaleAlgorithm;
 use shaders::ShaderTable;
 // use rand::prelude::*;
-use ui::{panel::*, specialized::layers_panel::*};
+use ui::layers_panel::*;
 
 mod shaders;
 mod vector_path;
@@ -56,9 +57,9 @@ fn main() {
     let mut layers_panel = LayersPanel::new(
         Panel::new(
             &window_rect,
-            UIBox::init()
-                .width(256.0)
+            UIRect::init()
                 .from_right(0.0)
+                .with_width(256.0)
                 .build(),
             Color::new(24,24,24,255),
         ),
@@ -115,6 +116,7 @@ fn main() {
             window_rect.xmax = width  as f32;
             window_rect.ymax = height as f32;
             layers_panel.panel.update_rec(&window_rect);
+            println!("{:?}", layers_panel.panel.rec_cache);
             trim_rtex = rl.load_render_texture(&thread, width as u32, height as u32).unwrap();
         }
 
