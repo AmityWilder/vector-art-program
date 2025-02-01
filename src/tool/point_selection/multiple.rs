@@ -3,7 +3,7 @@ use std::fmt;
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::rc::*;
-use crate::{document::layer::Layer, layer::LayerType, shaders::ShaderTable, vector_path::{path_point::PathPoint, VectorPath}, Change, Document};
+use crate::{document::layer::Layer, layer::LayerType, shaders::ShaderTable, vector_path::{path_point::PathPoint, VectorPath, DrawPathPoint}, Change, Document};
 use super::HOVER_RADIUS;
 
 struct EditMultiPointAction {
@@ -40,7 +40,7 @@ impl MultiSelect {
         for SelectionPiece { target, ref points } in &mut self.pieces {
             let mut path = target.write();
             for idx in points {
-                path.points[*idx].move_point(delta);
+                path.curve.points[*idx].move_point(delta);
             }
         }
     }
@@ -49,7 +49,7 @@ impl MultiSelect {
         self.pieces.iter()
             .any(|SelectionPiece { target, points }| {
                 let path = target.read();
-                points.iter().any(|&idx| path.points[idx].p.rec_distance_to(mouse_world_pos) <= HOVER_RADIUS)
+                points.iter().any(|&idx| path.curve.points[idx].p.rec_distance_to(mouse_world_pos) <= HOVER_RADIUS)
             })
     }
 
@@ -62,12 +62,12 @@ impl MultiSelect {
                     if let Some(selected) = selected {
                         for (is_point_selected, pp) in path.enumerate_selected_points(selected) {
                             let is_selected = is_point_selected || selection_rec.check_collision_point_rec(pp.p);
-                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false, shader_table);
+                            d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
                         }
                     } else {
-                        for pp in path.points.iter() {
+                        for pp in &path.curve.points {
                             let is_selected = selection_rec.check_collision_point_rec(pp.p);
-                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false, shader_table);
+                            d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
                         }
                     }
                 }
@@ -78,10 +78,10 @@ impl MultiSelect {
                 path.draw_selected(d, px_world_size);
                 let mut indices = piece.points.iter().copied();
                 let mut idx = indices.next();
-                for (pp_idx, pp) in path.points.iter().enumerate() {
+                for (pp_idx, pp) in path.curve.points.iter().enumerate() {
                     let is_selected = idx.is_some_and(|idx| pp_idx == idx);
                     if is_selected { idx = indices.next(); }
-                    pp.draw(d, px_world_size, path.settings.color, is_selected, false, false, shader_table);
+                    d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
                 }
             }
         }
@@ -143,7 +143,7 @@ impl<'a> EnumerateSelectedPoints<'a> for &'a VectorPath {
         let mut selected_iter = selection.points.iter().copied();
         let awaiting_match = selected_iter.next();
         PointSelection {
-            iter: self.points.iter().enumerate(),
+            iter: self.curve.points.iter().enumerate(),
             selected_iter,
             awaiting_match,
         }

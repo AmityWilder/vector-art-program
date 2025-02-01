@@ -1,4 +1,4 @@
-pub trait Stack<T>: FromIterator<T> {
+pub trait Stack<T> {
     fn new() -> Self;
     fn push(&mut self, value: T);
     fn pop(&mut self) -> Option<T>;

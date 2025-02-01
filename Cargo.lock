@@ -29,6 +29,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "amyvec"
+version = "0.1.0"
+dependencies = [
+ "amylib",
+ "amymath",
+ "raylib",
+]
+
+[[package]]
 name = "arrayvec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -598,6 +607,7 @@ version = "0.1.0"
 dependencies = [
  "amylib",
  "amymath",
+ "amyvec",
  "rand",
  "raylib",
 ]

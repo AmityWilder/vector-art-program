@@ -1,50 +1,43 @@
-use std::collections::LinkedList;
 use super::Stack;
 
-pub struct LinkedStack<T>(LinkedList<T>);
-
-impl<T> FromIterator<T> for LinkedStack<T> {
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        let mut list = LinkedList::new();
-        for item in iter {
-            list.push_front(item);
-        }
-        Self(list)
-    }
+struct Link<T> {
+    value: T,
+    next: Option<Box<Link<T>>>,
 }
+
+pub struct LinkedStack<T>(Option<Box<Link<T>>>);
 
 impl<T> LinkedStack<T> {
     pub const fn new() -> Self {
-        Self(LinkedList::new())
+        Self(None)
     }
 
-    #[inline]
     pub fn push(&mut self, value: T) {
-        self.0.push_front(value);
+        self.0 = Some(Box::new(Link { value, next: self.0.take() }));
     }
 
-    #[inline]
     pub fn pop(&mut self) -> Option<T> {
-        self.0.pop_front()
+        if let Some(curr) = self.0.take() {
+            let Link { value, next } = *curr;
+            self.0 = next;
+            return Some(value);
+        }
+        None
     }
 
-    #[inline]
     pub fn top(&mut self) -> Option<&T> {
-        self.0.front()
+        self.0.as_ref().map(|x| &x.value)
     }
-    #[inline]
     pub fn top_mut(&mut self) -> Option<&mut T> {
-        self.0.front_mut()
+        self.0.as_mut().map(|x| &mut x.value)
     }
 
-    #[inline]
     pub fn clear(&mut self) {
-        self.0.clear();
+        _ = self.0.take();
     }
 
-    #[inline]
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.0.is_none()
     }
 }
 

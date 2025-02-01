@@ -1,7 +1,7 @@
 use amymath::prelude::*;
 use raylib::prelude::*;
 use amylib::{collections::tree::*, iter::directed::*};
-use crate::{document::layer::Layer, layer::{BackToFore, ForeToBack, LayerType}, shaders::ShaderTable, vector_path::path_point::PPPart, Document};
+use crate::{document::layer::Layer, layer::{BackToFore, ForeToBack, LayerType}, shaders::ShaderTable, vector_path::{path_point::PPPart, DrawPathPoint}, Document};
 use super::ToolType;
 
 pub const HOVER_RADIUS: f32 = 3.0;
@@ -76,7 +76,7 @@ impl PointSelection {
             .cdir::<ForeToBack>()
             .find_map(|layer| {
                 if let Layer::Path(path) = layer {
-                    let idx = path.read().points.iter()
+                    let idx = path.read().curve.points.iter()
                         .position(|pp| pp.p.rec_distance_to(mouse_world_pos) <= HOVER_RADIUS);
                     if let Some(idx) = idx {
                         return Some((path, idx));
@@ -113,7 +113,7 @@ impl PointSelection {
                 .shallow_iter_mut()
                 .filter_map(|layer| {
                     if let Layer::Path(path) = layer {
-                        let points = path.read().points.iter()
+                        let points = path.read().curve.points.iter()
                             .enumerate()
                             .filter_map(|(idx, pp)|
                                 selection_rec.check_collision_point_rec(pp.p)
@@ -192,9 +192,9 @@ impl ToolType for PointSelection {
                     if let Layer::Path(path) = layer {
                         let path = path.read();
                         path.draw_selected(d, px_world_size);
-                        for pp in path.points.iter() {
+                        for pp in &path.curve.points {
                             let is_selected = selection_rec.is_some_and(|rec| rec.check_collision_point_rec(pp.p));
-                            pp.draw(d, px_world_size, path.settings.color, is_selected, false, false, shader_table);
+                            d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
                         }
                     }
                 }

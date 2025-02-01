@@ -6,6 +6,8 @@
 \usepackage{parskip}
 \usepackage{fancyhdr}
 \usepackage{tikz}
+\usepackage{txfonts}
+\usepackage{esvect}
 \pagestyle{fancy}
 
 \newtheorem{theorem}{Theorem}
@@ -32,35 +34,44 @@
 
 Given an ongoing, two-dimensional signal, we will create a cubic B\'ezier curve to approximate that signal while using the smallest reasonable number of control points.
 
-Our original signal will be \(s(t) = \langle s_x(t),s_y(t) \rangle\), and the pressure of that signal will be \(s_p(t)\).
-Assume \(\frac{\Delta s_p}{\Delta t}(t)\) is known.
+Our original signal will be \(s(t) = \langle s_x(t),s_y(t) \rangle\), and the ``pressure'' of that signal will be \(s_p(t)\).
+Let the change in pressure, \(\frac{\Delta s_p}{\Delta t}(t)\), be known. Let the array into which we place our control points be \(P(t) = [\dots]\).
 
-Requirements:
+Stipulations:
 \begin{itemize}
-    \item We must never add a point while \(s_p(t) = 0\).
-    \item We must always add a point while \(\frac{\Delta s_p}{\Delta t}(t) \ne 0\).
-    \item If \(s_p(t) \ne 0\), whether we add a point will depend on the criteria we are defining.
+    \item If \(s_p(t) = 0\) and \(\frac{\Delta s_p}{\Delta t}(t) = 0\), then \(P\) is immutable.
+    \item If \(s_p(t) \ne 0\) or \(\frac{\Delta s_p}{\Delta t}(t) \ne 0\), then \(P\) is mutable.
+    \item If \(\frac{\Delta s_p}{\Delta t}(t) \ne 0\), then \({P(t)}_{|P(t)|}\) must be exactly \(s(t)\), either through mutation or insertion.
 \end{itemize}
 
 \section*{Case 1: Point}
 
-Assume \(\frac{\Delta s_p}{\Delta t}(t - \Delta t) = 1\) and \(\frac{\Delta s_p}{\Delta t}(t) = -1\).
+The signal is a ``point'' if \(\frac{\Delta s_p}{\Delta t}(t - \Delta t) = 1\) and \(\frac{\Delta s_p}{\Delta t}(t) = -1\).
+For this case, we must insert the current signal.
+\begin{align*}
+    P(t) = P(t - \Delta t) \cup \begin{cases}
+        \left[s(t)\right] & \text{if } \frac{\Delta s_p}{\Delta t}(t - \Delta t) = 1 \bigwedge \frac{\Delta s_p}{\Delta t}(t) = -1 \\
+        \varnothing & \text{otherwise}
+    \end{cases}
+\end{align*}
 
-\section*{Case 2: Edge}
+\section*{Case 2: Point}
 
-\section*{Case 3: Corner}
+Assume \(|P(t)| \ge 2\).
+Let \(\vec{p_{-1}} = {P(t)_{|P(t)|}}\) and \(\vec{p_0} = s(t)\).
 
-\section*{Case 4: Angle}
+\section*{Case 3: Straight Edge}
 
-\section*{Case 5: Turn}
+Assume \(|P(t)| \ge 2\).
+Let \(\vec{p_{-1}} = {P(t)_{|P(t)|}}\) and \(\vec{p_0} = s(t)\).
+The signal is a ``straight edge'' if
 
-\section*{Case 6: Inflection}
+\section*{Case 4: Hard Corner}
 
-\begin{center}
-    \begin{tikzpicture}
-        \draw (0,0) circle[radius=2pt];
-        \draw (3,0) circle[radius=2pt];
-    \end{tikzpicture}
-\end{center}
+\section*{Case 5: Wide Angle}
+
+\section*{Case 6: Smooth Turn}
+
+\section*{Case 7: Inflection}
 
 \end{document}

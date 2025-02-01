@@ -1,5 +1,6 @@
 use std::{collections::VecDeque, fs::File, io::{self, BufRead, BufReader, BufWriter, Read, Write}, path::Path};
 use amymath::prelude::{IntRect2, Matrix2x2};
+use amyvec::curve::Curve;
 use raylib::prelude::*;
 use amylib::{io::*, rc::*};
 use crate::{
@@ -184,7 +185,7 @@ impl Document {
 
                 Layer::Path(path) => {
                     let path = &mut *path.write();
-                    writer.write_all(&[b'p', path.is_closed as u8])?; // todo: an entire byte for one bit? :c
+                    writer.write_all(&[b'p', path.curve.is_closed as u8])?; // todo: an entire byte for one bit? :c
 
                     writer.write_le(path.appearance.items.len())?;
                     for style_item in path.appearance.items.iter_mut() {
@@ -248,9 +249,9 @@ impl Document {
                         }
                     }
 
-                    writer.write_le(path.points.len())?;
+                    writer.write_le(path.curve.points.len())?;
                     writer.write_all(
-                        &path.points.make_contiguous().chunks(2)
+                        &path.curve.points.make_contiguous().chunks(2)
                             .map(|pair| {
                                 let mut byte = 0u8;
                                 debug_assert!(pair.len() <= 2);
@@ -282,7 +283,7 @@ impl Document {
                             .collect::<Box<[u8]>>()
                     )?;
 
-                    for pp in path.points.iter_mut() {
+                    for pp in path.curve.points.iter_mut() {
                         write_vector2(&mut writer, &pp.p)?;
                         if let Some(Ctrl1 { c1: (_, c1), c2 }) = pp.c.as_ref() {
                             write_vector2(&mut writer, c1)?;
@@ -502,9 +503,11 @@ impl Document {
 
                                 Layer::Path(StrongMut::new(VectorPath {
                                     settings,
-                                    points,
+                                    curve: Curve {
+                                        points,
+                                        is_closed,
+                                    },
                                     appearance: Appearance { items: style_items },
-                                    is_closed,
                                 }))
                             },
 

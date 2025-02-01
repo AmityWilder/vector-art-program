@@ -2,7 +2,7 @@ use std::{collections::VecDeque, fmt};
 use raylib::prelude::*;
 use amylib::rc::*;
 use amymath::prelude::*;
-use crate::{layer::LayerType, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath}, Change, Document};
+use crate::{layer::LayerType, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath, DrawPathPoint}, Change, Document};
 use super::{point_selection::SNAP_VERT_RADIUS_SQR, ToolType};
 
 struct BrushAction {
@@ -18,12 +18,12 @@ impl fmt::Debug for BrushAction {
 
 impl Change for BrushAction {
     fn redo(&mut self, _document: &mut Document) -> Result<(), String> {
-        self.target.write().points.clone_from(&self.stroke);
+        self.target.write().curve.points.clone_from(&self.stroke);
         Ok(())
     }
 
     fn undo(&mut self, _document: &mut Document) -> Result<(), String> {
-        self.target.write().points.clear();
+        self.target.write().curve.points.clear();
         Ok(())
     }
 }
@@ -58,6 +58,18 @@ const MIN_OPP_LENGTH_SQR: f32 = MIN_OPP_LENGTH * MIN_OPP_LENGTH;
 const MIN_OPP_LENGTH_SQR_CHANGE: f32 = 1.0;
 const IS_CURVATURE_SUPPORTED: bool = false;
 
+fn is_position_changed(last_changed: &Vector2, p: &Vector2) -> bool {
+    todo!()
+}
+
+fn is_direction_changed(last_straight: &Vector2, last_changed: &Vector2, p: &Vector2) -> bool {
+    todo!()
+}
+
+fn is_curvature_changed(last_curved: &Vector2, last_straight: &Vector2, last_changed: &Vector2, p: &Vector2) -> bool {
+    todo!()
+}
+
 impl ToolType for VectorBrush {
     fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) && matches!(self, Self::Inactive(_)) {
@@ -74,7 +86,7 @@ impl ToolType for VectorBrush {
                 trail.push(mouse_world_pos);
                 let mut path = target.write();
                 for _ in 0..2 {
-                    path.points.push_back(PathPoint { p: mouse_world_pos, c: None });
+                    path.curve.points.push_back(PathPoint { p: mouse_world_pos, c: None });
                 }
             }
 
@@ -124,17 +136,17 @@ impl ToolType for VectorBrush {
                 {
                     let mut path = target.write();
 
-                    if let Some(back) = path.points.back_mut() {
+                    if let Some(back) = path.curve.points.back_mut() {
                         back.p = new_pos;
                     }
-                    if let Some(idx) = path.points.len().checked_sub(3) {
-                        let (prev, curr, next) = (path.points[idx].p, path.points[idx + 1].p, path.points[idx + 2].p);
+                    if let Some(idx) = path.curve.points.len().checked_sub(3) {
+                        let (prev, curr, next) = (path.curve.points[idx].p, path.curve.points[idx + 1].p, path.curve.points[idx + 2].p);
                         let speed_in  = (curr - prev).length();
                         let speed_out = (next - curr).length();
                         let t_hat = (next - prev).normalized();
                         let c_out = curr + t_hat * speed_out / 3.0;
                         {
-                            let curr = &mut path.points[idx + 1].c;
+                            let curr = &mut path.curve.points[idx + 1].c;
                             *curr = Some(Ctrl1 {
                                 c1: (Ctrl::Out, c_out),
                                 c2: Some(Ctrl2::Mirror(speed_in / 3.0)),
@@ -142,10 +154,10 @@ impl ToolType for VectorBrush {
                         }
                     }
                     // join points confirmed to be no longer editing
-                    if let Some(idx) = path.points.len().checked_sub(4) {
-                        if path.points[idx].p.distance_sqr_to(path.points[idx + 1].p) < 0.001 {
-                            let b = path.points.remove(idx + 1).expect("checked sub should ensure element existence");
-                            let a = &mut path.points[idx];
+                    if let Some(idx) = path.curve.points.len().checked_sub(4) {
+                        if path.curve.points[idx].p.distance_sqr_to(path.curve.points[idx + 1].p) < 0.001 {
+                            let b = path.curve.points.remove(idx + 1).expect("checked sub should ensure element existence");
+                            let a = &mut path.curve.points[idx];
                             println!("merging points\n  {a:?}\n  {b:?}");
                             if let Some((c_a, c_b)) = a.c.as_mut().zip(b.c) {
                                 assert_eq!((c_a.c1.0, c_b.c1.0), (Ctrl::Out, Ctrl::Out), "brush should be producing Out ctrl only");
@@ -160,7 +172,7 @@ impl ToolType for VectorBrush {
                     let pos = last_failing.take().unwrap_or(new_pos);
                     trail.push(pos);
 
-                    target.write().points.push_back(PathPoint { p: new_pos, c: None });
+                    target.write().curve.points.push_back(PathPoint { p: new_pos, c: None });
                 } else if !is_too_close {
                     *last_failing = Some(new_pos);
                 }
@@ -178,10 +190,10 @@ impl ToolType for VectorBrush {
                     }
 
                     if let Some(p) = trail.last().copied() {
-                        path.points.push_back(PathPoint { p, c: None });
+                        path.curve.points.push_back(PathPoint { p, c: None });
                     }
 
-                    path.points.clone()
+                    path.curve.points.clone()
                 };
                 document.push_change(
                     Box::new(BrushAction {
@@ -200,8 +212,8 @@ impl ToolType for VectorBrush {
             let path = target.read();
             path.draw_selected(d, px_world_size);
             let color = path.settings.color;
-            for pp in &path.points {
-                pp.draw(d, px_world_size, color, false, true, true, shader_table);
+            for pp in &path.curve.points {
+                d.draw_path_point(pp, px_world_size, color, false, true, true);
             }
         }
     }

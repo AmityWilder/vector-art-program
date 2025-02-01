@@ -2,7 +2,7 @@ use std::fmt;
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{iter::directed::DirectibleDoubleEndedIterator, rc::*};
-use crate::{layer::{BackToFore, ForeToBack, Layer, LayerType}, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath}, Change, Document};
+use crate::{layer::{BackToFore, ForeToBack, Layer, LayerType}, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath, DrawPathPoint}, Change, Document};
 use super::{point_selection::HOVER_RADIUS_SQR, ToolType};
 
 struct AddPointAction {
@@ -22,8 +22,8 @@ impl Change for AddPointAction {
         let mut path = self.target.write();
         let pp = self.pp.clone();
         match self.side {
-            Ctrl::In  => path.points.push_front(pp),
-            Ctrl::Out => path.points.push_back (pp),
+            Ctrl::In  => path.curve.points.push_front(pp),
+            Ctrl::Out => path.curve.points.push_back (pp),
         }
         Ok(())
     }
@@ -31,8 +31,8 @@ impl Change for AddPointAction {
     fn undo(&mut self, _document: &mut Document) -> Result<(), String> {
         let mut path = self.target.write();
         match self.side {
-            Ctrl::In  => _ = path.points.pop_front(),
-            Ctrl::Out => _ = path.points.pop_back (),
+            Ctrl::In  => _ = path.curve.points.pop_front(),
+            Ctrl::Out => _ = path.curve.points.pop_back (),
         }
         Ok(())
     }
@@ -69,8 +69,8 @@ impl Pen {
             // find hovered endpoint
             if let Layer::Path(target) = layer {
                 let path = target.read();
-                if let Some(last_idx) = path.points.len().checked_sub(1) { // failure to subtract 1 implies an empty list
-                    let search_options = [(0, &path.points[0]), (last_idx, &path.points[last_idx])]; // heap allocations are yucky, ew. all my homies use stack arrays
+                if let Some(last_idx) = path.curve.points.len().checked_sub(1) { // failure to subtract 1 implies an empty list
+                    let search_options = [(0, &path.curve.points[0]), (last_idx, &path.curve.points[last_idx])]; // heap allocations are yucky, ew. all my homies use stack arrays
                     let search_in = if last_idx != 0 { &search_options } else { &search_options[..=0] }; // only check last if the first isn't the last
                     for (idx, pp) in search_in {
                         if pp.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR {
@@ -114,12 +114,12 @@ impl ToolType for Pen {
             if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
                 // already drawing
                 if let Some(opp_end) = match direction {
-                    Ctrl::In  => path.points.back(),
-                    Ctrl::Out => path.points.front(),
+                    Ctrl::In  => path.curve.points.back(),
+                    Ctrl::Out => path.curve.points.front(),
                 } {
                     // close path
                     if opp_end.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR {
-                        path.is_closed = true;
+                        path.curve.is_closed = true;
                         *is_dragging = true;
                     }
                 }
@@ -129,8 +129,8 @@ impl ToolType for Pen {
                 if *is_dragging {
                     // modifying an existing path point
                     let pp = &mut match direction {
-                        Ctrl::In  => path.points.front_mut(),
-                        Ctrl::Out => path.points.back_mut(),
+                        Ctrl::In  => path.curve.points.front_mut(),
+                        Ctrl::Out => path.curve.points.back_mut(),
                     }.expect("shouldn't have been able to select a path that had no points originally");
 
                     if let Some(Ctrl1 { c1: (c1_side, c1), c2 }) = pp.c.as_mut() {
@@ -152,11 +152,11 @@ impl ToolType for Pen {
                     };
                     match direction {
                         Ctrl::Out => {
-                            path.points.push_back(pp);
+                            path.curve.points.push_back(pp);
                             *is_dragging = true;
                         }
                         Ctrl::In => {
-                            path.points.push_front(pp);
+                            path.curve.points.push_front(pp);
                             *is_dragging = true;
                         }
                     }
@@ -165,10 +165,10 @@ impl ToolType for Pen {
 
             if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
                 *is_dragging = false;
-                let is_closed = path.is_closed;
+                let is_closed = path.curve.is_closed;
                 let pp = match direction {
-                    Ctrl::In  => path.points.front(),
-                    Ctrl::Out => path.points.back(),
+                    Ctrl::In  => path.curve.points.front(),
+                    Ctrl::Out => path.curve.points.back(),
                 }.cloned().expect("point should have been created to have been dragging it");
                 drop(path);
                 document.push_change(Box::new(AddPointAction {
@@ -194,20 +194,20 @@ impl ToolType for Pen {
                 if let Self::Active { direction, .. } = self {
                     match direction {
                         Ctrl::In => {
-                            let mut iter = path.points.iter();
+                            let mut iter = path.curve.points.iter();
                             if let Some(pp_latest) = iter.next() {
-                                pp_latest.draw(d, px_world_size, color, true, true, true, shader_table);
+                                d.draw_path_point(pp_latest, px_world_size, color, true, true, true);
                                 for pp in iter {
-                                    pp.draw(d, px_world_size, color, false, false, false, shader_table);
+                                    d.draw_path_point(pp, px_world_size, color, false, false, false);
                                 }
                             }
                         }
                         Ctrl::Out => {
-                            let mut iter = path.points.iter().rev();
+                            let mut iter = path.curve.points.iter().rev();
                             if let Some(pp_latest) = iter.next() {
-                                pp_latest.draw(d, px_world_size, color, true, true, true, shader_table);
+                                d.draw_path_point(pp_latest, px_world_size, color, true, true, true);
                                 for pp in iter {
-                                    pp.draw(d, px_world_size, color, false, false, false, shader_table);
+                                    d.draw_path_point(pp, px_world_size, color, false, false, false);
                                 }
                             }
                         }
@@ -220,15 +220,15 @@ impl ToolType for Pen {
                     if let Layer::Path(path) = layer {
                         let path = path.read();
                         let color = path.settings.color;
-                        if path.points.iter().any(|pp| pp.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR) {
+                        if path.curve.points.iter().any(|pp| pp.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR) {
                             path.draw_selected(d, px_world_size);
                         }
-                        if let Some(last_idx) = path.points.len().checked_sub(1) {
-                            let pp = &path.points[last_idx];
-                            pp.draw(d, px_world_size, color, false, false, false, shader_table);
-                            if path.points.len() > 1 {
-                                let pp = &path.points[0];
-                                pp.draw(d, px_world_size, color, false, false, false, shader_table);
+                        if let Some(last_idx) = path.curve.points.len().checked_sub(1) {
+                            let pp = &path.curve.points[last_idx];
+                            d.draw_path_point(pp, px_world_size, color, false, false, false);
+                            if path.curve.points.len() > 1 {
+                                let pp = &path.curve.points[0];
+                                d.draw_path_point(pp, px_world_size, color, false, false, false);
                             }
                         }
                     }
