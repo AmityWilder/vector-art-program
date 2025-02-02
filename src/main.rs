@@ -1,7 +1,86 @@
+#![feature(
+    let_chains,
+    if_let_guard,
+    vec_deque_iter_as_slices,
+    vec_pop_if,
+    can_vector,
+    associated_const_equality,
+    associated_type_defaults,
+    // specialization,
+    array_windows,
+    array_chunks,
+    array_repeat,
+    slice_as_array,
+    variant_count,
+    const_for,
+    const_trait_impl,
+    const_format_args,
+    inline_const_pat,
+    const_destruct,
+    // generic_const_items,
+    gen_blocks,
+    // generic_const_exprs,
+    generic_assert,
+    // guard_patterns,
+    pattern,
+    never_type,
+    // never_patterns,
+    // negative_bounds,
+    negative_impls,
+    trait_alias,
+    auto_traits,
+    marker_trait_attr,
+    try_with_capacity,
+    anonymous_lifetime_in_impl_trait,
+    fn_traits,
+    float_minimum_maximum,
+    more_float_constants,
+    sort_floats,
+    // const_closures,
+    non_zero_count_ones,
+    nonzero_ops,
+    optimize_attribute,
+    iter_advance_by,
+    iter_array_chunks,
+    iter_chain,
+    iter_intersperse,
+    iter_is_partitioned,
+    iter_collect_into,
+    iterator_try_collect,
+    iter_map_windows,
+    lazy_get,
+    lazy_cell_into_inner,
+    // lazy_type_alias,
+    sync_unsafe_cell,
+    sealed,
+    default_field_values,
+    deref_pure_trait,
+    maybe_uninit_array_assume_init,
+    maybe_uninit_slice,
+    maybe_uninit_fill,
+    maybe_uninit_write_slice,
+    maybe_uninit_as_bytes,
+    maybe_uninit_uninit_array,
+    trivial_bounds,
+    bound_as_ref,
+    box_patterns,
+    slice_pattern,
+    // deref_patterns,
+    exhaustive_patterns,
+    unwrap_infallible,
+    unsigned_is_multiple_of,
+    slice_take,
+    slice_as_chunks,
+    slice_range,
+    box_into_boxed_slice,
+    arbitrary_self_types,
+    arbitrary_self_types_pointers,
+)]
+
 use std::{path::Path, time::Instant};
 use amygui::{panel::Panel, rec::UIRect};
 use amylib::iter::directed::DirectibleDoubleEndedIterator;
-use amymath::prelude::Rect2;
+use amymath::prelude::*;
 use layer::{BackToFore, LayerType};
 use raylib::prelude::*;
 use serialize::render_png::DownscaleAlgorithm;
@@ -36,11 +115,11 @@ fn main() {
 
     let shader_table = ShaderTable::new(&mut rl, &thread).unwrap();
 
-    let mut window_rect = Rect2 {
-        xmin: 0.0,
-        ymin: 0.0,
-        xmax: rl.get_screen_width () as f32,
-        ymax: rl.get_screen_height() as f32,
+    let mut window_rect = IRect2 {
+        xmin: 0,
+        ymin: 0,
+        xmax: rl.get_screen_width (),
+        ymax: rl.get_screen_height(),
     };
 
     let mut document = Document::new();
@@ -58,12 +137,13 @@ fn main() {
         Panel::new(
             &window_rect,
             UIRect::init()
-                .from_right(0.0)
-                .with_width(256.0)
+                .from_right(0)
+                .with_width(256)
                 .build(),
             Color::new(24,24,24,255),
         ),
     );
+    layers_panel.panel.update_rec(&window_rect);
 
     const MIN_ZOOM_EXP: i32 = -3;
     #[allow(non_snake_case)]
@@ -113,10 +193,10 @@ fn main() {
                 rl.get_screen_width (),
                 rl.get_screen_height(),
             );
-            window_rect.xmax = width  as f32;
-            window_rect.ymax = height as f32;
+            window_rect.xmax = width;
+            window_rect.ymax = height;
             layers_panel.panel.update_rec(&window_rect);
-            println!("{:?}", layers_panel.panel.rec_cache);
+            println!("{:?}", layers_panel.panel.rect());
             trim_rtex = rl.load_render_texture(&thread, width as u32, height as u32).unwrap();
         }
 
@@ -159,7 +239,7 @@ fn main() {
             current_tool.switch_to_brush();
         }
 
-        if layers_panel.panel.is_overlapping_point(mouse_screen_pos) {
+        if layers_panel.panel.rect().is_overlapping_point(mouse_screen_pos.x as i32, mouse_screen_pos.y as i32) {
             layers_panel.tick(&mut rl, &mut document, mouse_screen_pos);
         } else {
             current_tool.tick(&mut rl, &mut document, mouse_world_pos);

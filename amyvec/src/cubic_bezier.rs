@@ -14,6 +14,7 @@ impl CubicBezier {
 }
 
 impl CubicBezier {
+    /// Calculate the position at time along the curve
     pub fn position_at(&self, t: f32) -> Vector2 {
         let coefs = (
             (1.0 - t).powi(3),
@@ -28,6 +29,7 @@ impl CubicBezier {
         }
     }
 
+    /// First-degree derivative at time along curve
     pub fn velocity_at(&self, t: f32) -> Vector2 {
         let coefs = (
             3.0*(1.0 - t).powi(2),
@@ -41,6 +43,7 @@ impl CubicBezier {
         }
     }
 
+    /// Second-degree derivative at time along curve
     pub fn acceleration_at(&self, t: f32) -> Vector2 {
         let coefs = (
             6.0*(1.0 - t),
@@ -53,6 +56,7 @@ impl CubicBezier {
         }
     }
 
+    /// Third-degree derivative at time along curve
     pub fn jerk(&self) -> Vector2 {
         let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
         Vector2 {
@@ -61,8 +65,9 @@ impl CubicBezier {
         }
     }
 
-    pub fn t_nearest_to(&self, p: Vector2) -> f32 {
-        let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
+    /// Time along curve closest to the position
+    pub fn _t_nearest_to(&self, _p: Vector2) -> f32 {
+        // let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
         // let a = Vector2 {
         //     x: p3.x + 3.0*(p1.x - p2.x) - p0.x,
         //     y: p3.y + 3.0*(p1.y - p2.y) - p0.y,

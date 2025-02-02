@@ -1,7 +1,7 @@
 use std::{fmt, path::PathBuf};
 use amygui::panel::Panel;
 use amylib::collections::VecDestack;
-use amymath::prelude::IntRect2;
+use amymath::prelude::*;
 use layer::{Layer, LayerTree};
 use crate::{raster::Raster, vector_path::VectorPath};
 use amylib::rc::*;
@@ -130,7 +130,7 @@ impl Document {
         let (x, y) = xy.unwrap_or_else(|| self.artboards.last().map_or((0, 0), |b| (b.rect.x + b.rect.width + 10, b.rect.y)));
         self.artboards.push(ArtBoard {
             name,
-            rect: IntRect2 { x, y, width, height },
+            rect: IntRectangle { x, y, width, height },
         });
     }
 
@@ -171,10 +171,10 @@ impl Document {
     pub fn draw_layer_tree(&self, d: &mut impl RaylibDraw, panel: &Panel) {
         const SLOT_COLOR: Color = Color::new(32,32,32,255);
         const TEXT_COLOR: Color = Color::new(200,200,200,255);
-        let panel_rec: Rectangle = panel.rec_cache.into();
-        let mut d = d.begin_scissor_mode(panel_rec.x as i32, panel_rec.y as i32, panel_rec.width as i32, panel_rec.height as i32);
-        d.draw_rectangle_rec(panel_rec, panel.background);
-        for (layer, recs) in self.ui_iter(panel.rec_cache, panel.rec_cache.ymin) {
+        let panel_rec = panel.rect();
+        let mut d = d.begin_scissor_mode_irect2(panel_rec);
+        d.draw_rectangle_irect2(panel_rec, panel.background);
+        for (layer, recs) in self.ui_iter(panel_rec, panel_rec.ymin) {
             let name = match layer {
                 Layer::Group(group) => &group.settings.name,
                 Layer::Path(path) => &path.read().settings.name,

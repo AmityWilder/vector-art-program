@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use raylib::prelude::*;
 use crate::{
     cubic_bezier::CubicBezier,
-    path_point::{Ctrl, PathPoint},
+    path_point::PathPoint,
 };
 
 pub struct Curve {

@@ -1,5 +1,5 @@
 [workspace]
-members = [ "amygui", "amylib", "amymath", "amyvec"]
+members = [ "amygui", "amylib", "amymath", "amyvec", "rltest"]
 
 [package]
 name = "vector-art-program"

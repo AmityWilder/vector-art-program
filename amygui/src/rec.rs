@@ -1,4 +1,4 @@
-use amymath::{rec::Rect2, Arithmetic};
+use amymath::prelude::IRect2;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Side {
@@ -22,27 +22,27 @@ impl Side {
 #[derive(Clone, Copy, Debug)]
 pub enum Align {
     /// Relative to container
-    Relative(f32),
+    Relative(i32),
     /// Position on screen
-    Absolute(f32),
+    Absolute(i32),
 }
 
 #[derive(Clone, Copy, Debug)]
 pub enum Axis {
     Position(Align, Align),
-    Distance(f32, Option<(Side, Align)>),
+    Distance(i32, Option<(Side, Align)>),
 }
 
 impl Axis {
-    pub fn to_range(&self, container: (f32, f32)) -> (f32, f32) {
+    pub fn to_range(&self, container: (i32, i32)) -> (i32, i32) {
         let (c_start, c_end) = container;
-        let calculate_start = |x: &Align| -> f32 {
+        let calculate_start = |x: &Align| -> i32 {
             match x {
                 Align::Relative(offset) => c_start + *offset,
                 Align::Absolute(start) => *start,
             }
         };
-        let calculate_end = |x: &Align| -> f32 {
+        let calculate_end = |x: &Align| -> i32 {
             match x {
                 Align::Relative(offset) => c_end - *offset,
                 Align::Absolute(end) => *end,
@@ -65,7 +65,7 @@ impl Axis {
                     }
                 },
                 None => {
-                    let (center, radius) = ((c_start + c_end).half(), len.half());
+                    let (center, radius) = ((c_start + c_end) / 2, len / 2);
                     (center - radius, center + radius)
                 }
             },
@@ -91,10 +91,10 @@ impl UIRect {
         }
     }
 
-    pub fn rect(&self, container: &Rect2) -> Rect2 {
+    pub fn rect(&self, container: &IRect2) -> IRect2 {
         let (xmin, xmax) = self.h.to_range((container.xmin, container.xmax));
         let (ymin, ymax) = self.v.to_range((container.ymin, container.ymax));
-        Rect2 { xmin, ymin, xmax, ymax }
+        IRect2 { xmin, ymin, xmax, ymax }
     }
 }
 
@@ -103,47 +103,47 @@ pub struct RectBuilder {
     bottom: Option<Align>,
     left:   Option<Align>,
     right:  Option<Align>,
-    width:  Option<f32>,
-    height: Option<f32>,
+    width:  Option<i32>,
+    height: Option<i32>,
 }
 
 impl RectBuilder {
-    pub const fn top_at(mut self, value: f32) -> Self {
+    pub const fn top_at(mut self, value: i32) -> Self {
         self.top = Some(Align::Absolute(value)); self
     }
-    pub const fn from_top(mut self, value: f32) -> Self {
+    pub const fn from_top(mut self, value: i32) -> Self {
         self.top = Some(Align::Relative(value)); self
     }
 
-    pub const fn bottom_at(mut self, value: f32) -> Self {
+    pub const fn bottom_at(mut self, value: i32) -> Self {
         self.bottom = Some(Align::Absolute(value)); self
     }
-    pub const fn from_bottom(mut self, value: f32) -> Self {
+    pub const fn from_bottom(mut self, value: i32) -> Self {
         self.bottom = Some(Align::Relative(value)); self
     }
 
-    pub const fn left_at(mut self, value: f32) -> Self {
+    pub const fn left_at(mut self, value: i32) -> Self {
         self.left = Some(Align::Absolute(value)); self
     }
-    pub const fn from_left(mut self, value: f32) -> Self {
+    pub const fn from_left(mut self, value: i32) -> Self {
         self.left = Some(Align::Relative(value)); self
     }
 
-    pub const fn right_at(mut self, value: f32) -> Self {
+    pub const fn right_at(mut self, value: i32) -> Self {
         self.right = Some(Align::Absolute(value)); self
     }
-    pub const fn from_right(mut self, value: f32) -> Self {
+    pub const fn from_right(mut self, value: i32) -> Self {
         self.right = Some(Align::Relative(value)); self
     }
 
-    pub const fn with_width(mut self, value: f32) -> Self {
+    pub const fn with_width(mut self, value: i32) -> Self {
         self.width = Some(value); self
     }
-    pub const fn with_height(mut self, value: f32) -> Self {
+    pub const fn with_height(mut self, value: i32) -> Self {
         self.height = Some(value); self
     }
 
-    const fn make_axis(start: Option<Align>, end: Option<Align>, size: Option<f32>) -> Axis {
+    const fn make_axis(start: Option<Align>, end: Option<Align>, size: Option<i32>) -> Axis {
         match size {
             Some(size) => Axis::Distance(size, match (start, end) {
                 (None, None) => None,
@@ -152,8 +152,8 @@ impl RectBuilder {
                 (Some(_), Some(_)) => panic!("invalid axis: start, end, and size should not all be defined at once"),
             }),
             None => Axis::Position(
-                if let Some(x) = start { x } else { Align::Relative(0.0) },
-                if let Some(x) = end   { x } else { Align::Relative(0.0) },
+                if let Some(x) = start { x } else { Align::Relative(0) },
+                if let Some(x) = end   { x } else { Align::Relative(0) },
             ),
         }
     }

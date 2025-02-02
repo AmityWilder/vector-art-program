@@ -1,12 +1,12 @@
-use amymath::prelude::IntRect2;
+use amymath::prelude::IntRectangle;
 
 pub struct ArtBoard {
     pub name: String,
-    pub rect: IntRect2,
+    pub rect: IntRectangle,
 }
 
 impl ArtBoard {
-    pub fn new(name: String, rect: IntRect2) -> Self {
+    pub fn new(name: String, rect: IntRectangle) -> Self {
         Self { name, rect }
     }
 }

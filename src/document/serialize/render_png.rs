@@ -1,5 +1,5 @@
 use std::{io, path::Path};
-use amymath::prelude::IntRect2;
+use amymath::prelude::IntRectangle;
 use raylib::prelude::*;
 use amylib::iter::directed::DirectibleDoubleEndedIterator;
 use crate::{document::Document, layer::{BackToFore, LayerType}};
@@ -106,13 +106,13 @@ impl Resize for Image {
                     std::slice::from_raw_parts(self.data.cast::<Color>(), old_data_len as usize)
                 };
 
-                let src_rec = IntRect2 {
+                let src_rec = IntRectangle {
                     x: 0,
                     y: 0,
                     width:  old_width,
                     height: old_height,
                 };
-                let dest_rec = IntRect2 {
+                let dest_rec = IntRectangle {
                     x: 0,
                     y: 0,
                     width:  new_width,
@@ -123,7 +123,7 @@ impl Resize for Image {
                     old_width  as f32 / new_width  as f32,
                     old_height as f32 / new_height as f32,
                 );
-                let sample_rec = IntRect2 {
+                let sample_rec = IntRectangle {
                     x: (ratio.x * -0.5).floor() as i32,
                     y: (ratio.y * -0.5).floor() as i32,
                     width:  (ratio.x).ceil() as i32,

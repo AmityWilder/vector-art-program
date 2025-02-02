@@ -76,16 +76,144 @@ impl From<Rect2> for ffi::Rectangle {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct IRect2 {
+    pub xmin: i32,
+    pub ymin: i32,
+    pub xmax: i32,
+    pub ymax: i32,
+}
+
+impl IRect2 {
+    pub fn is_overlapping_point(&self, x: i32, y: i32) -> bool {
+        self.xmin <= x && x < self.xmax &&
+        self.ymin <= y && y < self.ymax
+    }
+
+    pub fn is_overlapping(&self, rec: &Self) -> bool {
+        self.xmin < rec.xmax && rec.xmin < self.xmax &&
+        self.ymin < rec.ymax && rec.ymin < self.ymax
+    }
+
+    pub fn offset(&mut self, x: i32, y: i32) {
+        self.xmin += x;
+        self.ymin += y;
+        self.xmax += x;
+        self.ymax += y;
+    }
+
+    pub fn with_offset(&self, x: i32, y: i32) -> Self {
+        Self {
+            xmin: self.xmin + x,
+            ymin: self.ymin + y,
+            xmax: self.xmax + x,
+            ymax: self.ymax + y,
+        }
+    }
+
+    pub fn intersect(&self, other: &Self) -> Self {
+        Self {
+            xmin: self.xmin.max(other.xmin),
+            ymin: self.ymin.max(other.ymin),
+            xmax: self.xmax.min(other.xmax),
+            ymax: self.ymax.min(other.ymax),
+        }
+    }
+
+    #[inline]
+    pub fn width(&self) -> i32 {
+        self.xmax - self.xmin
+    }
+
+    #[inline]
+    pub fn height(&self) -> i32 {
+        self.ymax - self.ymin
+    }
+
+    /// Iterate over `x` coordinates
+    pub fn iter_x(&self) -> impl Iterator<Item = i32> {
+        self.xmin..=self.xmax
+    }
+
+    /// Iterate over `y` coordinates
+    pub fn iter_y(&self) -> impl Iterator<Item = i32> {
+        self.ymin..=self.ymax
+    }
+
+    /// Iterate over `x`,`y` coordinates by `for y { for x { ... } }`
+    pub fn iter_xy_row_col(&self) -> impl Iterator<Item = (i32, i32)> {
+        let (xmin, xmax) = (self.xmin, self.xmax);
+        (self.ymin..=(self.ymax))
+            .flat_map(move |y| (xmin..=xmax)
+                .map(move |x| (x, y)))
+    }
+
+    /// Iterate over `x`,`y` coordinates by `for x { for y { ... } }`
+    pub fn iter_xy_col_row(&self) -> impl Iterator<Item = (i32, i32)> {
+        let (ymin, ymax) = (self.ymin, self.ymax);
+        (self.xmin..=self.xmax)
+            .flat_map(move |x| (ymin..=ymax)
+                .map(move |y| (x, y)))
+    }
+}
+
+impl From<Rectangle> for IRect2 {
+    fn from(Rectangle { x, y, width, height }: Rectangle) -> Self {
+        Self {
+            xmin: x as i32,
+            ymin: y as i32,
+            xmax: (x + width) as i32,
+            ymax: (y + height) as i32,
+        }
+    }
+}
+
+impl From<IRect2> for Rectangle {
+    fn from(IRect2 { xmin, ymin, xmax, ymax }: IRect2) -> Self {
+        Self {
+            x: xmin as f32,
+            y: ymin as f32,
+            width:  xmax as f32 - xmin as f32,
+            height: ymax as f32 - ymin as f32,
+        }
+    }
+}
+
+impl From<IRect2> for ffi::Rectangle {
+    fn from(IRect2 { xmin, ymin, xmax, ymax }: IRect2) -> Self {
+        Self {
+            x: xmin as f32,
+            y: ymin as f32,
+            width:  xmax as f32 - xmin as f32,
+            height: ymax as f32 - ymin as f32,
+        }
+    }
+}
+
+pub trait RaylibIntRect2Ex: RaylibDraw {
+    #[inline]
+    fn begin_scissor_mode_irect2(&mut self, rect: &IRect2) -> RaylibScissorMode<Self> where Self: RaylibScissorModeExt {
+        <Self as RaylibScissorModeExt>::begin_scissor_mode(self, rect.xmin, rect.ymin, rect.width(), rect.height())
+    }
+
+    #[inline]
+    fn draw_rectangle_irect2(&mut self, rect: &IRect2, color: Color) {
+        <Self as RaylibDraw>::draw_rectangle(self, rect.xmin, rect.ymin, rect.width(), rect.height(), color);
+    }
+}
+
+impl<D: RaylibDraw> RaylibIntRect2Ex for D {}
+
 #[derive(Debug, Clone, Copy)]
-pub struct IntRect2 {
+pub struct IntRectangle {
     pub x: i32,
     pub y: i32,
     pub width: i32,
     pub height: i32,
 }
 
-impl From<IntRect2> for Rectangle {
-    fn from(value: IntRect2) -> Self {
+impl From<IntRectangle> for Rectangle {
+    fn from(value: IntRectangle) -> Self {
         Rectangle {
             x:      value.x      as f32,
             y:      value.y      as f32,
@@ -95,7 +223,7 @@ impl From<IntRect2> for Rectangle {
     }
 }
 
-impl IntRect2 {
+impl IntRectangle {
     pub fn offset(&mut self, x: i32, y: i32) {
         self.x += x;
         self.y += y;
@@ -211,8 +339,8 @@ impl IntRect2 {
     }
 }
 
-impl From<IntRect2> for ffi::Rectangle {
-    fn from(value: IntRect2) -> Self {
+impl From<IntRectangle> for ffi::Rectangle {
+    fn from(value: IntRectangle) -> Self {
         ffi::Rectangle {
             x:      value.x      as f32,
             y:      value.y      as f32,
@@ -221,3 +349,17 @@ impl From<IntRect2> for ffi::Rectangle {
         }
     }
 }
+
+pub trait RaylibIntRectangleEx: RaylibDraw {
+    #[inline]
+    fn begin_scissor_mode_irec(&mut self, rec: &IntRectangle) -> RaylibScissorMode<Self> where Self: RaylibScissorModeExt {
+        <Self as RaylibScissorModeExt>::begin_scissor_mode(self, rec.x, rec.y, rec.width, rec.height)
+    }
+
+    #[inline]
+    fn draw_rectangle_irec(&mut self, rec: &IntRectangle, color: Color) {
+        <Self as RaylibDraw>::draw_rectangle(self, rec.x, rec.y, rec.width, rec.height, color);
+    }
+}
+
+impl<D: RaylibDraw> RaylibIntRectangleEx for D {}

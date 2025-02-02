@@ -1,5 +1,5 @@
 use std::{collections::VecDeque, fs::File, io::{self, BufRead, BufReader, BufWriter, Read, Write}, path::Path};
-use amymath::prelude::{IntRect2, Matrix2x2};
+use amymath::prelude::{IntRectangle, Matrix2x2};
 use amyvec::curve::Curve;
 use raylib::prelude::*;
 use amylib::{io::*, rc::*};
@@ -49,11 +49,11 @@ fn read_color_rgba(reader: &mut BufReader<File>) -> io::Result<Color> {
     reader.read_le_arr().map(|[r, g, b, a]| Color { r, g, b, a })
 }
 
-fn write_irect2(writer: &mut BufWriter<File>, r: &IntRect2) -> io::Result<()> {
+fn write_irect2(writer: &mut BufWriter<File>, r: &IntRectangle) -> io::Result<()> {
     writer.write_le_arr([r.x, r.y, r.width, r.height])
 }
-fn read_irect2(reader: &mut BufReader<File>) -> io::Result<IntRect2> {
-    reader.read_le_arr().map(|[x, y, width, height]| IntRect2 { x, y, width, height  })
+fn read_irect2(reader: &mut BufReader<File>) -> io::Result<IntRectangle> {
+    reader.read_le_arr().map(|[x, y, width, height]| IntRectangle { x, y, width, height  })
 }
 
 fn write_vector2(writer: &mut BufWriter<File>, v: &Vector2) -> io::Result<()> {

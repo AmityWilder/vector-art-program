@@ -1,29 +1,29 @@
-use amymath::prelude::Rect2;
+use amymath::prelude::*;
 use crate::document::Document;
 use amylib::iter::directed::*;
 use super::{Layer, TopToBot};
 
-pub const INSET: f32 = 2.0;
-pub const GAP: f32 = 2.0;
-pub const INDENT: f32 = 6.0;
-pub const THUMBNAIL_SIZE: f32 = 32.0;
-pub const THUMBNAIL_INSET: f32 = 6.0;
-pub const LAYER_HEIGHT: f32 = 2.0 * THUMBNAIL_INSET + THUMBNAIL_SIZE;
-pub const LAYER_COLOR_WIDTH: f32 = 4.0;
-pub const TEXT_FONT_SIZE: f32 = 10.0;
-pub const EXPAND_COLLAPSE_SIZE: f32 = 10.0;
+pub const INSET: i32 = 2;
+pub const GAP: i32 = 2;
+pub const INDENT: i32 = 6;
+pub const THUMBNAIL_SIZE: i32 = 32;
+pub const THUMBNAIL_INSET: i32 = 6;
+pub const LAYER_HEIGHT: i32 = 2 * THUMBNAIL_INSET + THUMBNAIL_SIZE;
+pub const LAYER_COLOR_WIDTH: i32 = 4;
+pub const TEXT_FONT_SIZE: i32 = 10;
+pub const EXPAND_COLLAPSE_SIZE: i32 = 10;
 
 #[derive(Default)]
 pub struct LayerUI {
-    pub slot_rec: Rect2,
-    pub color_rec: Rect2,
-    pub thumbnail_rec: Rect2,
-    pub name_rec: Rect2,
-    pub expand_button_rec: Option<Rect2>,
+    pub slot_rec: IRect2,
+    pub color_rec: IRect2,
+    pub thumbnail_rec: IRect2,
+    pub name_rec: IRect2,
+    pub expand_button_rec: Option<IRect2>,
 }
 
 impl LayerUI {
-    pub fn generate(mut rec: Rect2, is_group: bool) -> Self {
+    pub fn generate(mut rec: IRect2, is_group: bool) -> Self {
         let width = rec.width();
         let slot_rec = rec;
         let color_rec = {
@@ -60,8 +60,8 @@ impl LayerUI {
 
 pub struct LayerUiIter<I> {
     tree_iter: I,
-    container: Rect2,
-    slot: Rect2,
+    container: IRect2,
+    slot: IRect2,
 }
 
 trait IsGroup {
@@ -95,7 +95,7 @@ impl<'a, L: IsGroup, I: Iterator<Item = (usize, L)>> Iterator for LayerUiIter<I>
                 self.slot.ymin = bottom;
                 continue; // sprint to first visible
             }
-            let indentation = depth as f32 * INDENT;
+            let indentation = depth as i32 * INDENT;
             self.slot.xmin = container.xmin + indentation;
             self.slot.xmax = container.xmax - indentation;
             if self.slot.is_overlapping(container) {
@@ -113,37 +113,36 @@ impl<'a, L: IsGroup, I: Iterator<Item = (usize, L)>> Iterator for LayerUiIter<I>
 
 impl Document {
     /// Iterate over each expanded layer panel item immutably, overlapping `container`, with the first item's y-value being `top`
-    pub fn ui_iter(&self, container: Rect2, top: f32) -> impl Iterator<Item = (&Layer, LayerUI)> {
-        let container = container.into();
+    pub fn ui_iter(&self, container: &IRect2, top: i32) -> impl Iterator<Item = (&Layer, LayerUI)> {
         LayerUiIter {
             tree_iter: self.layers
                 .dfs_iter(|group| group.is_expanded)
                 .enumerate_depth()
                 .cdir::<TopToBot>(),
-            container,
-            slot: Rect2 {
+            slot: IRect2 {
                 xmin: container.xmin,
                 ymin: top + INSET,
                 xmax: container.xmax,
                 ymax: top + INSET + LAYER_HEIGHT,
             },
+            container: *container,
         }
     }
 
     /// Iterate over each expanded layer panel item mutably, overlapping `container`, with the first item's y-value being `top`
-    pub fn ui_iter_mut(&mut self, container: Rect2, top: f32) -> impl Iterator<Item = (&mut Layer, LayerUI)> {
+    pub fn ui_iter_mut(&mut self, container: &IRect2, top: i32) -> impl Iterator<Item = (&mut Layer, LayerUI)> {
         LayerUiIter {
             tree_iter: self.layers
                 .dfs_iter_mut(|group| group.is_expanded)
                 .enumerate_depth()
                 .cdir::<TopToBot>(),
-            container,
-            slot: Rect2 {
+            slot: IRect2 {
                 xmin: container.xmin,
                 ymin: top + INSET,
                 xmax: container.xmax,
                 ymax: top + INSET + LAYER_HEIGHT,
             },
+            container: *container,
         }
     }
 }
