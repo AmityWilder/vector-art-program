@@ -26,24 +26,39 @@ impl Document {
         let artboard = self.artboards.get(artboard).ok_or_else(|| io::Error::other("invalid artboard index"))?.rect;
         let filename = path.as_ref().to_str().ok_or_else(|| io::Error::other("could not convert path to &str"))?;
 
+        let (artboard_width, artboard_height) = {
+            assert!(artboard.width.is_positive() && artboard.height.is_positive());
+            #[allow(clippy::cast_sign_loss, reason = "guarded by assertion `artboard.width.is_positive() && artboard.height.is_positive()`")]
+            (artboard.width as u32, artboard.height as u32)
+        };
+
+        let (artboard_x, artboard_y) = {
+            assert!(artboard.x.ilog2() < f32::MANTISSA_DIGITS && artboard.y.ilog2() < f32::MANTISSA_DIGITS);
+            #[allow(clippy::cast_precision_loss, reason = "guarded by assertion `artboard.x.ilog2() < f32::MANTISSA_DIGITS && artboard.y.ilog2() < f32::MANTISSA_DIGITS`")]
+            (artboard.x as f32, artboard.y as f32)
+        };
+
         let mut rtex = rl.load_render_texture(
-            &thread,
-            if is_supersampled { artboard.width  as u32 * SUPERSAMPLE_FACTOR } else { artboard.width  as u32 },
-            if is_supersampled { artboard.height as u32 * SUPERSAMPLE_FACTOR } else { artboard.height as u32 },
-        ).map_err(|e| io::Error::other(e))?;
+            thread,
+            if is_supersampled { artboard_width  * SUPERSAMPLE_FACTOR } else { artboard_width  },
+            if is_supersampled { artboard_height * SUPERSAMPLE_FACTOR } else { artboard_height },
+        ).map_err(io::Error::other)?;
 
         let camera = Camera2D {
             offset: Vector2::zero(),
-            target: Vector2::new(
-                artboard.x as f32,
-                artboard.y as f32,
-            ),
+            target: Vector2::new(artboard_x, artboard_y),
             rotation: 0.0,
-            zoom: if is_supersampled { SUPERSAMPLE_FACTOR as f32 } else { 1.0 },
+            zoom: if is_supersampled {
+                const _: () = assert!(SUPERSAMPLE_FACTOR.ilog2() < f32::MANTISSA_DIGITS); // proof
+                #[allow(clippy::cast_precision_loss, reason = "SUPERSAMPLE_FACTOR can be represented losslessly")]
+                (SUPERSAMPLE_FACTOR as f32)
+            } else {
+                1.0
+            },
         };
 
         {
-            let mut d = rl.begin_texture_mode(&thread, &mut rtex);
+            let mut d = rl.begin_texture_mode(thread, &mut rtex);
             d.clear_background(background);
             {
                 let mut d = d.begin_mode2D(camera);
@@ -53,7 +68,7 @@ impl Document {
             }
         }
 
-        let mut image = rtex.load_image().map_err(|e| io::Error::other(e))?;
+        let mut image = rtex.load_image().map_err(io::Error::other)?;
         if let Some(downscale_algo) = supersampling {
             fn l(x: f32, y: f32) -> f32 { lanczos(x, 1.0) * lanczos(y, 1.0) }
             match downscale_algo {
@@ -61,7 +76,7 @@ impl Document {
                 DownscaleAlgorithm::Bicubic => image.resize(artboard.width, artboard.height),
                 DownscaleAlgorithm::Lanczos => image.resize_custom(artboard.width, artboard.height, l),
             }
-        };
+        }
         image.flip_vertical();
         image.export_image(filename);
 
@@ -91,11 +106,16 @@ impl Resize for Image {
     fn resize_custom(&mut self, new_width: i32, new_height: i32, weight_fn: WeightFn) {
         let old_width = self.width;
         let old_height = self.height;
-        if self.data.is_null() || old_width == 0 || old_height == 0 { return; }
+        if self.data.is_null() || old_width <= 0 || old_height <= 0 { return; }
         if self.format == PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 as i32 {
-            let bytes_per_pixel = unsafe { ffi::GetPixelDataSize(1, 1, self.format) } as u32;
-            let old_data_len = old_width as u32 * old_height as u32 * bytes_per_pixel;
-            let new_data_len = new_width as u32 * new_height as u32 * bytes_per_pixel;
+            let bytes_per_pixel =
+                #[allow(clippy::cast_sign_loss, reason = "data should never take up a negative amount of space")]
+                (unsafe { ffi::GetPixelDataSize(1, 1, self.format) } as u32);
+            let (old_data_len, new_data_len) =
+                #[allow(clippy::cast_sign_loss, reason = "guarded by `if old_width <= 0 || old_height <= 0 { return; }`")] {(
+                    old_width as u32 * old_height as u32 * bytes_per_pixel,
+                    new_width as u32 * new_height as u32 * bytes_per_pixel,
+                )};
             let new_data = unsafe { ffi::MemAlloc(new_data_len) };
 
             if !new_data.is_null() {
@@ -119,16 +139,18 @@ impl Resize for Image {
                     height: new_height,
                 };
 
-                let ratio = Vector2::new(
-                    old_width  as f32 / new_width  as f32,
-                    old_height as f32 / new_height as f32,
+                let (ratio_x, ratio_y) = (
+                    f64::from(old_width ) / f64::from(new_width ),
+                    f64::from(old_height) / f64::from(new_height),
                 );
-                let sample_rec = IntRectangle {
-                    x: (ratio.x * -0.5).floor() as i32,
-                    y: (ratio.y * -0.5).floor() as i32,
-                    width:  (ratio.x).ceil() as i32,
-                    height: (ratio.y).ceil() as i32,
-                };
+                let sample_rec =
+                    #[allow(clippy::cast_possible_truncation, reason = "they're being floor'd and ceil'd")]
+                    IntRectangle {
+                        x: (ratio_x * -0.5).floor() as i32,
+                        y: (ratio_y * -0.5).floor() as i32,
+                        width:  (ratio_x).ceil() as i32,
+                        height: (ratio_y).ceil() as i32,
+                    };
                 // let weights: Box<[f32]> = sample_rec
                 //     .iter_uv_row_col()
                 //     .map(|(_, (u, v))| weight_fn(2.0 * (u - 0.5), 2.0 * (v - 0.5)))
@@ -164,8 +186,8 @@ impl Resize for Image {
 
             unsafe { ffi::MemFree(self.data) };
             self.data = new_data;
-            self.width = new_width as i32;
-            self.height = new_height as i32;
+            self.width = new_width;
+            self.height = new_height;
         } else {
             println!("unsupported pixel format, enjoy your oversized image");
         }

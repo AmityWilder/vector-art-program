@@ -2,7 +2,7 @@ use std::fmt;
 
 use raylib::prelude::*;
 use amymath::prelude::*;
-use amylib::rc::*;
+use amylib::rc::prelude::*;
 use crate::{document::layer::Layer, layer::LayerType, shaders::ShaderTable, vector_path::{path_point::PathPoint, VectorPath, DrawPathPoint}, Change, Document};
 use super::HOVER_RADIUS;
 
@@ -53,9 +53,9 @@ impl MultiSelect {
             })
     }
 
-    pub fn draw(&self, d: &mut impl RaylibDraw, document: &Document, px_world_size: f32, selection_rec: Option<Rectangle>, shader_table: &ShaderTable) {
+    pub fn draw(&self, d: &mut impl RaylibDraw, document: &Document, px_world_size: f32, selection_rec: Option<Rectangle>, _shader_table: &ShaderTable) {
         if let Some(selection_rec) = selection_rec {
-            for (selected, layer) in document.layers.shallow_iter().enumerate_selected_layers(&self) {
+            for (selected, layer) in document.layers.shallow_iter().enumerate_selected_layers(self) {
                 if let Layer::Path(path) = layer {
                     let path = path.read();
                     path.draw_selected(d, px_world_size);
@@ -156,15 +156,15 @@ pub struct PointSelection<'a, I> {
     awaiting_match: Option<usize>,
 }
 
-impl<'a, I: Iterator> Iterator for PointSelection<'a, I> {
+impl<I: Iterator> Iterator for PointSelection<'_, I> {
     type Item = (bool, I::Item);
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().and_then(|item| {
+        self.iter.next().map(|item| {
             let is_selected = self.awaiting_match.is_some_and(|selected_idx| item.0 == selected_idx);
             if is_selected {
                 self.awaiting_match = self.selected_iter.next();
             }
-            Some((is_selected, item.1))
+            (is_selected, item.1)
         })
     }
 }

@@ -2,7 +2,7 @@ use raylib::prelude::*;
 
 pub struct RaylibRlglLines<'a, D: ?Sized>(&'a mut D);
 
-impl<'a, D: ?Sized> Drop for RaylibRlglLines<'a, D> {
+impl<D: ?Sized> Drop for RaylibRlglLines<'_, D> {
     /// Finish vertex providing
     fn drop(&mut self) {
         unsafe { ffi::rlEnd(); }
@@ -11,7 +11,7 @@ impl<'a, D: ?Sized> Drop for RaylibRlglLines<'a, D> {
 
 pub struct RaylibRlglTriangless<'a, D: ?Sized>(&'a mut D);
 
-impl<'a, D: ?Sized> Drop for RaylibRlglTriangless<'a, D> {
+impl<D: ?Sized> Drop for RaylibRlglTriangless<'_, D> {
     /// Finish vertex providing
     fn drop(&mut self) {
         unsafe { ffi::rlEnd(); }
@@ -20,14 +20,14 @@ impl<'a, D: ?Sized> Drop for RaylibRlglTriangless<'a, D> {
 
 pub struct RaylibRlglQuads<'a, D: ?Sized>(&'a mut D);
 
-impl<'a, D: ?Sized> Drop for RaylibRlglQuads<'a, D> {
+impl<D: ?Sized> Drop for RaylibRlglQuads<'_, D> {
     /// Finish vertex providing
     fn drop(&mut self) {
         unsafe { ffi::rlEnd(); }
     }
 }
 
-impl<'a, D: ?Sized> RaylibRlglQuads<'a, D> {
+impl<D: ?Sized> RaylibRlglQuads<'_, D> {
     /// Define one vertex (texture coordinate) - 2 float
     /// NOTE: Texture coordinates are limited to QUADS only
     pub fn rl_tex_coord2f(&mut self, x: f32, y: f32) {
@@ -37,18 +37,27 @@ impl<'a, D: ?Sized> RaylibRlglQuads<'a, D> {
 
 pub trait RaylibRlglEx {
     /// Initialize drawing mode (how to organize vertex)
+    ///
+    /// # Safety
+    /// idk what to put here
     unsafe fn rl_begin_lines(&mut self) -> RaylibRlglLines<'_, Self> {
         unsafe { ffi::rlBegin(ffi::RL_LINES as i32); }
         RaylibRlglLines(self)
     }
 
     /// Initialize drawing mode (how to organize vertex)
+    ///
+    /// # Safety
+    /// idk what to put here
     unsafe fn rl_begin_triangles(&mut self) -> RaylibRlglTriangless<'_, Self> {
         unsafe { ffi::rlBegin(ffi::RL_TRIANGLES as i32); }
         RaylibRlglTriangless(self)
     }
 
     /// Initialize drawing mode (how to organize vertex)
+    ///
+    /// # Safety
+    /// idk what to put here
     unsafe fn rl_begin_quads(&mut self) -> RaylibRlglQuads<'_, Self> {
         unsafe { ffi::rlBegin(ffi::RL_QUADS as i32); }
         RaylibRlglQuads(self)
@@ -58,7 +67,7 @@ pub trait RaylibRlglEx {
 pub struct RlglMatrix<'a, D: ?Sized>(&'a mut D);
 
 impl<D: RaylibDraw> RaylibRlglEx for D {}
-impl<'a, D: ?Sized> RaylibRlglEx for RlglMatrix<'a, D> {}
+impl<D: ?Sized> RaylibRlglEx for RlglMatrix<'_, D> {}
 
 pub trait RaylibRlglDraw {
     /// Define one vertex (position) - 2 int
@@ -98,7 +107,7 @@ pub trait RaylibRlglDraw {
     }
 }
 
-impl<'a, D: ?Sized> RaylibRlglDraw for RaylibRlglLines<'a, D> {}
-impl<'a, D: ?Sized> RaylibRlglDraw for RaylibRlglTriangless<'a, D> {}
-impl<'a, D: ?Sized> RaylibRlglDraw for RaylibRlglQuads<'a, D> {}
-impl<'a, D: ?Sized> RaylibRlglDraw for RlglMatrix<'a, D> {}
+impl<D: ?Sized> RaylibRlglDraw for RaylibRlglLines<'_, D> {}
+impl<D: ?Sized> RaylibRlglDraw for RaylibRlglTriangless<'_, D> {}
+impl<D: ?Sized> RaylibRlglDraw for RaylibRlglQuads<'_, D> {}
+impl<D: ?Sized> RaylibRlglDraw for RlglMatrix<'_, D> {}

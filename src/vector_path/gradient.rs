@@ -1,5 +1,5 @@
 use amymath::prelude::*;
-use super::*;
+use raylib::prelude::*;
 
 pub struct Control {
     pub pos: u8,
@@ -18,7 +18,9 @@ impl Ramp {
     }
 
     pub fn color_at(&self, t: f32) -> Color {
-        let pos = u8::try_from((t * 255.0).floor() as isize).expect("t must be between 0 and 1");
+        let pos =
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation, reason = "value is both clamped and rounded")]
+            ((t.clamp(0.0, 1.0) * 255.0).round() as isize as u8);
         let mut lower: &Control = &self.colors[0];
         let mut upper: &Control = &self.colors[0];
         // todo: use binary search
@@ -30,7 +32,7 @@ impl Ramp {
                 upper = ctrl;
             }
         }
-        let t = (t - lower.pos as f32) / (upper.pos as f32 - lower.pos as f32); // normalize
+        let t = (t - f32::from(lower.pos)) / (f32::from(upper.pos) - f32::from(lower.pos)); // normalize
         lower.color.mix(upper.color, t)
     }
 }

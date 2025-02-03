@@ -1,5 +1,13 @@
 use std::{cell::{self, RefCell, RefMut}, fmt, rc::{self, Rc}};
 
+pub mod prelude {
+    pub use super::{
+        Owned, Unowned,
+        Strong, StrongMut,
+        Weak, WeakMut,
+    };
+}
+
 // --- Owned ---
 
 /// A strong, owning reference
@@ -10,7 +18,7 @@ pub trait Owned {
     type Cloned: Owned<Inner = Self::Inner>;
     fn read(&self) -> Self::Read<'_>;
     fn downgrade(&self) -> Self::Downgraded;
-    fn clone(&self) -> Self::Cloned;
+    fn clone_ref(&self) -> Self::Cloned;
 }
 
 /// An owned reference to an immutable `T`
@@ -48,7 +56,7 @@ impl<T: ?Sized> Strong<T> {
         Weak(Rc::downgrade(&self.0))
     }
 
-    pub fn clone(&self) -> Self {
+    pub fn clone_ref(&self) -> Self {
         Self(self.0.clone())
     }
 }
@@ -70,8 +78,8 @@ impl<T: ?Sized> Owned for Strong<T> {
     }
 
     #[inline]
-    fn clone(&self) -> Self::Cloned {
-        self.clone()
+    fn clone_ref(&self) -> Self::Cloned {
+        self.clone_ref()
     }
 }
 
@@ -136,7 +144,7 @@ impl<T: ?Sized> StrongMut<T> {
         WeakMut(Rc::downgrade(&self.0))
     }
 
-    pub fn clone(&self) -> Strong<T> {
+    pub fn clone_ref(&self) -> Strong<T> {
         Strong(self.0.clone())
     }
     pub fn clone_mut(&self) -> Self {
@@ -146,13 +154,13 @@ impl<T: ?Sized> StrongMut<T> {
 
 pub trait AsConst {
     type Output;
-    fn as_const(self) -> Self::Output;
+    fn as_const(&self) -> &Self::Output;
 }
 
-impl<'a, T: ?Sized> AsConst for &'a StrongMut<T> {
-    type Output = &'a Strong<T>;
+impl<T: ?Sized> AsConst for StrongMut<T> {
+    type Output = Strong<T>;
     /// Use a [`StrongMut`] as a [`Strong`]
-    fn as_const(self) -> Self::Output {
+    fn as_const(&self) -> &Self::Output {
         unsafe { &*(self as *const StrongMut<T> as *const Strong<T>) }
     }
 }
@@ -174,8 +182,8 @@ impl<T: ?Sized> Owned for StrongMut<T> {
     }
 
     #[inline]
-    fn clone(&self) -> Self::Cloned {
-        self.clone()
+    fn clone_ref(&self) -> Self::Cloned {
+        self.clone_ref()
     }
 }
 
@@ -206,7 +214,7 @@ pub trait Unowned {
     type Upgraded: Owned<Inner = Self::Inner>;
     type Cloned: Unowned<Inner = Self::Inner>;
     fn upgrade(&self) -> Option<Self::Upgraded>;
-    fn clone(&self) -> Self::Cloned;
+    fn clone_ref(&self) -> Self::Cloned;
 }
 
 /// An unowned reference to an immutable `T`
@@ -217,7 +225,7 @@ impl<T: ?Sized> Weak<T> {
         self.0.upgrade().map(|rc| Strong(rc))
     }
 
-    pub fn clone(&self) -> Self {
+    pub fn clone_ref(&self) -> Self {
         Self(self.0.clone())
     }
 }
@@ -234,8 +242,8 @@ impl<T: ?Sized> Unowned for Weak<T> {
     }
 
     #[inline]
-    fn clone(&self) -> Self::Cloned {
-        self.clone()
+    fn clone_ref(&self) -> Self::Cloned {
+        self.clone_ref()
     }
 }
 
@@ -253,7 +261,7 @@ impl<T: ?Sized> WeakMut<T> {
         self.0.upgrade().map(|rc| StrongMut(rc))
     }
 
-    pub fn clone(&self) -> Weak<T> {
+    pub fn clone_ref(&self) -> Weak<T> {
         Weak(self.0.clone())
     }
 
@@ -271,7 +279,7 @@ impl<T: ?Sized> Unowned for WeakMut<T> {
         self.upgrade()
     }
 
-    fn clone(&self) -> Self::Cloned {
-        self.clone()
+    fn clone_ref(&self) -> Self::Cloned {
+        self.clone_ref()
     }
 }

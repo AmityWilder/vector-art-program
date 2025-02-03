@@ -14,11 +14,11 @@ impl BasicSelection {
 }
 
 impl ToolType for BasicSelection {
-    fn tick(&mut self, rl: &mut RaylibHandle, document: &mut crate::Document, mouse_world_pos: Vector2) {
+    fn tick(&mut self, _rl: &mut RaylibHandle, _document: &mut crate::Document, _mouse_world_pos: Vector2) {
         todo!()
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &crate::Document, mouse_world_pos: Vector2, shader_table: &ShaderTable) {
+    fn draw(&self, _d: &mut impl RaylibDraw, _document: &crate::Document, _shader_table: &ShaderTable) {
         todo!()
     }
 }

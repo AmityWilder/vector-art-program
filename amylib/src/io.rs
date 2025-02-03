@@ -166,6 +166,7 @@ impl AsBytes for bool {
     }
 }
 
+#[allow(clippy::uninit_assumed_init)]
 pub trait ReadBytes: Read {
     /// Special cases:
     /// - [`usize`] reads as [`u64`] and gets converted using `as`
@@ -222,29 +223,30 @@ pub trait WriteBytes: Write {
 
 impl<W: Write> WriteBytes for W {}
 
+#[allow(clippy::uninit_assumed_init)]
 pub trait ReadArr: ReadBytes {
     fn read_le_arr<T: AsBytes, const N: usize>(&mut self) -> io::Result<[T; N]> {
-        let mut output: [T; N] = unsafe { MaybeUninit::uninit().assume_init() };
+        let mut output = MaybeUninit::uninit_array();
         for item in &mut output {
-            *item = self.read_le()?;
+            item.write(self.read_le()?);
         }
-        Ok(output)
+        Ok(unsafe { MaybeUninit::array_assume_init(output) })
     }
 
     fn read_be_arr<T: AsBytes, const N: usize>(&mut self) -> io::Result<[T; N]> {
-        let mut output: [T; N] = unsafe { MaybeUninit::uninit().assume_init() };
+        let mut output = MaybeUninit::uninit_array();
         for item in &mut output {
-            *item = self.read_le()?;
+            item.write(self.read_be()?);
         }
-        Ok(output)
+        Ok(unsafe { MaybeUninit::array_assume_init(output) })
     }
 
     fn read_ne_arr<T: AsBytes, const N: usize>(&mut self) -> io::Result<[T; N]> {
-        let mut output: [T; N] = unsafe { MaybeUninit::uninit().assume_init() };
+        let mut output = MaybeUninit::uninit_array();
         for item in &mut output {
-            *item = self.read_le()?;
+            item.write(self.read_ne()?);
         }
-        Ok(output)
+        Ok(unsafe { MaybeUninit::array_assume_init(output) })
     }
 }
 

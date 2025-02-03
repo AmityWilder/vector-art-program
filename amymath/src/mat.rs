@@ -65,7 +65,7 @@ impl std::ops::Add for Matrix2x2 {
 
 impl std::ops::AddAssign for Matrix2x2 {
     fn add_assign(&mut self, rhs: Self) {
-        *self = self.clone() - rhs;
+        *self = *self + rhs;
     }
 }
 
@@ -83,7 +83,7 @@ impl std::ops::Sub for Matrix2x2 {
 
 impl std::ops::SubAssign for Matrix2x2 {
     fn sub_assign(&mut self, rhs: Self) {
-        *self = self.clone() - rhs;
+        *self = *self - rhs;
     }
 }
 
@@ -101,7 +101,7 @@ impl std::ops::Mul for Matrix2x2 {
 
 impl std::ops::MulAssign for Matrix2x2 {
     fn mul_assign(&mut self, rhs: Self) {
-        *self = self.clone() * rhs;
+        *self = *self * rhs;
     }
 }
 

@@ -46,6 +46,12 @@ impl<T: Recursive> std::ops::IndexMut<usize> for Tree<T> {
     }
 }
 
+impl<T: Recursive> Default for Tree<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Recursive> Tree<T> {
     pub const fn new() -> Self {
         Self(Vec::new())
@@ -122,13 +128,13 @@ impl<T: Recursive> Tree<T> {
 
     /// Iterate over only the topmost layer
     #[inline]
-    pub fn shallow_iter<'a>(&'a self) -> std::slice::Iter<'a, T> {
+    pub fn shallow_iter(&self) -> std::slice::Iter<'_, T> {
         self.0.iter()
     }
 
     /// Iterate over only the topmost layer
     #[inline]
-    pub fn shallow_iter_mut<'a>(&'a mut self) -> std::slice::IterMut<'a, T> {
+    pub fn shallow_iter_mut(&mut self) -> std::slice::IterMut<'_, T> {
         self.0.iter_mut()
     }
 

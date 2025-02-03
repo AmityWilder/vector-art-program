@@ -49,7 +49,7 @@ pub trait ReversibleIterator: Iterator {
     }
 }
 
-impl<'a, I: ReversibleIterator + ?Sized> ReversibleIterator for &'a mut I {
+impl<I: ReversibleIterator + ?Sized> ReversibleIterator for &'_ mut I {
     fn prev(&mut self) -> Option<I::Item> {
         (**self).prev()
     }

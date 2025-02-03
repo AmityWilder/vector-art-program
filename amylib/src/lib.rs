@@ -1,3 +1,5 @@
+#![feature(maybe_uninit_uninit_array, maybe_uninit_array_assume_init)]
+
 pub mod collections;
 pub mod iter;
 pub mod io;

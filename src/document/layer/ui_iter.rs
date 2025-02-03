@@ -1,6 +1,6 @@
 use amymath::prelude::*;
 use crate::document::Document;
-use amylib::iter::directed::*;
+use amylib::iter::directed::DirectibleDoubleEndedIterator;
 use super::{Layer, TopToBot};
 
 pub const INSET: i32 = 2;
@@ -14,15 +14,20 @@ pub const TEXT_FONT_SIZE: i32 = 10;
 pub const EXPAND_COLLAPSE_SIZE: i32 = 10;
 
 #[derive(Default)]
-pub struct LayerUI {
-    pub slot_rec: IRect2,
-    pub color_rec: IRect2,
-    pub thumbnail_rec: IRect2,
-    pub name_rec: IRect2,
-    pub expand_button_rec: Option<IRect2>,
+pub struct LayerUIRecs {
+    /// The rectangle representing the entire layer slot
+    pub slot: IRect2,
+    /// The rectangle representing the layer color slice
+    pub color: IRect2,
+    /// The rectangle representing the layer thumbnail
+    pub thumbnail: IRect2,
+    /// The rectangle containing the layer name
+    pub name: IRect2,
+    /// The rectangle representing the expand/collapse button on groups
+    pub expand_button: Option<IRect2>,
 }
 
-impl LayerUI {
+impl LayerUIRecs {
     pub fn generate(mut rec: IRect2, is_group: bool) -> Self {
         let width = rec.width();
         let slot_rec = rec;
@@ -48,12 +53,12 @@ impl LayerUI {
             rec.ymax = rec.ymin + EXPAND_COLLAPSE_SIZE;
             rec
         });
-        LayerUI {
-            slot_rec,
-            color_rec,
-            thumbnail_rec,
-            name_rec,
-            expand_button_rec,
+        LayerUIRecs {
+            slot: slot_rec,
+            color: color_rec,
+            thumbnail: thumbnail_rec,
+            name: name_rec,
+            expand_button: expand_button_rec,
         }
     }
 }
@@ -80,12 +85,12 @@ impl IsGroup for &mut Layer {
     }
 }
 
-impl<'a, L: IsGroup, I: Iterator<Item = (usize, L)>> Iterator for LayerUiIter<I> {
-    type Item = (L, LayerUI);
+impl<L: IsGroup, I: Iterator<Item = (usize, L)>> Iterator for LayerUiIter<I> {
+    type Item = (L, LayerUIRecs);
 
     fn next(&mut self) -> Option<Self::Item> {
         let container = &self.container;
-        while let Some((depth, layer)) = self.tree_iter.next() {
+        for (depth, layer) in self.tree_iter.by_ref() {
             let ymin = self.slot.ymin;
             if ymin >= container.ymax {
                 return None; // no more are going to be visible
@@ -95,16 +100,16 @@ impl<'a, L: IsGroup, I: Iterator<Item = (usize, L)>> Iterator for LayerUiIter<I>
                 self.slot.ymin = bottom;
                 continue; // sprint to first visible
             }
-            let indentation = depth as i32 * INDENT;
+            let indentation =
+                #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation, reason = "guarded by `min(256)`")]
+                (depth.min(256) as i32) * INDENT;
             self.slot.xmin = container.xmin + indentation;
             self.slot.xmax = container.xmax - indentation;
-            if self.slot.is_overlapping(container) {
-                let is_group = layer.is_group();
-                let recs = LayerUI::generate(self.slot, is_group);
-                self.slot.ymin = bottom;
+            let recs = self.slot.is_overlapping(container)
+                .then(|| LayerUIRecs::generate(self.slot, layer.is_group()));
+            self.slot.ymin = bottom;
+            if let Some(recs) = recs {
                 return Some((layer, recs));
-            } else {
-                self.slot.ymin = bottom;
             }
         }
         None
@@ -113,7 +118,7 @@ impl<'a, L: IsGroup, I: Iterator<Item = (usize, L)>> Iterator for LayerUiIter<I>
 
 impl Document {
     /// Iterate over each expanded layer panel item immutably, overlapping `container`, with the first item's y-value being `top`
-    pub fn ui_iter(&self, container: &IRect2, top: i32) -> impl Iterator<Item = (&Layer, LayerUI)> {
+    pub fn ui_iter(&self, container: &IRect2, top: i32) -> impl Iterator<Item = (&Layer, LayerUIRecs)> {
         LayerUiIter {
             tree_iter: self.layers
                 .dfs_iter(|group| group.is_expanded)
@@ -130,7 +135,7 @@ impl Document {
     }
 
     /// Iterate over each expanded layer panel item mutably, overlapping `container`, with the first item's y-value being `top`
-    pub fn ui_iter_mut(&mut self, container: &IRect2, top: i32) -> impl Iterator<Item = (&mut Layer, LayerUI)> {
+    pub fn ui_iter_mut(&mut self, container: &IRect2, top: i32) -> impl Iterator<Item = (&mut Layer, LayerUIRecs)> {
         LayerUiIter {
             tree_iter: self.layers
                 .dfs_iter_mut(|group| group.is_expanded)

@@ -1,4 +1,4 @@
-use amylib::{collections::tree::*, iter::directed::*, rc::StrongMut};
+use amylib::{collections::tree::{Recursive, Tree}, iter::directed::{CForward, CReverse}, rc::StrongMut};
 use raylib::prelude::*;
 use crate::{appearance::Blending, raster::Raster, vector_path::VectorPath};
 
@@ -20,7 +20,6 @@ pub struct LayerSettings {
     /// Items move with layer
     pub is_group: bool,
     pub blend: Blending,
-    pub artwork_bounds: Rectangle,
 }
 
 impl LayerSettings {
@@ -32,7 +31,6 @@ impl LayerSettings {
             is_locked: false,
             is_group: false,
             blend: Blending::default(),
-            artwork_bounds: Rectangle::default(),
         }
     }
 }

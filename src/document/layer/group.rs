@@ -1,4 +1,3 @@
-use amylib::rc::*;
 use raylib::prelude::*;
 use super::{LayerSettings, LayerTree, LayerType};
 
@@ -9,7 +8,7 @@ pub struct Group {
 }
 
 impl Group {
-    pub fn new(settings: LayerSettings) -> Self {
+    pub const fn new(settings: LayerSettings) -> Self {
         Self {
             settings,
             items: LayerTree::new(),

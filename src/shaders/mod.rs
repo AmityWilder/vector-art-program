@@ -1,7 +1,13 @@
 use raylib::prelude::*;
 
 const UV_TEX_SIZE: i32 = 2;
-const SRC_REC: Rectangle = Rectangle::new(0.0, 0.0, UV_TEX_SIZE as f32, UV_TEX_SIZE as f32);
+const SRC_REC: Rectangle = {
+    const _: () = assert!(UV_TEX_SIZE.ilog2() < f32::MANTISSA_DIGITS); // proof
+    const UV_TEX_SIZE_F: f32 =
+        #[allow(clippy::cast_precision_loss, reason = "UV_TEX_SIZE can be represented losslessly")]
+        (UV_TEX_SIZE as f32);
+    Rectangle::new(0.0, 0.0, UV_TEX_SIZE_F, UV_TEX_SIZE_F)
+};
 
 pub struct ShaderTable {
     pub circle: Shader,

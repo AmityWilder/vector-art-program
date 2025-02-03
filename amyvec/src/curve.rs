@@ -10,6 +10,12 @@ pub struct Curve {
     pub is_closed: bool,
 }
 
+impl Default for Curve {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Curve {
     pub fn new() -> Self {
         Self {

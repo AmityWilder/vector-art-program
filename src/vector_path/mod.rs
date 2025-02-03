@@ -17,6 +17,8 @@ pub use amyvec::{
 use curve::Curve;
 use path_point::PathPoint;
 
+const FRAC_SQRT_3_2: f32 = std::f32::consts::SQRT_3 * 0.5;
+
 pub struct VectorPath {
     pub settings: LayerSettings,
     pub curve: Curve,
@@ -71,6 +73,12 @@ impl LayerType for VectorPath {
     }
 }
 
+const ANCHOR_EXTENT_INNER: f32 = 2.0;
+const ANCHOR_OUTLINE_THICK: f32 = 1.0;
+const ANCHOR_EXTENT_OUTER: f32 = ANCHOR_EXTENT_INNER + ANCHOR_OUTLINE_THICK;
+const ANCHOR_SIZE_INNER: f32 = ANCHOR_EXTENT_INNER * 2.0;
+const ANCHOR_SIZE_OUTER: f32 = ANCHOR_EXTENT_OUTER * 2.0;
+
 pub trait DrawPathPoint: RaylibDraw {
     fn draw_path_point(
         &mut self,
@@ -111,7 +119,6 @@ pub trait DrawPathPoint: RaylibDraw {
                         Ctrl2::Transformed(_) => {
                             self.draw_line_v(pp.p, c2, color.alpha(0.5));
                             let radius = 3.0 * px_world_size;
-                            const FRAC_SQRT_3_2: f32 = 0.86602540378;
                             self.draw_triangle(
                                 Vector2::new( FRAC_SQRT_3_2,  0.5) * radius,
                                 Vector2::new(-FRAC_SQRT_3_2,  0.5) * radius,
@@ -128,12 +135,6 @@ pub trait DrawPathPoint: RaylibDraw {
                 }
             }
         }
-
-        const ANCHOR_EXTENT_INNER: f32 = 2.0;
-        const ANCHOR_OUTLINE_THICK: f32 = 1.0;
-        const ANCHOR_EXTENT_OUTER: f32 = ANCHOR_EXTENT_INNER + ANCHOR_OUTLINE_THICK;
-        const ANCHOR_SIZE_INNER: f32 = ANCHOR_EXTENT_INNER * 2.0;
-        const ANCHOR_SIZE_OUTER: f32 = ANCHOR_EXTENT_OUTER * 2.0;
 
         // outline
         {

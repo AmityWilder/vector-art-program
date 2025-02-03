@@ -14,6 +14,12 @@ impl<T, V: Into<Vec<T>>> From<V> for VecStack<T> {
     }
 }
 
+impl<T> Default for VecStack<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> VecStack<T> {
     pub const fn new() -> Self {
         Self(Vec::new())

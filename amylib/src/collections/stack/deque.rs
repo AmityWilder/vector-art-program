@@ -25,6 +25,12 @@ impl<T> VecDestack<T> {
     }
 }
 
+impl<T> Default for VecDestack<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> VecDestack<T> {
     pub const fn new() -> Self {
         Self(VecDeque::new())

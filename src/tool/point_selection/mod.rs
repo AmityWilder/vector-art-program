@@ -1,20 +1,20 @@
 use amymath::prelude::*;
 use raylib::prelude::*;
-use amylib::{collections::tree::*, iter::directed::*};
+use amylib::iter::directed::DirectibleDoubleEndedIterator;
 use crate::{document::layer::Layer, layer::{BackToFore, ForeToBack, LayerType}, shaders::ShaderTable, vector_path::{path_point::PPPart, DrawPathPoint}, Document};
 use super::ToolType;
 
 pub const HOVER_RADIUS: f32 = 3.0;
 pub const HOVER_RADIUS_SQR: f32 = HOVER_RADIUS * HOVER_RADIUS;
 
-pub const SNAP_VERT_RADIUS: f32 = 3.0;
-pub const SNAP_VERT_RADIUS_SQR: f32 = SNAP_VERT_RADIUS * SNAP_VERT_RADIUS;
+// pub const SNAP_VERT_RADIUS: f32 = 3.0;
+// pub const SNAP_VERT_RADIUS_SQR: f32 = SNAP_VERT_RADIUS * SNAP_VERT_RADIUS;
 
 mod singular;
 mod multiple;
 
-use singular::*;
-use multiple::*;
+use singular::SingleSelect;
+use multiple::{MultiSelect, SelectionPiece};
 
 /// Pieces should be ordered by unique target layer [`TreeIterDir::BackToFore`]. Points should be ordered by index.
 enum Selection {
@@ -38,14 +38,14 @@ impl SelectionState {
 
 pub struct PointSelection {
     state: Option<SelectionState>,
-    selection_start: Option<Vector2>,
+    selection_points: Option<(Vector2, Vector2)>,
 }
 
 impl PointSelection {
     pub const fn new() -> Self {
         Self {
             state: None,
-            selection_start: None,
+            selection_points: None,
         }
     }
 
@@ -96,7 +96,7 @@ impl PointSelection {
             });
         } else {
             self.state = None;
-            self.selection_start = Some(mouse_world_pos);
+            self.selection_points = Some((mouse_world_pos, mouse_world_pos));
         }
     }
 
@@ -106,7 +106,7 @@ impl PointSelection {
         }
 
         // finalize selection
-        if let Some(selection_start) = self.selection_start.take() {
+        if let Some((selection_start, _)) = self.selection_points.take() {
             let selection_rec = selection_start.minmax_rec(mouse_world_pos);
 
             let selected = document.layers
@@ -150,12 +150,10 @@ impl ToolType for PointSelection {
             self.begin_dragging(document, mouse_world_pos);
         }
 
-        if let Some(state) = self.state.as_mut() {
-            if let Some((_drag_start, drag_cum)) = state.drag.as_mut() {
-                let delta = mouse_world_pos - *drag_cum;
-                *drag_cum += delta;
-                state.drag(delta);
-            }
+        if let Some(state) = self.state.as_mut() && let Some((_drag_start, drag_cum)) = state.drag.as_mut() {
+            let delta = mouse_world_pos - *drag_cum;
+            *drag_cum += delta;
+            state.drag(delta);
         }
 
         if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
@@ -163,11 +161,11 @@ impl ToolType for PointSelection {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, mouse_world_pos: Vector2, shader_table: &ShaderTable) {
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable) {
         let px_world_size = document.camera.zoom.recip();
 
-        let selection_rec = self.selection_start.as_ref().map(|&selection_start|
-            selection_start.minmax_rec(mouse_world_pos)
+        let selection_rec = self.selection_points.as_ref().copied().map(|(start, end)|
+            start.minmax_rec(end)
         );
 
         if let Some(selection_rec) = selection_rec.as_ref() {

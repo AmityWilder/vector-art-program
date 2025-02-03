@@ -2,6 +2,7 @@
 name = "amygui"
 version = "0.1.0"
 edition = "2021"
+channel = "nightly"
 
 [dependencies]
 raylib = "5.0.2"

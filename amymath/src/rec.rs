@@ -23,6 +23,17 @@ pub struct Rect2 {
     pub ymax: f32,
 }
 
+impl From<IRect2> for Rect2 {
+    fn from(IRect2 { xmin, ymin, xmax, ymax }: IRect2) -> Self {
+        Self {
+            xmin: xmin as f32,
+            ymin: ymin as f32,
+            xmax: xmax as f32,
+            ymax: ymax as f32,
+        }
+    }
+}
+
 impl Rect2 {
     pub fn is_overlapping_point(&self, point: Vector2) -> bool {
         self.xmin <= point.x && point.x < self.xmax &&
@@ -85,6 +96,11 @@ pub struct IRect2 {
 }
 
 impl IRect2 {
+    #[inline]
+    pub fn is_overlapping_v(&self, point: Vector2) -> bool {
+        self.is_overlapping_point(point.x.trunc() as i32, point.y.trunc() as i32)
+    }
+
     pub fn is_overlapping_point(&self, x: i32, y: i32) -> bool {
         self.xmin <= x && x < self.xmax &&
         self.ymin <= y && y < self.ymax

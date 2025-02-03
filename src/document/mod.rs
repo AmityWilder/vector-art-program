@@ -4,7 +4,7 @@ use amylib::collections::VecDestack;
 use amymath::prelude::*;
 use layer::{Layer, LayerTree};
 use crate::{raster::Raster, vector_path::VectorPath};
-use amylib::rc::*;
+use amylib::rc::prelude::*;
 use raylib::prelude::*;
 
 pub mod layer;
@@ -43,7 +43,6 @@ pub struct Document {
     pub camera: Camera2D,
     pub paper_color: Color,
     pub layers: LayerTree,
-    pub selection: Vec<WeakMut<Layer>>,
     pub artboards: Vec<ArtBoard>,
     pub active_artboard: Option<usize>,
 
@@ -84,7 +83,6 @@ impl Document {
             },
             paper_color: Color::GRAY,
             layers: LayerTree::new(),
-            selection: Vec::new(),
             artboards: Vec::new(),
             active_artboard: None,
 
@@ -181,35 +179,24 @@ impl Document {
                 Layer::Raster(raster) => &raster.read().settings.name,
             };
             let color = layer.settings().color;
-            d.draw_rectangle_rec(recs.slot_rec, SLOT_COLOR);
-            d.draw_rectangle_rec(recs.color_rec, color);
-            d.draw_rectangle_rec(recs.thumbnail_rec, Color::GRAY);
-            d.draw_text(name, recs.name_rec.xmin as i32, recs.name_rec.ymin as i32, 10, TEXT_COLOR);
+            d.draw_rectangle_rec(recs.slot, SLOT_COLOR);
+            d.draw_rectangle_rec(recs.color, color);
+            d.draw_rectangle_rec(recs.thumbnail, Color::GRAY);
+            d.draw_text(name, recs.name.xmin, recs.name.ymin, 10, TEXT_COLOR);
             // expand icon
             if let Layer::Group(Group { is_expanded, .. }) = layer {
-                let expand_button_rec = recs.expand_button_rec.expect("group should always have expand button");
-                let p0 = Vector2::new(expand_button_rec.xmin as f32, expand_button_rec.ymin as f32);
+                let expand_button_rec = recs.expand_button.expect("group should always have expand button");
+                let Rect2 { xmin, ymin, xmax, ymax } = expand_button_rec.into();
+                let p0 = Vector2::new(xmin, ymin);
                 let [p1, p2] = if *is_expanded {
                     [
-                        Vector2::new(
-                            expand_button_rec.xmin as f32 + 5.0,
-                            expand_button_rec.ymin as f32 + 6.0,
-                        ),
-                        Vector2::new(
-                            expand_button_rec.xmin as f32 + expand_button_rec.ymax as f32 - expand_button_rec.ymin as f32,
-                            expand_button_rec.ymin as f32,
-                        ),
+                        Vector2::new(xmin + 5.0, ymin + 6.0),
+                        Vector2::new(xmax, ymin),
                     ]
                 } else {
                     [
-                        Vector2::new(
-                            expand_button_rec.xmin as f32,
-                            expand_button_rec.ymax as f32,
-                        ),
-                        Vector2::new(
-                            expand_button_rec.xmin as f32 + 6.0,
-                            expand_button_rec.ymin as f32 + 5.0,
-                        ),
+                        Vector2::new(xmin, ymax),
+                        Vector2::new(xmin + 6.0, ymin + 5.0),
                     ]
                 };
                 d.draw_triangle(p0, p1, p2, TEXT_COLOR);

@@ -7,6 +7,12 @@ struct Link<T> {
 
 pub struct LinkedStack<T>(Option<Box<Link<T>>>);
 
+impl<T> Default for LinkedStack<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> LinkedStack<T> {
     pub const fn new() -> Self {
         Self(None)
