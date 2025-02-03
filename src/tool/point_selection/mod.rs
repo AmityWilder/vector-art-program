@@ -150,6 +150,10 @@ impl ToolType for PointSelection {
             self.begin_dragging(document, mouse_world_pos);
         }
 
+        if let Some((_, curr)) = self.selection_points.as_mut() {
+            *curr = mouse_world_pos;
+        }
+
         if let Some(state) = self.state.as_mut() && let Some((_drag_start, drag_cum)) = state.drag.as_mut() {
             let delta = mouse_world_pos - *drag_cum;
             *drag_cum += delta;
