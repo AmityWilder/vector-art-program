@@ -3,7 +3,7 @@ use amygui::panel::Panel;
 use amylib::collections::VecDestack;
 use amymath::prelude::*;
 use layer::{Layer, LayerTree};
-use crate::{raster::Raster, vector_path::VectorPath};
+use crate::{raster::{Raster, RasterTex}, vector_path::VectorPath};
 use amylib::rc::prelude::*;
 use raylib::prelude::*;
 
@@ -124,11 +124,17 @@ impl Document {
     }
 
     pub fn create_artboard(&mut self, name: Option<String>, xy: Option<(i32, i32)>, width: i32, height: i32) {
+        const AUTO_GAP: i32 = 10;
         let name = name.unwrap_or_else(|| self.auto_artboard_name());
-        let (x, y) = xy.unwrap_or_else(|| self.artboards.last().map_or((0, 0), |b| (b.rect.x + b.rect.width + 10, b.rect.y)));
+        let (xmin, ymin) = xy.unwrap_or_else(|| self.artboards.last().map_or((0, 0), |b| (b.rect.xmax + AUTO_GAP, b.rect.ymin)));
         self.artboards.push(ArtBoard {
             name,
-            rect: IntRectangle { x, y, width, height },
+            rect: IRect2 {
+                xmin,
+                ymin,
+                xmax: xmin + width,
+                ymax: ymin + height,
+            },
         });
     }
 
@@ -147,9 +153,9 @@ impl Document {
         }
     }
 
-    pub fn create_raster(&mut self, name: Option<String>, color: Option<Color>) -> &mut StrongMut<Raster> {
+    pub fn create_raster(&mut self, name: Option<String>, color: Option<Color>, texture: RasterTex) -> &mut StrongMut<Raster> {
         let settings = self.gen_layer_settings(name, color);
-        self.layers.push(Layer::Raster(StrongMut::new(Raster::new(settings))));
+        self.layers.push(Layer::Raster(StrongMut::new(Raster::new(settings, texture))));
         match self.layers.last_mut() {
             Some(Layer::Raster(raster)) => raster,
             _ => unreachable!("raster layer should exist when one is pushed"),

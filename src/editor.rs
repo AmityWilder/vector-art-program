@@ -1,6 +1,7 @@
 use std::{path::Path, time::Instant};
 
 use amylib::prelude::DirectibleDoubleEndedIterator;
+use amymath::prelude::{IRect2, MinMaxRectangle};
 use raylib::prelude::*;
 use crate::{document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, shaders::ShaderTable, tool::{Tool, ToolType}};
 
@@ -87,8 +88,8 @@ impl Editor {
         let mut document = Document::new();
         document.create_artboard(None, None, 512, 512);
         document.camera.target = Vector2::new(
-            0.5 * (document.artboards[0].rect.width  - screen_width ) as f32,
-            0.5 * (document.artboards[0].rect.height - screen_height) as f32,
+            0.5 * (document.artboards[0].rect.width () - screen_width ) as f32,
+            0.5 * (document.artboards[0].rect.height() - screen_height) as f32,
         );
         Self {
             document,
@@ -145,7 +146,7 @@ impl Editor {
         }
 
         if !is_mouse_event_handled {
-            self.current_tool.tick(rl, &mut self.document, mouse_world_pos);
+            self.current_tool.tick(rl, thread, &mut self.document, mouse_world_pos);
         }
 
         if (is_ctrl_down) && rl.is_key_pressed(KEY_Z) {
@@ -164,14 +165,11 @@ impl Editor {
         }
     }
 
-    pub fn draw_trimmed(&self, d: &mut RaylibDrawHandle<'_>, trim_rtex: &RenderTexture2D, window_rec: Rectangle) {
+    pub fn draw_trimmed(&self, d: &mut RaylibDrawHandle<'_>, trim_rtex: &RenderTexture2D, window_rec: &IRect2) {
         for board in &self.document.artboards {
-            let rect_world = Rectangle::from(board.rect);
-            if rect_world.check_collision_recs(&window_rec) {
-                let tl_world = Vector2::new(rect_world.x, rect_world.y);
-                let br_world = tl_world + Vector2::new(rect_world.width, rect_world.height);
-                let tl_screen = d.get_world_to_screen2D(tl_world, self.document.camera);
-                let br_screen = d.get_world_to_screen2D(br_world, self.document.camera);
+            let board_rec = &board.rect;
+            if board_rec.is_overlapping(window_rec) {
+                let (tl_screen, br_screen) = board.get_screen_tl_br(|v| d.get_world_to_screen2D(v, self.document.camera));
                 let rect_screen = Rectangle {
                     x: tl_screen.x,
                     y: tl_screen.y,
@@ -179,10 +177,10 @@ impl Editor {
                     height: br_screen.y - tl_screen.y,
                 };
                 let rect_screen_inv = Rectangle {
-                    x: tl_screen.x,
-                    y: -br_screen.y,
-                    width:  br_screen.x - tl_screen.x,
-                    height: tl_screen.y - br_screen.y,
+                    x:  rect_screen.x,
+                    y: -rect_screen.y,
+                    width:   rect_screen.width,
+                    height: -rect_screen.height,
                 };
                 d.draw_texture_pro(trim_rtex, rect_screen_inv, rect_screen, Vector2::zero(), 0.0, Color::WHITE);
             }
@@ -201,25 +199,13 @@ impl Editor {
 
     pub fn draw_foreground(&self, d: &mut RaylibDrawHandle<'_>, shader_table: &ShaderTable) {
         const FONT_SIZE: i32 = 10;
+        let zoom_inv = self.document.camera.zoom.recip();
         // Artboards foreground
         for board in &self.document.artboards {
-            let   left_world = board.rect.x as f32;
-            let    top_world = board.rect.y as f32;
-            let  right_world = (board.rect.x + board.rect.width ) as f32;
-            let bottom_world = (board.rect.y + board.rect.height) as f32;
-            let Vector2 { x:  left_screen, y:    top_screen } = d.get_world_to_screen2D(Vector2::new( left_world,    top_world), self.document.camera);
-            let Vector2 { x: right_screen, y: bottom_screen } = d.get_world_to_screen2D(Vector2::new(right_world, bottom_world), self.document.camera);
-            let (x, y) =
-                #[allow(clippy::cast_possible_truncation, reason = "yeah, that's what I'm counting on")]
-                (left_screen.trunc() as i32, top_screen.trunc() as i32);
-            d.draw_text(&board.name, x, y - FONT_SIZE, FONT_SIZE, Color::WHITE);
-            d.draw_line_strip(&[
-                Vector2::new( left_screen,    top_screen),
-                Vector2::new(right_screen,    top_screen),
-                Vector2::new(right_screen, bottom_screen),
-                Vector2::new( left_screen, bottom_screen),
-                Vector2::new( left_screen,    top_screen),
-            ], Color::BLACK);
+            let (tl, br) = board.get_screen_tl_br(|v| d.get_world_to_screen2D(v, self.document.camera));
+            let rec = tl.minmax_rec(br);
+            d.draw_text(&board.name, tl.x.floor() as i32, tl.y.floor() as i32 - FONT_SIZE, FONT_SIZE, Color::WHITE);
+            d.draw_rectangle_lines_ex(rec, zoom_inv, Color::BLACK);
         }
         let mut d = d.begin_mode2D(self.document.camera);
         self.current_tool.draw(&mut d, &self.document, &shader_table);

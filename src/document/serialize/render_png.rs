@@ -26,16 +26,17 @@ impl Document {
         let artboard = self.artboards.get(artboard).ok_or_else(|| io::Error::other("invalid artboard index"))?.rect;
         let filename = path.as_ref().to_str().ok_or_else(|| io::Error::other("could not convert path to &str"))?;
 
+        let (width, height) = (artboard.width(), artboard.height());
         let (artboard_width, artboard_height) = {
-            assert!(artboard.width.is_positive() && artboard.height.is_positive());
+            assert!(width.is_positive() && height.is_positive());
             #[allow(clippy::cast_sign_loss, reason = "guarded by assertion `artboard.width.is_positive() && artboard.height.is_positive()`")]
-            (artboard.width as u32, artboard.height as u32)
+            (width as u32, height as u32)
         };
 
         let (artboard_x, artboard_y) = {
-            assert!(artboard.x.ilog2() < f32::MANTISSA_DIGITS && artboard.y.ilog2() < f32::MANTISSA_DIGITS);
+            assert!(artboard.xmin.ilog2() < f32::MANTISSA_DIGITS && artboard.ymin.ilog2() < f32::MANTISSA_DIGITS);
             #[allow(clippy::cast_precision_loss, reason = "guarded by assertion `artboard.x.ilog2() < f32::MANTISSA_DIGITS && artboard.y.ilog2() < f32::MANTISSA_DIGITS`")]
-            (artboard.x as f32, artboard.y as f32)
+            (artboard.xmin as f32, artboard.ymin as f32)
         };
 
         let mut rtex = rl.load_render_texture(
@@ -72,9 +73,9 @@ impl Document {
         if let Some(downscale_algo) = supersampling {
             fn l(x: f32, y: f32) -> f32 { lanczos(x, 1.0) * lanczos(y, 1.0) }
             match downscale_algo {
-                DownscaleAlgorithm::Nearest => image.resize_nn(artboard.width, artboard.height),
-                DownscaleAlgorithm::Bicubic => image.resize(artboard.width, artboard.height),
-                DownscaleAlgorithm::Lanczos => image.resize_custom(artboard.width, artboard.height, l),
+                DownscaleAlgorithm::Nearest => image.resize_nn(width, height),
+                DownscaleAlgorithm::Bicubic => image.resize(width, height),
+                DownscaleAlgorithm::Lanczos => image.resize_custom(width, height, l),
             }
         }
         image.flip_vertical();

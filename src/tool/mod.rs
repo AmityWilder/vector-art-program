@@ -14,7 +14,7 @@ use self::{
 };
 
 pub trait ToolType {
-    fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2);
+    fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, document: &mut Document, mouse_world_pos: Vector2);
     fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable);
 }
 
@@ -55,12 +55,12 @@ impl Tool {
 }
 
 impl ToolType for Tool {
-    fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2) {
+    fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, document: &mut Document, mouse_world_pos: Vector2) {
         match self {
-            Tool::BasicSelection(tool) => tool.tick(rl, document, mouse_world_pos),
-            Tool::PointSelection(tool) => tool.tick(rl, document, mouse_world_pos),
-            Tool::Pen           (tool) => tool.tick(rl, document, mouse_world_pos),
-            Tool::Brush         (tool) => tool.tick(rl, document, mouse_world_pos),
+            Tool::BasicSelection(tool) => tool.tick(rl, thread, document, mouse_world_pos),
+            Tool::PointSelection(tool) => tool.tick(rl, thread, document, mouse_world_pos),
+            Tool::Pen           (tool) => tool.tick(rl, thread, document, mouse_world_pos),
+            Tool::Brush         (tool) => tool.tick(rl, thread, document, mouse_world_pos),
         }
     }
 

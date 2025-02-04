@@ -1,9 +1,10 @@
-#![feature(maybe_uninit_uninit_array, maybe_uninit_array_assume_init)]
+#![feature(maybe_uninit_uninit_array, maybe_uninit_array_assume_init, assert_matches)]
 
 pub mod collections;
 pub mod iter;
 pub mod io;
 pub mod ops;
+pub mod math;
 
 /// Wrappers for [`Rc<RefCell<T>>`] to enable finer tuning of mutability.
 ///
@@ -25,5 +26,6 @@ pub mod prelude {
         },
         io::*,
         rc::*,
+        math::*,
     };
 }

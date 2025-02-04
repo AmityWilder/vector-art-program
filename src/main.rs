@@ -88,6 +88,7 @@
 #[allow(clippy::enum_glob_use, reason = "every frickin one of these is prefixed with its type name >:T")]
 pub use {KeyboardKey::*, MouseButton::*};
 
+use amymath::prelude::IRect2;
 use raylib::prelude::*;
 use editor::Editor;
 use engine::Engine;
@@ -103,7 +104,6 @@ mod document;
 mod tool;
 mod ui;
 
-
 fn main() {
     let (mut rl, thread) = init()
         .title("Amity Vector Art")
@@ -115,17 +115,36 @@ fn main() {
     rl.set_window_state(WindowState::set_window_maximized(rl.get_window_state(), true));
     rl.set_target_fps(60);
 
-    let (window_width, window_height) = (rl.get_screen_width(), rl.get_screen_height());
-    assert!(window_width.is_positive() && window_height.is_positive());
-    let mut trim_rtex =
-        #[allow(clippy::cast_sign_loss, reason = "screen cannot have negative width/height")]
-        rl.load_render_texture(&thread, window_width as u32, window_height as u32).unwrap();
+    let mut window_rect = IRect2 {
+        xmin: 0,
+        ymin: 0,
+        xmax: rl.get_screen_width(),
+        ymax: rl.get_screen_height(),
+    };
+    let mut trim_rtex = {
+        assert!(window_rect.xmax.is_positive() && window_rect.ymax.is_positive());
+        #[allow(clippy::cast_sign_loss, reason = "screen should not have negative width/height")]
+        rl.load_render_texture(&thread, window_rect.xmax as u32, window_rect.ymax as u32).unwrap()
+    };
     let mut engine = Engine::new(&mut rl, &thread);
-    engine.create_editor(Editor::new(window_width, window_height));
+    engine.create_editor(Editor::new(window_rect.xmax, window_rect.ymax));
 
     while !rl.window_should_close() {
-        engine.tick(&mut rl, &thread, &mut trim_rtex);
-        let mut d = rl.begin_drawing(&thread);
-        engine.draw(&mut d, &thread, &mut trim_rtex);
+        let is_window_resized = rl.is_window_resized();
+        if is_window_resized {
+            (window_rect.xmax, window_rect.ymax) = (rl.get_screen_width(), rl.get_screen_height());
+
+            trim_rtex = {
+                assert!(window_rect.xmax.is_positive() && window_rect.ymax.is_positive());
+                #[allow(clippy::cast_sign_loss, reason = "guarded by `width.is_positive() && height.is_positive()` assertion")]
+                rl.load_render_texture(&thread, window_rect.xmax as u32, window_rect.ymax as u32).unwrap()
+            };
+        }
+
+        engine.tick(&mut rl, &thread, is_window_resized, &window_rect);
+        {
+            let mut d = rl.begin_drawing(&thread);
+            engine.draw(&mut d, &thread, &mut trim_rtex, &window_rect);
+        }
     }
 }

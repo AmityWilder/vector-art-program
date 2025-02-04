@@ -27,7 +27,6 @@ impl Config {
 
 pub struct Engine {
     pub config: Config,
-    pub window_rect: IRect2,
     pub is_trim_view: bool,
     shader_table: ShaderTable,
     layers_panel: LayersPanel,
@@ -58,7 +57,6 @@ impl Engine {
         );
         Self {
             config: Config::new(),
-            window_rect,
             shader_table: ShaderTable::new(rl, thread).unwrap(),
             is_trim_view: false,
             layers_panel,
@@ -85,25 +83,30 @@ impl Engine {
     }
 
     pub fn set_active_editor(&mut self, idx: Option<usize>) {
-        assert!(idx.is_none_or(|i| i < self.editors.len()));
+        assert!(idx.is_none_or(|i| i < self.editors.len()), "index out of bounds");
         self.active_editor = idx;
     }
 
-    pub fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, trim_rtex: &mut RenderTexture2D) {
+    pub fn get_active_editor(&self) -> Option<&Editor> {
+        if let Some(idx) = self.active_editor.as_ref().copied() {
+            assert!(idx < self.editors.len(), "active_editor should be a valid editor index");
+            Some(&self.editors[idx])
+        } else { None }
+    }
+
+    pub fn get_active_editor_mut(&mut self) -> Option<&mut Editor> {
+        if let Some(idx) = self.active_editor.as_ref().copied() {
+            assert!(idx < self.editors.len(), "active_editor should be a valid editor index");
+            Some(&mut self.editors[idx])
+        } else { None }
+    }
+
+    pub fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, is_window_resized: bool, window_rect: &IRect2) {
         let mouse_screen_pos = rl.get_mouse_position();
         let mouse_screen_delta = rl.get_mouse_delta();
 
-        if rl.is_window_resized() {
-            let (width, height) = (rl.get_screen_width(), rl.get_screen_height());
-            self.window_rect.xmax = width;
-            self.window_rect.ymax = height;
-            self.layers_panel.panel.update_rec(&self.window_rect);
-            println!("{:?}", self.layers_panel.panel.rect());
-
-            assert!(width.is_positive() && height.is_positive());
-            *trim_rtex =
-                #[allow(clippy::cast_sign_loss, reason = "guarded by `width.is_positive() && height.is_positive()` assertion")]
-                rl.load_render_texture(thread, width as u32, height as u32).unwrap();
+        if is_window_resized {
+            self.layers_panel.panel.update_rec(window_rect);
         }
 
         if rl.is_key_pressed(KEY_T) {
@@ -117,27 +120,32 @@ impl Engine {
             assert!(active_editor_idx < self.editors.len(), "`engine.active_editor` should be a valid editor index in `engine.editors`");
             self.editors[active_editor_idx].tick(&self.config, rl, thread, is_hovering_layers_panel, mouse_screen_pos, mouse_screen_delta);
             if is_hovering_layers_panel {
-                self.layers_panel.tick(rl, &mut self.editors[active_editor_idx].document, mouse_screen_pos);
+                let document = &mut self.editors[active_editor_idx].document;
+                self.layers_panel.tick(rl, document, mouse_screen_pos);
             }
         }
     }
 
-    pub fn draw(&self, d: &mut RaylibDrawHandle<'_>, thread: &RaylibThread, trim_rtex: &mut RenderTexture2D) {
+    pub fn draw(&self, d: &mut RaylibDrawHandle<'_>, thread: &RaylibThread, trim_rtex: &mut RenderTexture2D, window_rect: &IRect2) {
+        let editors = &self.editors;
+        let shader_table = &self.shader_table;
+
         d.clear_background(self.config.background_color);
-        for editor in self.editors.iter().filter(|e| e.is_visible) {
+        for editor in editors.iter().filter(|e| e.is_visible) {
             editor.draw_background(self, d);
 
             editor.draw_rendered(&mut d.begin_texture_mode(thread, trim_rtex));
 
             if self.is_trim_view {
-                editor.draw_trimmed(d, trim_rtex, self.window_rect.into());
+                editor.draw_trimmed(d, trim_rtex, window_rect);
             } else {
                 draw_artwork(d, trim_rtex);
             }
 
-            editor.draw_foreground(d, &self.shader_table);
+            editor.draw_foreground(d, shader_table);
         }
-        if let Some(active_editor_idx) = self.active_editor && let Some(active_editor) = self.editors.get(active_editor_idx) {
+
+        if let Some(active_editor) = self.get_active_editor() {
             self.layers_panel.draw(d, &active_editor.document);
         }
     }
