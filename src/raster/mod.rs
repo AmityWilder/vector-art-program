@@ -51,6 +51,7 @@ impl RasterTex {
         self.draw_tinted(d, Color::WHITE);
     }
 
+    #[inline]
     pub fn draw_tinted(&self, d: &mut impl RaylibDraw, tint: Color) {
         d.draw_texture_pro(&self.rtex, self.src_rec, self.dest_rec, self.origin, self.rotation, tint);
     }

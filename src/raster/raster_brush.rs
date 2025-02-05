@@ -28,6 +28,7 @@ pub struct RasterBrush {
     /// This is not a performance optimization.
     /// This is to hide the discrete nature of brush stroke ticks.
     buffer: RenderTexture2D,
+    pub shader: Option<Shader>,
     target: StrongMut<Raster>,
     mouse_prev: Option<Vector2>,
     mouse_curr: Vector2,
@@ -35,13 +36,30 @@ pub struct RasterBrush {
 }
 
 impl RasterBrush {
-    pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread, target: StrongMut<Raster>, stroke: Stroke) -> Result<Self, String> {
+    pub fn new(
+        rl: &mut RaylibHandle,
+        thread: &RaylibThread,
+        shader: Option<Shader>,
+        target: StrongMut<Raster>,
+        stroke: Stroke,
+    ) -> Result<Self, String> {
         let (width, height) = {
             let texture = &target.read().texture.rtex;
             (texture.width() as u32, texture.height() as u32)
         };
         let buffer = rl.load_render_texture(thread, width, height)?;
-        Ok(Self { buffer, target, mouse_curr: Vector2::default(), mouse_prev: None, stroke })
+        Ok(Self { buffer, shader, target, mouse_curr: Vector2::default(), mouse_prev: None, stroke })
+    }
+
+    fn draw_buffer(d: &mut impl RaylibDraw, buffer: &RenderTexture2D, shader: Option<&Shader>, src_rec: Rectangle, dest_rec: Rectangle, stroke: &Stroke) {
+        let mut d = d.begin_blend_mode(stroke.blend.mode);
+        if let Some(shader) = shader {
+            let mut d = d.begin_shader_mode(shader);
+            let mut d = d.begin_blend_mode(BlendMode::BLEND_ALPHA_PREMULTIPLY);
+            d.draw_texture_pro(buffer, src_rec, dest_rec, Vector2::zero(), 0.0, Color::WHITE.alpha(stroke.blend.opacity));
+        } else {
+            d.draw_texture_pro(buffer, src_rec, dest_rec, Vector2::zero(), 0.0, Color::WHITE.alpha(stroke.blend.opacity));
+        }
     }
 
     fn begin_stroke(&mut self, mut _rl: &mut RaylibHandle, _thread: &RaylibThread, mouse_world_pos: Vector2) {
@@ -50,7 +68,7 @@ impl RasterBrush {
 
     fn continue_stroke(&mut self, mut rl: &mut RaylibHandle, thread: &RaylibThread, mouse_world_pos: Vector2) {
         self.mouse_curr = mouse_world_pos;
-        let mouse_prev = self.mouse_prev.expect("should be set in begin_stroke");
+        let mouse_prev = self.mouse_prev.unwrap_or(mouse_world_pos);
         {
             let mut d = rl.begin_texture_mode(thread, &mut self.buffer);
 
@@ -93,10 +111,7 @@ impl RasterBrush {
         let (src_rec, dest_rec) = (raster.texture.src_rec, raster.texture.dest_rec);
         {
             let mut d = raster.texture.begin_texture_mode(&mut rl, thread);
-            {
-                let mut d = d.begin_blend_mode(self.stroke.blend.mode);
-                d.draw_texture_pro(&self.buffer, src_rec, dest_rec, Vector2::zero(), 0.0, Color::WHITE.alpha(self.stroke.blend.opacity));
-            }
+            Self::draw_buffer(&mut d, &self.buffer, self.shader.as_ref(), src_rec, dest_rec, &self.stroke);
         }
         {
             let mut d = rl.begin_texture_mode(thread, &mut self.buffer);
@@ -124,10 +139,7 @@ impl ToolType for RasterBrush {
         let inv_zoom = document.camera.zoom.recip();
         let raster = self.target.read();
         let (src_rec, dest_rec) = (raster.texture.src_rec.flipped(), raster.texture.dest_rec);
-        // dest_rec.y += dest_rec.height;
-        // dest_rec.height = -dest_rec.height;
-        // d.draw_rectangle_gradient_ex(dest_rec, Color::RED, Color::GREEN, Color::BLUE, Color::WHITE);
-        d.draw_texture_pro(&self.buffer, src_rec, dest_rec, Vector2::zero(), 0.0, Color::WHITE.alpha(self.stroke.blend.opacity));
+        Self::draw_buffer(d, &self.buffer, self.shader.as_ref(), src_rec, dest_rec, &self.stroke);
         d.draw_ring(self.mouse_curr, (self.stroke.thick - inv_zoom) * 0.5, (self.stroke.thick + inv_zoom) * 0.5, 0.0, 360.0, 72, Color::WHITE);
     }
 }

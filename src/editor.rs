@@ -144,9 +144,11 @@ impl Editor {
         } else if rl.is_key_pressed(KEY_B) {
             if is_shift_down {
                 let raster = RasterTex::new(rl, thread, 480, 480, Rectangle::new(0.0, 0.0, 480.0, 480.0)).unwrap();
+                let shader = rl.load_shader_from_memory(thread, None, Some(include_str!("shaders/blur.frag")));
                 self.current_tool.switch_to_raster_brush(
                     rl,
                     thread,
+                    Some(shader),
                     self.document.create_raster(None, None, raster),
                     raster_brush::Stroke {
                         blend: Blending::default(),

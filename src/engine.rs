@@ -163,7 +163,5 @@ fn draw_artwork(d: &mut RaylibDrawHandle<'_>, trim_rtex: &RenderTexture2D) {
         (width as f32, height as f32);
 
     let rect = Rectangle::new(0.0, 0.0, width, height);
-    let mut rect_inv = rect;
-    rect_inv.height = -rect_inv.height;
-    d.draw_texture_pro(trim_rtex, rect_inv, rect, Vector2::zero(), 0.0, Color::MAGENTA);
+    d.draw_texture_pro(trim_rtex, rect.flipped(), rect, Vector2::zero(), 0.0, Color::MAGENTA);
 }

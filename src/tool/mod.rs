@@ -55,9 +55,16 @@ impl Tool {
         *self = Self::VectorBrush(VectorBrush::new());
     }
 
-    pub fn switch_to_raster_brush(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, target: &StrongMut<Raster>, stroke: raster_brush::Stroke) -> Result<(), String> {
+    pub fn switch_to_raster_brush(
+        &mut self,
+        rl: &mut RaylibHandle,
+        thread: &RaylibThread,
+        shader: Option<Shader>,
+        target: &StrongMut<Raster>,
+        stroke: raster_brush::Stroke,
+    ) -> Result<(), String> {
         println!("switched to raster brush");
-        *self = Self::RasterBrush(RasterBrush::new(rl, thread, target.clone_mut(), stroke)?);
+        *self = Self::RasterBrush(RasterBrush::new(rl, thread, shader, target.clone_mut(), stroke)?);
         Ok(())
     }
 }
