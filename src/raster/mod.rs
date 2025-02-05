@@ -1,4 +1,4 @@
-use amymath::prelude::IRect2;
+use amymath::prelude::FlipRectangle;
 use raylib::prelude::*;
 use crate::layer::{LayerSettings, LayerType};
 
@@ -7,7 +7,7 @@ pub mod raster_brush;
 pub struct RasterTex {
     rtex: RenderTexture2D,
     /// Allows cropping
-    pub src_rec: IRect2,
+    pub src_rec: Rectangle,
     /// Allows stretching
     pub dest_rec: Rectangle,
     pub origin: Vector2,
@@ -16,12 +16,18 @@ pub struct RasterTex {
 
 impl RasterTex {
     #[inline]
-    pub fn new(d: &mut RaylibHandle, thread: &RaylibThread, width: u32, height: u32, dest_rec: Rectangle) -> Result<Self, String> {
-        Self::with_rotation(d, thread, width, height, dest_rec, Vector2::zero(), 0.0)
+    pub fn new(
+        rl: &mut RaylibHandle,
+        thread: &RaylibThread,
+        width: u32,
+        height: u32,
+        dest_rec: Rectangle,
+    ) -> Result<Self, String> {
+        Self::with_rotation(rl, thread, width, height, dest_rec, Vector2::zero(), 0.0)
     }
 
     pub fn with_rotation(
-        d: &mut RaylibHandle,
+        rl: &mut RaylibHandle,
         thread: &RaylibThread,
         width: u32,
         height: u32,
@@ -30,13 +36,8 @@ impl RasterTex {
         rotation: f32,
     ) -> Result<Self, String> {
         assert!(width < i32::MAX as u32 && height < i32::MAX as u32);
-        let rtex = d.load_render_texture(thread, width, height)?;
-        let src_rec = IRect2 {
-            xmin: 0,
-            ymin: 0,
-            xmax: width  as i32,
-            ymax: height as i32,
-        };
+        let rtex = rl.load_render_texture(thread, width, height)?;
+        let src_rec = Rectangle { x: 0.0, y: 0.0, width: width as f32, height: height as f32 };
         Ok(Self { rtex, src_rec, dest_rec, origin, rotation })
     }
 
@@ -51,13 +52,7 @@ impl RasterTex {
     }
 
     pub fn draw_tinted(&self, d: &mut impl RaylibDraw, tint: Color) {
-        let src = Rectangle {
-            x: self.src_rec.xmin as f32,
-            y: self.src_rec.ymin as f32,
-            width: self.src_rec.width() as f32,
-            height: self.src_rec.height() as f32,
-        };
-        d.draw_texture_pro(&self.rtex, src, self.dest_rec, self.origin, self.rotation, tint);
+        d.draw_texture_pro(&self.rtex, self.src_rec, self.dest_rec, self.origin, self.rotation, tint);
     }
 }
 

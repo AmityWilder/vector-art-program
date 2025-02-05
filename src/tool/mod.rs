@@ -1,5 +1,6 @@
+use amylib::prelude::StrongMut;
 use raylib::prelude::*;
-use crate::{shaders::ShaderTable, Document};
+use crate::{raster::{raster_brush::{self, RasterBrush}, Raster}, shaders::ShaderTable, Document};
 
 pub mod basic_selection;
 pub mod point_selection;
@@ -22,7 +23,8 @@ pub enum Tool {
     BasicSelection(BasicSelection),
     PointSelection(PointSelection),
     Pen(Pen),
-    Brush(VectorBrush),
+    VectorBrush(VectorBrush),
+    RasterBrush(RasterBrush),
 }
 
 impl Default for Tool {
@@ -48,9 +50,15 @@ impl Tool {
         *self = Self::Pen(Pen::new());
     }
 
-    pub fn switch_to_brush(&mut self) {
-        println!("switched to brush");
-        *self = Self::Brush(VectorBrush::new());
+    pub fn switch_to_vector_brush(&mut self) {
+        println!("switched to vector brush");
+        *self = Self::VectorBrush(VectorBrush::new());
+    }
+
+    pub fn switch_to_raster_brush(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, target: &StrongMut<Raster>, stroke: raster_brush::Stroke) -> Result<(), String> {
+        println!("switched to raster brush");
+        *self = Self::RasterBrush(RasterBrush::new(rl, thread, target.clone_mut(), stroke)?);
+        Ok(())
     }
 }
 
@@ -60,7 +68,8 @@ impl ToolType for Tool {
             Tool::BasicSelection(tool) => tool.tick(rl, thread, document, mouse_world_pos),
             Tool::PointSelection(tool) => tool.tick(rl, thread, document, mouse_world_pos),
             Tool::Pen           (tool) => tool.tick(rl, thread, document, mouse_world_pos),
-            Tool::Brush         (tool) => tool.tick(rl, thread, document, mouse_world_pos),
+            Tool::VectorBrush   (tool) => tool.tick(rl, thread, document, mouse_world_pos),
+            Tool::RasterBrush   (tool) => tool.tick(rl, thread, document, mouse_world_pos),
         }
     }
 
@@ -69,7 +78,8 @@ impl ToolType for Tool {
             Tool::BasicSelection(tool) => tool.draw(d, document, shader_table),
             Tool::PointSelection(tool) => tool.draw(d, document, shader_table),
             Tool::Pen           (tool) => tool.draw(d, document, shader_table),
-            Tool::Brush         (tool) => tool.draw(d, document, shader_table),
+            Tool::VectorBrush   (tool) => tool.draw(d, document, shader_table),
+            Tool::RasterBrush   (tool) => tool.draw(d, document, shader_table),
         }
     }
 }

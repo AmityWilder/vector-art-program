@@ -1,9 +1,9 @@
 use std::{path::Path, time::Instant};
 
 use amylib::prelude::DirectibleDoubleEndedIterator;
-use amymath::prelude::{IRect2, MinMaxRectangle};
+use amymath::prelude::{FlipRectangle, IRect2, MinMaxRectangle};
 use raylib::prelude::*;
-use crate::{document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, shaders::ShaderTable, tool::{Tool, ToolType}};
+use crate::{appearance::Blending, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, raster::{raster_brush, RasterTex}, shaders::ShaderTable, tool::{Tool, ToolType}};
 
 #[allow(clippy::enum_glob_use, reason = "every frickin one of these is prefixed with its type name >:T")]
 use {KeyboardKey::*, MouseButton::*};
@@ -138,11 +138,24 @@ impl Editor {
         }
 
         if rl.is_key_pressed(KEY_V) {
-            self.current_tool.switch_to_point_selection();
+            self.current_tool.switch_to_point_selection()
         } else if rl.is_key_pressed(KEY_P) {
-            self.current_tool.switch_to_pen();
+            self.current_tool.switch_to_pen()
         } else if rl.is_key_pressed(KEY_B) {
-            self.current_tool.switch_to_brush();
+            if is_shift_down {
+                let raster = RasterTex::new(rl, thread, 480, 480, Rectangle::new(0.0, 0.0, 480.0, 480.0)).unwrap();
+                self.current_tool.switch_to_raster_brush(
+                    rl,
+                    thread,
+                    self.document.create_raster(None, None, raster),
+                    raster_brush::Stroke {
+                        blend: Blending::default(),
+                        pattern: raster_brush::Pattern::Solid(Color::BLACK),
+                        thick: 10.0
+                    }).unwrap()
+            } else {
+                self.current_tool.switch_to_vector_brush()
+            }
         }
 
         if !is_mouse_event_handled {
@@ -170,18 +183,8 @@ impl Editor {
             let board_rec = &board.rect;
             if board_rec.is_overlapping(window_rec) {
                 let (tl_screen, br_screen) = board.get_screen_tl_br(|v| d.get_world_to_screen2D(v, self.document.camera));
-                let rect_screen = Rectangle {
-                    x: tl_screen.x,
-                    y: tl_screen.y,
-                    width:  br_screen.x - tl_screen.x,
-                    height: br_screen.y - tl_screen.y,
-                };
-                let rect_screen_inv = Rectangle {
-                    x:  rect_screen.x,
-                    y: -rect_screen.y,
-                    width:   rect_screen.width,
-                    height: -rect_screen.height,
-                };
+                let rect_screen = tl_screen.minmax_rec(br_screen);
+                let rect_screen_inv = rect_screen.flipped();
                 d.draw_texture_pro(trim_rtex, rect_screen_inv, rect_screen, Vector2::zero(), 0.0, Color::WHITE);
             }
         }
@@ -199,13 +202,17 @@ impl Editor {
 
     pub fn draw_foreground(&self, d: &mut RaylibDrawHandle<'_>, shader_table: &ShaderTable) {
         const FONT_SIZE: i32 = 10;
-        let zoom_inv = self.document.camera.zoom.recip();
         // Artboards foreground
         for board in &self.document.artboards {
             let (tl, br) = board.get_screen_tl_br(|v| d.get_world_to_screen2D(v, self.document.camera));
-            let rec = tl.minmax_rec(br);
             d.draw_text(&board.name, tl.x.floor() as i32, tl.y.floor() as i32 - FONT_SIZE, FONT_SIZE, Color::WHITE);
-            d.draw_rectangle_lines_ex(rec, zoom_inv, Color::BLACK);
+            d.draw_line_strip(&[
+                tl,
+                Vector2::new(tl.x, br.y),
+                br,
+                Vector2::new(br.x, tl.y),
+                tl,
+            ], Color::BLACK);
         }
         let mut d = d.begin_mode2D(self.document.camera);
         self.current_tool.draw(&mut d, &self.document, &shader_table);

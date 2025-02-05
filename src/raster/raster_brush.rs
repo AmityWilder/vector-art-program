@@ -1,5 +1,5 @@
 use amylib::{prelude::RoundToInt, rc::prelude::*};
-use amymath::prelude::DistanceSqr;
+use amymath::prelude::{DistanceSqr, FlipRectangle};
 use raylib::prelude::*;
 use crate::{appearance::Blending, document::Document, shaders::ShaderTable, tool::ToolType};
 use super::Raster;
@@ -35,13 +35,11 @@ pub struct RasterBrush {
 }
 
 impl RasterBrush {
-    fn new(rl: &mut RaylibHandle, thread: &RaylibThread, target: StrongMut<Raster>, stroke: Stroke) -> Result<Self, String> {
+    pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread, target: StrongMut<Raster>, stroke: Stroke) -> Result<Self, String> {
         let (width, height) = {
-            let src_rec = &target.read().texture.src_rec;
-            (src_rec.width(), src_rec.height())
+            let texture = &target.read().texture.rtex;
+            (texture.width() as u32, texture.height() as u32)
         };
-        assert!(width.is_positive() && height.is_positive(), "raster source should be positive");
-        let (width, height) = (width as u32, height as u32);
         let buffer = rl.load_render_texture(thread, width, height)?;
         Ok(Self { buffer, target, mouse_curr: Vector2::default(), mouse_prev: None, stroke })
     }
@@ -61,6 +59,9 @@ impl RasterBrush {
                     let color = if let Pattern::Solid(color) = &self.stroke.pattern { *color } else { Color::WHITE };
                     // todo: ew, low-poly
                     d.draw_line_ex(mouse_prev, self.mouse_curr, self.stroke.thick, color);
+                    d.draw_circle_v(mouse_prev, self.stroke.thick * 0.5, color);
+                    d.draw_circle_v(self.mouse_curr, self.stroke.thick * 0.5, color);
+                    self.mouse_prev = Some(self.mouse_curr);
                 }
 
                 Pattern::Image(interval, tex) => {
@@ -81,22 +82,20 @@ impl RasterBrush {
                         }
                     }
                     debug_assert!(pos.distance_sqr_to(self.mouse_curr) < interval, "should have placed a stamp at every interval");
+                    self.mouse_prev = Some(pos);
                 }
             }
         }
     }
 
     fn end_stroke(&mut self, mut rl: &mut RaylibHandle, thread: &RaylibThread, _mouse_world_pos: Vector2) {
-        let dest = {
-            let dest_rec = self.target.read().texture.src_rec;
-            Vector2::new(dest_rec.xmin as f32, dest_rec.ymin as f32)
-        };
         let mut raster = self.target.write();
+        let (src_rec, dest_rec) = (raster.texture.src_rec, raster.texture.dest_rec);
         {
             let mut d = raster.texture.begin_texture_mode(&mut rl, thread);
             {
                 let mut d = d.begin_blend_mode(self.stroke.blend.mode);
-                d.draw_texture_v(&self.buffer, dest, Color::WHITE.alpha(self.stroke.blend.opacity));
+                d.draw_texture_pro(&self.buffer, src_rec, dest_rec, Vector2::zero(), 0.0, Color::WHITE.alpha(self.stroke.blend.opacity));
             }
         }
         {
@@ -109,6 +108,7 @@ impl RasterBrush {
 
 impl ToolType for RasterBrush {
     fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, _document: &mut Document, mouse_world_pos: Vector2) {
+        self.mouse_curr = mouse_world_pos;
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             self.begin_stroke(rl, thread, mouse_world_pos);
         }
@@ -122,9 +122,12 @@ impl ToolType for RasterBrush {
 
     fn draw(&self, d: &mut impl RaylibDraw, document: &Document, _shader_table: &ShaderTable) {
         let inv_zoom = document.camera.zoom.recip();
-        {
-            let mut d = d.begin_blend_mode(BlendMode::BLEND_SUBTRACT_COLORS);
-            d.draw_ring(self.mouse_curr, self.stroke.thick - inv_zoom * 0.5, self.stroke.thick + inv_zoom * 0.5, 0.0, 360.0, 72, Color::WHITE);
-        }
+        let raster = self.target.read();
+        let (src_rec, dest_rec) = (raster.texture.src_rec.flipped(), raster.texture.dest_rec);
+        // dest_rec.y += dest_rec.height;
+        // dest_rec.height = -dest_rec.height;
+        // d.draw_rectangle_gradient_ex(dest_rec, Color::RED, Color::GREEN, Color::BLUE, Color::WHITE);
+        d.draw_texture_pro(&self.buffer, src_rec, dest_rec, Vector2::zero(), 0.0, Color::WHITE.alpha(self.stroke.blend.opacity));
+        d.draw_ring(self.mouse_curr, (self.stroke.thick - inv_zoom) * 0.5, (self.stroke.thick + inv_zoom) * 0.5, 0.0, 360.0, 72, Color::WHITE);
     }
 }

@@ -379,3 +379,19 @@ pub trait RaylibIntRectangleEx: RaylibDraw {
 }
 
 impl<D: RaylibDraw> RaylibIntRectangleEx for D {}
+
+pub trait FlipRectangle {
+    fn flipped(&self) -> Self;
+}
+
+impl FlipRectangle for Rectangle {
+    #[inline]
+    fn flipped(&self) -> Self {
+        Self {
+            x:  self.x,
+            y: -self.y,
+            width:  self.width,
+            height: -self.height,
+        }
+    }
+}
