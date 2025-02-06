@@ -10,15 +10,33 @@ impl<D: RaylibDraw> RaylibRlglExt for D {}
 
 pub struct RlglHandle<'a, D: ?Sized>(&'a mut D);
 
+pub struct RlglTexture<'a, D: ?Sized>(&'a mut D);
+
+impl<D: ?Sized> Drop for RlglTexture<'_, D> {
+    fn drop(&mut self) {
+        unsafe { ffi::rlSetTexture(0); }
+    }
+}
+
+impl<D: ?Sized> RlglTexture<'_, D> {
+    /// Initialize drawing mode (how to organize vertex)
+    pub fn rl_begin_quads(&mut self) -> RaylibRlglQuads<'_, Self> {
+        unsafe { ffi::rlBegin(ffi::RL_QUADS as i32); }
+        RaylibRlglQuads(self)
+    }
+}
+
 impl<D: ?Sized> RlglHandle<'_, D> {
     /// Set current texture to use
-    pub unsafe fn rl_set_texture(&mut self, texture: impl AsRef<ffi::Texture2D>) {
+    pub fn rl_set_texture(&mut self, texture: impl AsRef<ffi::Texture2D>) -> RlglTexture<'_, Self> {
         unsafe { ffi::rlSetTexture(texture.as_ref().id); }
+        RlglTexture(self)
     }
 
-    /// Set current texture to use
-    pub fn rl_clear_texture(&mut self) {
-        unsafe { ffi::rlSetTexture(0); }
+    /// Initialize drawing mode (how to organize vertex)
+    pub fn rl_begin_quads(&mut self) -> RaylibRlglQuads<'_, Self> {
+        unsafe { ffi::rlBegin(ffi::RL_QUADS as i32); }
+        RaylibRlglQuads(self)
     }
 
     /// Initialize drawing mode (how to organize vertex)
@@ -31,12 +49,6 @@ impl<D: ?Sized> RlglHandle<'_, D> {
     pub fn rl_begin_triangles(&mut self) -> RaylibRlglTriangles<'_, Self> {
         unsafe { ffi::rlBegin(ffi::RL_TRIANGLES as i32); }
         RaylibRlglTriangles(self)
-    }
-
-    /// Initialize drawing mode (how to organize vertex)
-    pub fn rl_begin_quads(&mut self) -> RaylibRlglQuads<'_, Self> {
-        unsafe { ffi::rlBegin(ffi::RL_QUADS as i32); }
-        RaylibRlglQuads(self)
     }
 }
 
@@ -133,21 +145,24 @@ mod tests {
                 }
                 rl.begin_drawing(Color::BLACK, |d| {
                     let mut d = d.begin_rlgl();
-                    unsafe { d.rl_set_texture(&texture); }
                     {
-                        let mut d = d.rl_begin_quads();
-                        d.rl_color4ub(255, 255, 255, 255);
-                        d.rl_normal3f(0.0, 0.0, 1.0);
-                        d.rl_tex_coord2f(0.0, 0.0);
-                        d.rl_vertex2f(0.0, 0.0);
-                        d.rl_tex_coord2f(0.0, 1.0);
-                        d.rl_vertex2f(0.0, 32.0);
-                        d.rl_tex_coord2f(1.0, 1.0);
-                        d.rl_vertex2f(32.0, 32.0);
-                        d.rl_tex_coord2f(1.0, 0.0);
-                        d.rl_vertex2f(32.0, 0.0);
+                        let mut d = d.rl_set_texture(&texture);
+                        {
+                            let mut d = d.rl_begin_quads();
+
+                            d.rl_color4ub(255, 255, 255, 255);
+                            d.rl_normal3f(0.0, 0.0, 1.0);
+
+                            d.rl_tex_coord2f(0.0, 0.0);
+                            d.rl_vertex2f(0.0, 0.0);
+                            d.rl_tex_coord2f(0.0, 1.0);
+                            d.rl_vertex2f(0.0, 32.0);
+                            d.rl_tex_coord2f(1.0, 1.0);
+                            d.rl_vertex2f(32.0, 32.0);
+                            d.rl_tex_coord2f(1.0, 0.0);
+                            d.rl_vertex2f(32.0, 0.0);
+                        }
                     }
-                    d.rl_clear_texture();
                 })
             })
         }).expect("rejected");
