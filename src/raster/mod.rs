@@ -1,4 +1,3 @@
-use amymath::prelude::FlipRectangle;
 use raylib::prelude::*;
 use crate::layer::{LayerSettings, LayerType};
 

@@ -1,7 +1,67 @@
 use raylib::prelude::*;
 
+pub trait RectangleCenter {
+    fn center(&self) -> Vector2;
+
+    fn extent(&self) -> Vector2;
+
+    #[inline]
+    fn center_and_extent(&self) -> (Vector2, Vector2) {
+        (self.center(), self.extent())
+    }
+}
+
+impl RectangleCenter for Rectangle {
+    fn center(&self) -> Vector2 {
+        Vector2 {
+            x: self.x + 0.5 * self.width,
+            y: self.y + 0.5 * self.height,
+        }
+    }
+
+    fn extent(&self) -> Vector2 {
+        Vector2 {
+            x: 0.5 * self.width,
+            y: 0.5 * self.height,
+        }
+    }
+}
+
+impl RectangleCenter for Rect2 {
+    fn center(&self) -> Vector2 {
+        Vector2 {
+            x: self.xmin.midpoint(self.xmax),
+            y: self.ymin.midpoint(self.ymax),
+        }
+    }
+
+    fn extent(&self) -> Vector2 {
+        Vector2 {
+            x: 0.5 * self.width (),
+            y: 0.5 * self.height(),
+        }
+    }
+}
+
+impl RectangleCenter for IRect2 {
+    fn center(&self) -> Vector2 {
+        Vector2 {
+            x: (self.xmin as f32).midpoint(self.xmax as f32),
+            y: (self.ymin as f32).midpoint(self.ymax as f32),
+        }
+    }
+
+    fn extent(&self) -> Vector2 {
+        Vector2 {
+            x: 0.5 * self.width () as f32,
+            y: 0.5 * self.height() as f32,
+        }
+    }
+}
+
 pub trait MinMaxRectangle {
     fn minmax_rec(&self, other: Self) -> Rectangle;
+    fn midpoint(&self, other: Self) -> Self;
 }
 
 impl MinMaxRectangle for Vector2 {
@@ -11,6 +71,13 @@ impl MinMaxRectangle for Vector2 {
             y: self.y.min(other.y),
             width:  (other.x - self.x).abs(),
             height: (other.y - self.y).abs(),
+        }
+    }
+
+    fn midpoint(&self, other: Self) -> Self {
+        Self {
+            x: self.x.midpoint(other.x),
+            y: self.y.midpoint(other.y),
         }
     }
 }

@@ -35,6 +35,7 @@ name = "amymath"
 version = "0.1.0"
 dependencies = [
  "raylib",
+ "rltest",
 ]
 
 [[package]]

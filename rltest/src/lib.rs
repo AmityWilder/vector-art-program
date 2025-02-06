@@ -49,6 +49,7 @@ pub enum RlTestFailure {
     Cancelled,
     FailedAssertion(String),
     FailedCustom(String),
+    FailedResourceLoad(String),
     Other(Box<dyn Error + 'static>),
 }
 
@@ -58,6 +59,7 @@ impl fmt::Display for RlTestFailure {
             Self::Cancelled => write!(f, "test cancelled manually"),
             Self::FailedAssertion(msg) => write!(f, "assertion failed: {msg}"),
             Self::FailedCustom(msg) => write!(f, "custom failed: {msg}"),
+            Self::FailedResourceLoad(msg) => write!(f, "failed to load resource: {msg}"),
             Self::Other(err) => write!(f, "other: {err}"),
         }
     }
@@ -71,6 +73,7 @@ impl Error for RlTestFailure {
             | Self::Cancelled
             | Self::FailedAssertion(_)
             | Self::FailedCustom(_)
+            | Self::FailedResourceLoad(_)
                 => None,
         }
     }
@@ -172,6 +175,16 @@ impl<'a> RaylibTestWrapper {
             }
         }
         Err(RlTestFailure::Cancelled)
+    }
+
+    pub fn load_texture(&mut self, filename: &str) -> std::result::Result<Texture2D, RlTestFailure> {
+        self.rl.load_texture(&self.thread, filename)
+            .map_err(|e| RlTestFailure::FailedCustom(e))
+    }
+
+    pub fn load_texture_from_image(&mut self, image: &Image) -> std::result::Result<Texture2D, RlTestFailure> {
+        self.rl.load_texture_from_image(&self.thread, image)
+            .map_err(|e| RlTestFailure::FailedCustom(e))
     }
 }
 

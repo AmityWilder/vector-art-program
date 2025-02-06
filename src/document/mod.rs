@@ -1,6 +1,5 @@
 use std::{fmt, path::PathBuf};
 use amygui::panel::Panel;
-use amylib::collections::VecDestack;
 use amymath::prelude::*;
 use layer::{Layer, LayerTree};
 use crate::{raster::{Raster, RasterTex}, vector_path::VectorPath};
@@ -45,10 +44,6 @@ pub struct Document {
     pub layers: LayerTree,
     pub artboards: Vec<ArtBoard>,
     pub active_artboard: Option<usize>,
-
-    history: VecDestack<Box<dyn Change>>,
-    future:  VecDestack<Box<dyn Change>>,
-
     layer_color_acc: usize,
     layer_name_acc: usize,
     artboard_name_acc: usize,
@@ -85,41 +80,9 @@ impl Document {
             layers: LayerTree::new(),
             artboards: Vec::new(),
             active_artboard: None,
-
-            history: VecDestack::with_capacity(128),
-            future:  VecDestack::with_capacity(128),
-
             layer_color_acc: 0,
             layer_name_acc: 0,
             artboard_name_acc: 0,
-        }
-    }
-
-    /// Apply a change that can be undone/redone and add it to the history
-    pub fn push_change(&mut self, change: Box<dyn Change>) {
-        self.future.clear();
-        self.history.push_no_resize(change);
-    }
-
-    pub fn undo(&mut self) -> Result<Option<()>, String> {
-        if let Some(mut change) = self.history.pop() {
-            println!("undo: {change:?}");
-            change.undo(self)?;
-            self.future.push_no_resize(change);
-            Ok(Some(()))
-        } else {
-            Ok(None)
-        }
-    }
-
-    pub fn redo(&mut self) -> Result<Option<()>, String> {
-        if let Some(mut change) = self.future.pop() {
-            println!("redo: {change:?}");
-            change.redo(self)?;
-            self.history.push_no_resize(change);
-            Ok(Some(()))
-        } else {
-            Ok(None)
         }
     }
 

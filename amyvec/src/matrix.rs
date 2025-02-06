@@ -1,4 +1,4 @@
-use std::simd::{f32x2, f32x4, usizex4, StdFloat};
+use std::simd::{f32x2, f32x4};
 use crate::vector::Vec2;
 
 #[derive(Debug, Clone, Copy)]

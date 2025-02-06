@@ -56,7 +56,7 @@ pub struct ActivePen {
 }
 
 impl ActivePen {
-    fn tick(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2) -> Option<InactivePen> {
+    fn tick(&mut self, rl: &mut RaylibHandle, _document: &mut Document, mouse_world_pos: Vector2) -> Option<InactivePen> {
         let mut path = self.target.write();
 
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
@@ -114,16 +114,18 @@ impl ActivePen {
         if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
             self.is_dragging = false;
             let is_closed = path.curve.is_closed;
-            let pp = match self.direction {
-                Ctrl::In  => path.curve.points.front(),
-                Ctrl::Out => path.curve.points.back(),
-            }.copied().expect("point should have been created to have been dragging it");
-            drop(path);
-            document.push_change(Box::new(AddPointAction {
-                target: self.target.clone_mut(),
-                side: self.direction,
-                pp,
-            }));
+            // todo: rework undo/redo
+
+            // let pp = match self.direction {
+            //     Ctrl::In  => path.curve.points.front(),
+            //     Ctrl::Out => path.curve.points.back(),
+            // }.copied().expect("point should have been created to have been dragging it");
+
+            // document.push_change(Box::new(AddPointAction {
+            //     target: self.target.clone_mut(),
+            //     side: self.direction,
+            //     pp,
+            // }));
             if is_closed {
                 return Some(InactivePen(None));
             }

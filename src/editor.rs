@@ -1,9 +1,9 @@
-use std::{path::Path, time::Instant};
+use std::{collections::VecDeque, path::Path, time::Instant};
 
 use amylib::prelude::DirectibleDoubleEndedIterator;
 use amymath::prelude::{FlipRectangle, IRect2, MinMaxRectangle};
 use raylib::prelude::*;
-use crate::{appearance::Blending, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, raster::{raster_brush, RasterTex}, shaders::ShaderTable, tool::{Tool, ToolType}};
+use crate::{appearance::Blending, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Change, Document}, engine::{Config, Engine}, raster::{raster_brush, RasterTex}, shaders::ShaderTable, tool::{Tool, ToolType}};
 
 #[allow(clippy::enum_glob_use, reason = "every frickin one of these is prefixed with its type name >:T")]
 use {KeyboardKey::*, MouseButton::*};
@@ -74,8 +74,49 @@ const fn serialization_key(key: Option<KeyboardKey>) -> Option<SerializationKind
     }
 }
 
+struct EditHistory {
+    changes: VecDeque<Box<dyn Change>>,
+    present: usize,
+}
+
+impl EditHistory {
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            changes: VecDeque::with_capacity(capacity),
+            present: 0,
+        }
+    }
+
+    /// Apply a change that can be undone/redone and add it to the history
+    pub fn push_change(&mut self, change: Box<dyn Change>) {
+        for _ in 0..self.present {
+            self.changes.pop_front();
+        }
+        self.present = 0;
+        if self.changes.len() == self.changes.capacity() {
+            self.changes.pop_back();
+        }
+        self.changes.push_front(change);
+    }
+
+    pub fn prev(&mut self) -> Option<&mut Box<dyn Change>> {
+        let change = self.changes.get_mut(self.present);
+        if change.is_some() { self.present += 1; }
+        change
+    }
+
+    pub fn next(&mut self) -> Option<&mut Box<dyn Change>> {
+        if let Some(present) = self.present.checked_sub(1) {
+            self.present = present;
+            return Some(&mut self.changes[present])
+        }
+        None
+    }
+}
+
 pub struct Editor {
     pub document: Document,
+    history: EditHistory,
     pub current_tool: Tool,
     /// as opposed to being in a background tab
     ///
@@ -93,9 +134,30 @@ impl Editor {
         );
         Self {
             document,
+            history: EditHistory::with_capacity(128),
             current_tool: Tool::default(),
             is_visible: true,
         }
+    }
+
+    pub fn push_change(&mut self, change: Box<dyn Change>) {
+        self.history.push_change(change);
+    }
+
+    pub fn undo(&mut self) -> Option<Result<(), String>> {
+        if let Some(change) = self.history.prev() {
+            println!("undo: {change:?}");
+            return Some(change.undo(&mut self.document));
+        }
+        None
+    }
+
+    pub fn redo(&mut self) -> Option<Result<(), String>> {
+        if let Some(change) = self.history.next() {
+            println!("redo: {change:?}");
+            return Some(change.redo(&mut self.document));
+        }
+        None
     }
 
     pub fn tick(&mut self, engine_config: &Config, rl: &mut RaylibHandle, thread: &RaylibThread, is_mouse_event_handled: bool, mouse_screen_pos: Vector2, mouse_screen_delta: Vector2) {
@@ -165,8 +227,14 @@ impl Editor {
         }
 
         if (is_ctrl_down) && rl.is_key_pressed(KEY_Z) {
-            if let Err(e) = (if is_shift_down { Document::redo } else { Document::undo })(&mut self.document) {
-                println!("error: {e:?}");
+            match if is_shift_down { self.redo() } else { self.undo() } {
+                Some(Ok(())) => (),
+                Some(Err(e)) => println!("error: {e:?}"),
+                None => if is_shift_down {
+                    println!("nothing to redo")
+                } else {
+                    println!("nothing to undo")
+                },
             }
         }
     }

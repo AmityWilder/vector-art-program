@@ -25,6 +25,10 @@ impl Config {
     }
 }
 
+pub struct Panels {
+
+}
+
 pub struct Engine {
     pub config: Config,
     pub is_trim_view: bool,

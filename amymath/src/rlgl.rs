@@ -1,5 +1,45 @@
 use raylib::prelude::*;
 
+pub trait RaylibRlglExt {
+    fn begin_rlgl(&mut self) -> RlglHandle<'_, Self> {
+        RlglHandle(self)
+    }
+}
+
+impl<D: RaylibDraw> RaylibRlglExt for D {}
+
+pub struct RlglHandle<'a, D: ?Sized>(&'a mut D);
+
+impl<D: ?Sized> RlglHandle<'_, D> {
+    /// Set current texture to use
+    pub unsafe fn rl_set_texture(&mut self, texture: impl AsRef<ffi::Texture2D>) {
+        unsafe { ffi::rlSetTexture(texture.as_ref().id); }
+    }
+
+    /// Set current texture to use
+    pub fn rl_clear_texture(&mut self) {
+        unsafe { ffi::rlSetTexture(0); }
+    }
+
+    /// Initialize drawing mode (how to organize vertex)
+    pub fn rl_begin_lines(&mut self) -> RaylibRlglLines<'_, Self> {
+        unsafe { ffi::rlBegin(ffi::RL_LINES as i32); }
+        RaylibRlglLines(self)
+    }
+
+    /// Initialize drawing mode (how to organize vertex)
+    pub fn rl_begin_triangles(&mut self) -> RaylibRlglTriangles<'_, Self> {
+        unsafe { ffi::rlBegin(ffi::RL_TRIANGLES as i32); }
+        RaylibRlglTriangles(self)
+    }
+
+    /// Initialize drawing mode (how to organize vertex)
+    pub fn rl_begin_quads(&mut self) -> RaylibRlglQuads<'_, Self> {
+        unsafe { ffi::rlBegin(ffi::RL_QUADS as i32); }
+        RaylibRlglQuads(self)
+    }
+}
+
 pub struct RaylibRlglLines<'a, D: ?Sized>(&'a mut D);
 
 impl<D: ?Sized> Drop for RaylibRlglLines<'_, D> {
@@ -9,9 +49,9 @@ impl<D: ?Sized> Drop for RaylibRlglLines<'_, D> {
     }
 }
 
-pub struct RaylibRlglTriangless<'a, D: ?Sized>(&'a mut D);
+pub struct RaylibRlglTriangles<'a, D: ?Sized>(&'a mut D);
 
-impl<D: ?Sized> Drop for RaylibRlglTriangless<'_, D> {
+impl<D: ?Sized> Drop for RaylibRlglTriangles<'_, D> {
     /// Finish vertex providing
     fn drop(&mut self) {
         unsafe { ffi::rlEnd(); }
@@ -34,40 +74,6 @@ impl<D: ?Sized> RaylibRlglQuads<'_, D> {
         unsafe { ffi::rlTexCoord2f(x, y); }
     }
 }
-
-pub trait RaylibRlglEx {
-    /// Initialize drawing mode (how to organize vertex)
-    ///
-    /// # Safety
-    /// idk what to put here
-    unsafe fn rl_begin_lines(&mut self) -> RaylibRlglLines<'_, Self> {
-        unsafe { ffi::rlBegin(ffi::RL_LINES as i32); }
-        RaylibRlglLines(self)
-    }
-
-    /// Initialize drawing mode (how to organize vertex)
-    ///
-    /// # Safety
-    /// idk what to put here
-    unsafe fn rl_begin_triangles(&mut self) -> RaylibRlglTriangless<'_, Self> {
-        unsafe { ffi::rlBegin(ffi::RL_TRIANGLES as i32); }
-        RaylibRlglTriangless(self)
-    }
-
-    /// Initialize drawing mode (how to organize vertex)
-    ///
-    /// # Safety
-    /// idk what to put here
-    unsafe fn rl_begin_quads(&mut self) -> RaylibRlglQuads<'_, Self> {
-        unsafe { ffi::rlBegin(ffi::RL_QUADS as i32); }
-        RaylibRlglQuads(self)
-    }
-}
-
-pub struct RlglMatrix<'a, D: ?Sized>(&'a mut D);
-
-impl<D: RaylibDraw> RaylibRlglEx for D {}
-impl<D: ?Sized> RaylibRlglEx for RlglMatrix<'_, D> {}
 
 pub trait RaylibRlglDraw {
     /// Define one vertex (position) - 2 int
@@ -108,6 +114,42 @@ pub trait RaylibRlglDraw {
 }
 
 impl<D: ?Sized> RaylibRlglDraw for RaylibRlglLines<'_, D> {}
-impl<D: ?Sized> RaylibRlglDraw for RaylibRlglTriangless<'_, D> {}
+impl<D: ?Sized> RaylibRlglDraw for RaylibRlglTriangles<'_, D> {}
 impl<D: ?Sized> RaylibRlglDraw for RaylibRlglQuads<'_, D> {}
-impl<D: ?Sized> RaylibRlglDraw for RlglMatrix<'_, D> {}
+
+#[cfg(test)]
+mod tests {
+    use raylib::prelude::*;
+    use rltest::*;
+    use super::*;
+
+    #[test]
+    fn test0() {
+        rl_test("test0", 640, 480, 60, |rl| {
+            let texture = rl.load_texture_from_image(&Image::gen_image_gradient_square(32, 32, 0.5, Color::RED, Color::BLUE))?;
+            rl.run(|rl| {
+                if rl.is_key_pressed(KeyboardKey::KEY_ENTER) {
+                    success!()
+                }
+                rl.begin_drawing(Color::BLACK, |d| {
+                    let mut d = d.begin_rlgl();
+                    unsafe { d.rl_set_texture(&texture); }
+                    {
+                        let mut d = d.rl_begin_quads();
+                        d.rl_color4ub(255, 255, 255, 255);
+                        d.rl_normal3f(0.0, 0.0, 1.0);
+                        d.rl_tex_coord2f(0.0, 0.0);
+                        d.rl_vertex2f(0.0, 0.0);
+                        d.rl_tex_coord2f(0.0, 1.0);
+                        d.rl_vertex2f(0.0, 32.0);
+                        d.rl_tex_coord2f(1.0, 1.0);
+                        d.rl_vertex2f(32.0, 32.0);
+                        d.rl_tex_coord2f(1.0, 0.0);
+                        d.rl_vertex2f(32.0, 0.0);
+                    }
+                    d.rl_clear_texture();
+                })
+            })
+        }).expect("rejected");
+    }
+}

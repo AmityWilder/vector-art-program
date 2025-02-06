@@ -196,10 +196,10 @@ impl ActiveVectorBrush {
 
     fn finish_path(
         &mut self,
-        document: &mut Document,
+        _document: &mut Document,
         mouse_world_pos: Vector2,
     ) -> InactiveVectorBrush {
-        let stroke = {
+        let _stroke = {
             let mut path = self.target.write();
 
             if let Some(last) = self.trail.last() && last.distance_sqr_to(mouse_world_pos) > MIN_DISTANCE_SQR {
@@ -212,12 +212,14 @@ impl ActiveVectorBrush {
 
             path.curve.points.clone()
         };
-        document.push_change(
-            Box::new(BrushAction {
-                target: self.target.clone_mut(),
-                stroke,
-            })
-        );
+        // todo: rework undo/redo
+
+        // document.push_change(
+        //     Box::new(BrushAction {
+        //         target: self.target.clone_mut(),
+        //         stroke,
+        //     })
+        // );
         InactiveVectorBrush
     }
 

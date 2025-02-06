@@ -10,19 +10,21 @@ const SRC_REC: Rectangle = {
 };
 
 pub struct ShaderTable {
-    pub circle: Shader,
-    pub bezier: Shader,
-    pub blur: Shader,
+    pub circle:    Shader,
+    pub bezier:    Shader,
+    pub blur:      Shader,
+    pub hue_wheel: Shader,
     pub uv_tex: Texture2D,
 }
 
 impl ShaderTable {
     pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> Result<Self, String> {
         Ok(Self {
-            circle: rl.load_shader_from_memory(thread, None, Some(include_str!("circle.frag"))),
-            bezier: rl.load_shader_from_memory(thread, None, Some(include_str!("bezier.frag"))),
-            blur:   rl.load_shader_from_memory(thread, None, Some(include_str!("blur.frag"  ))),
-            uv_tex: rl.load_texture_from_image(thread, &Image::gen_image_color(UV_TEX_SIZE, UV_TEX_SIZE, Color::WHITE))?,
+            circle:    rl.load_shader_from_memory(thread, None, Some(include_str!(   "circle.frag"))),
+            bezier:    rl.load_shader_from_memory(thread, None, Some(include_str!(   "bezier.frag"))),
+            blur:      rl.load_shader_from_memory(thread, None, Some(include_str!(     "blur.frag"))),
+            hue_wheel: rl.load_shader_from_memory(thread, None, Some(include_str!("hue_wheel.frag"))),
+            uv_tex:    rl.load_texture_from_image(thread, &Image::gen_image_color(UV_TEX_SIZE, UV_TEX_SIZE, Color::WHITE))?,
         })
     }
 
