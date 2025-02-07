@@ -82,7 +82,7 @@
 *
 **********************************************************************************************/
 
-use crate::{tracelog, utils::TraceLogLevel::*};
+use crate::{tracelog, utils::TraceLogLevel::*, Vector2, Matrix, KeyboardKey};
 
 mod ffi {
     #[link(name = "raylib")]
@@ -95,7 +95,6 @@ mod ffi {
 
         /// Initialize rlgl: OpenGL extensions, default buffers/shaders/textures, OpenGL states
         pub fn rlglInit(width: i32, height: i32);
-
 
         /// Set the viewport area (transformation from normalized device coordinates to window coordinates)
         /// NOTE: We store current viewport dimensions
@@ -133,15 +132,6 @@ const MAX_DECOMPRESSION_SIZE: usize = 64;
 
 /// Maximum number of automation events to record
 const MAX_AUTOMATION_EVENTS: usize = 16384;
-
-#[derive(Debug, Clone, Copy, Default)]
-struct Matrix {} // todo
-
-#[derive(Debug, Clone, Copy, Default)]
-struct Vector2 { x: f32, y: f32 } // todo
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum KeyboardKey {} // todo
 
 #[derive(Debug, Clone, Copy, Default)]
 struct Point {
@@ -360,7 +350,8 @@ pub fn init_window<'a>(width: u32, height: u32, title: &'a str) -> RaylibHandle<
     unsafe { ffi::rlglInit(width.try_into().unwrap(), height.try_into().unwrap()) }; // todo: make this safer
 
     // Setup default viewport
-    setup_viewport(&mut core, core.window.current_fbo.width, core.window.current_fbo.height);
+    let Size { width, height } = core.window.current_fbo;
+    setup_viewport(&mut core, width, height);
 
 //     #if defined(SUPPORT_MODULE_RTEXT) && defined(SUPPORT_DEFAULT_FONT)
 //     // Load default font
@@ -409,8 +400,7 @@ pub fn init_window<'a>(width: u32, height: u32, title: &'a str) -> RaylibHandle<
 }
 
 // Set viewport for a provided width and height
-fn setup_viewport<'a>(core: &mut CoreData<'a>, width: u32, height: u32)
-{
+fn setup_viewport<'a>(core: &mut CoreData<'a>, width: u32, height: u32) {
     core.window.render.width = width;
     core.window.render.height = height;
 
@@ -437,8 +427,7 @@ fn setup_viewport<'a>(core: &mut CoreData<'a>, width: u32, height: u32)
 
 // Compute framebuffer size relative to screen size and display size
 // NOTE: Global variables core.window.render.width/core.window.render.height and core.window.render_offset.x/core.window.render_offset.y can be modified
-fn setup_frame_buffer(width: u32, height: u32)
-{
+fn setup_frame_buffer(width: u32, height: u32) {
     // Calculate core.window.render.width and core.window.render.height, we have the display size (input params) and the desired screen size (global var)
     if ((core.window.screen.width > core.window.display.width) || (core.window.screen.height > core.window.display.height))
     {
