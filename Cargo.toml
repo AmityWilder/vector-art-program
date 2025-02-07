@@ -1,5 +1,5 @@
 [workspace]
-members = [ "amygui", "amylib", "amymath", "amyvec", "rltest"]
+members = [ "amygui", "amylib", "amymath", "amyvec", "raylib_rs", "rltest"]
 
 [package]
 name = "vector-art-program"
@@ -12,3 +12,4 @@ amylib = { path = "amylib" }
 amymath = { path = "amymath" }
 amygui = { path = "amygui" }
 amyvec = { path = "amyvec" }
+# raylib_rs = { path = "raylib_rs" }

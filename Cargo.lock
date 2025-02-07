@@ -391,6 +391,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raylib_rs"
+version = "0.1.0"
+dependencies = [
+ "raylib",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"

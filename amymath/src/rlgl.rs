@@ -138,7 +138,7 @@ mod tests {
     #[test]
     fn test0() {
         rl_test("test0", 640, 480, 60, |rl| {
-            let texture = rl.load_texture_from_image(&Image::gen_image_gradient_square(32, 32, 0.5, Color::RED, Color::BLUE))?;
+            let texture = RaylibTestWrapper::load_texture_from_image(rl, &Image::gen_image_gradient_square(32, 32, 0.5, Color::RED, Color::BLUE))?;
             rl.run(|rl| {
                 if rl.is_key_pressed(KeyboardKey::KEY_ENTER) {
                     success!()
