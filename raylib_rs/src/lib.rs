@@ -10,6 +10,7 @@ pub use core::{
     init_window,
 };
 
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct rl_float16 {
     v: [f32; 16],

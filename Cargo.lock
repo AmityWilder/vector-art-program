@@ -576,7 +576,6 @@ dependencies = [
  "amymath",
  "amyvec",
  "raylib",
- "raylib_rs",
 ]
 
 [[package]]

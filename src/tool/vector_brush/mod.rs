@@ -41,7 +41,7 @@ impl InactiveVectorBrush {
             // create a new path
             return Some(ActiveVectorBrush {
                 target: document.create_path(None, None).clone_mut(),
-                trail: Vec::new(),
+                signal: PathSignal::default(),
                 last_failing: None,
             })
         }
@@ -56,30 +56,78 @@ pub struct ActiveVectorBrush {
     /// If there is a layer, it must not die before the pen dies.
     target: StrongMut<VectorPath>,
 
-    /// History of confirmed positions
-    trail: Vec<Vector2>,
+    signal: PathSignal,
 
     /// The position the last time its dot product was 1
     last_failing: Option<Vector2>,
 }
 
-const MIN_DISTANCE: f32 = 5.0;
+const MIN_DISTANCE: f32 = 2.0;
 const MIN_DISTANCE_SQR: f32 = MIN_DISTANCE * MIN_DISTANCE;
-const MIN_OPP_LENGTH: f32 = 1.0;
+const MIN_OPP_LENGTH: f32 = 0.5;
 const MIN_OPP_LENGTH_SQR: f32 = MIN_OPP_LENGTH * MIN_OPP_LENGTH;
-const MIN_OPP_LENGTH_SQR_CHANGE: f32 = 1.0;
+const MIN_OPP_LENGTH_SQR_CHANGE: f32 = 0.25;
 const IS_CURVATURE_SUPPORTED: bool = false;
 
-fn is_position_changed(_last_changed: Vector2, _p: Vector2) -> bool {
-    todo!()
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum ChangeType {
+    None,
+    Position,
+    Direction,
+    Curvature,
 }
 
-fn is_direction_changed(_last_straight: Vector2, _last_changed: Vector2, _p: Vector2) -> bool {
-    todo!()
+#[derive(Debug, Default)]
+struct PathSignal {
+    last_changed:  Vector2,
+    last_straight: Vector2,
+    last_curved:   Vector2,
 }
 
-fn is_curvature_changed(_last_curved: Vector2, _last_straight: Vector2, _last_changed: Vector2, _p: Vector2) -> bool {
-    todo!()
+impl PathSignal {
+    fn test(&mut self, p: Vector2) -> ChangeType {
+        let mut change_type = ChangeType::None;
+        let last_changed = self.last_changed;
+        let delta = p - last_changed;
+        let distance_sqr = delta.length_sqr();
+
+        if distance_sqr > MIN_DISTANCE_SQR {
+            change_type = ChangeType::Position;
+
+            if self.last_straight != last_changed {
+                let last_straight = self.last_straight;
+                let delta_prev = last_changed - last_straight;
+                let distance_sqr_prev = delta_prev.length_sqr();
+                assert!(distance_sqr_prev.is_normal() && distance_sqr_prev > 0.0, "delta_prev: {delta_prev:?}");
+                let adj_length = (delta_prev / distance_sqr_prev.sqrt()).dot(delta);
+                let opp_length_sqr = distance_sqr - adj_length * adj_length;
+
+                if adj_length < 0.0 || opp_length_sqr > MIN_OPP_LENGTH_SQR {
+                    change_type = ChangeType::Direction;
+
+                    if self.last_curved != last_straight {
+                        let last_curved = self.last_curved;
+                        let delta_prev_prev = last_straight - last_curved;
+                        let distance_sqr_prev_prev = delta_prev_prev.length_sqr();
+                        let adj_length_prev = (delta_prev_prev / distance_sqr_prev_prev.sqrt()).dot(delta_prev);
+                        let opp_length_sqr_prev = distance_sqr_prev - adj_length_prev * adj_length_prev;
+
+                        if (opp_length_sqr - opp_length_sqr_prev).abs() > MIN_OPP_LENGTH_SQR_CHANGE {
+                            change_type = ChangeType::Curvature;
+
+                            self.last_curved = p;
+                        }
+                    }
+
+                    self.last_straight = p;
+                }
+            }
+
+            self.last_changed = p;
+        }
+
+        change_type
+    }
 }
 
 impl ActiveVectorBrush {
@@ -89,7 +137,9 @@ impl ActiveVectorBrush {
         mouse_world_pos: Vector2,
     ) {
         if rl.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) {
-            self.trail.push(mouse_world_pos);
+            self.signal.last_changed  = mouse_world_pos;
+            self.signal.last_straight = mouse_world_pos;
+            self.signal.last_curved   = mouse_world_pos;
             let mut path = self.target.write();
             for _ in 0..2 {
                 path.curve.points.push_back(PathPoint { p: mouse_world_pos, c: None });
@@ -97,6 +147,8 @@ impl ActiveVectorBrush {
         }
     }
 
+    // sometimes two points will be created at the same position on high framerates, creating a division by zero error.
+    // this makes sure they become one point.
     fn merge_confirmed_verts(path: &mut VectorPath) {
         // join points confirmed to be no longer editing
         if let Some(idx) = path.curve.points.len().checked_sub(4) && path.curve.points[idx].p.distance_sqr_to(path.curve.points[idx + 1].p) < 0.001 {
@@ -134,63 +186,15 @@ impl ActiveVectorBrush {
         Self::merge_confirmed_verts(path);
     }
 
-    fn is_point_needed(&self, new_pos: Vector2, num_points: usize) -> (bool, bool) {
-        let mut is_point_needed = true;
-        let mut is_too_close = false;
-        let is_too_straight;
-        let is_inflecting;
-        if let Some(pos_prev) = num_points.checked_sub(1).map(|i| self.trail[i]) {
-            let delta = new_pos - pos_prev;
-            let distance_sqr = delta.length_sqr();
-
-            // change in position
-            is_too_close = distance_sqr <= MIN_DISTANCE_SQR;
-            if is_too_close {
-                is_point_needed = false;
-            } else if let Some(pos_pprev) = num_points.checked_sub(2).map(|i| self.trail[i]) {
-                let delta_prev = pos_prev - pos_pprev;
-                let distance_sqr_prev = delta_prev.length_sqr();
-                assert!(distance_sqr_prev.is_normal() && distance_sqr_prev > 0.0, "delta_prev: {delta_prev:?}");
-                let adj_length = (delta_prev / distance_sqr_prev.sqrt()).dot(delta);
-                let opp_length_sqr = distance_sqr - adj_length * adj_length;
-                // change in direction
-                is_too_straight = adj_length >= 0.0 && opp_length_sqr <= MIN_OPP_LENGTH_SQR;
-                if is_too_straight {
-                    is_point_needed = false;
-                } else if IS_CURVATURE_SUPPORTED && let Some(pos_ppprev) = num_points.checked_sub(3).map(|i| self.trail[i]) {
-                    let delta_prev_prev = pos_pprev - pos_ppprev;
-                    let distance_sqr_prev_prev = delta_prev_prev.length_sqr();
-                    // change in curvature
-                    let adj_length_prev = (delta_prev_prev / distance_sqr_prev_prev.sqrt()).dot(delta_prev);
-                    let opp_length_sqr_prev = distance_sqr_prev - adj_length_prev * adj_length_prev;
-                    is_inflecting = (opp_length_sqr - opp_length_sqr_prev).abs() <= MIN_OPP_LENGTH_SQR_CHANGE;
-                    if is_inflecting {
-                        is_point_needed = false;
-                    }
-                }
-            }
-        } else {
-            println!("warning: mouse is down without having been pressed");
-            is_point_needed = false;
-        }
-        (is_point_needed, is_too_close)
-    }
-
     fn continue_path(&mut self, mouse_world_pos: Vector2) {
         let new_pos = mouse_world_pos;
-        let num_points = self.trail.len();
 
-        let (is_point_needed, is_too_close) = self.is_point_needed(new_pos, num_points);
+        let change_type = self.signal.test(new_pos);
 
         Self::update_path(&mut self.target.write(), new_pos);
 
-        if is_point_needed {
-            let pos = self.last_failing.take().unwrap_or(new_pos);
-            self.trail.push(pos);
-
-            self.target.write().curve.points.push_back(PathPoint { p: new_pos, c: None });
-        } else if !is_too_close {
-            self.last_failing = Some(new_pos);
+        if matches!(change_type, ChangeType::Curvature) {
+            self.target.write().curve.points.push_back(PathPoint { p: self.signal.last_curved, c: None });
         }
     }
 
@@ -202,13 +206,7 @@ impl ActiveVectorBrush {
         let _stroke = {
             let mut path = self.target.write();
 
-            if let Some(last) = self.trail.last() && last.distance_sqr_to(mouse_world_pos) > MIN_DISTANCE_SQR {
-                self.trail.push(mouse_world_pos);
-            }
-
-            if let Some(p) = self.trail.last().copied() {
-                path.curve.points.push_back(PathPoint { p, c: None });
-            }
+            path.curve.points.push_back(PathPoint { p: mouse_world_pos, c: None });
 
             path.curve.points.clone()
         };
@@ -282,8 +280,28 @@ impl ToolType for VectorBrush {
     }
 
     fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable) {
+        const DRAW_DEBUG: bool = true;
+        let zoom_inv = document.camera.zoom.recip();
         if let VectorBrush::Active(brush) = self {
             brush.draw(d, document, shader_table);
+
+            if DRAW_DEBUG {
+                let last_changed = brush.signal.last_changed;
+                let last_straight = brush.signal.last_straight;
+                let last_curved = brush.signal.last_curved;
+
+                d.draw_pixel_v(last_changed, Color::BLUE);
+                d.draw_ring(last_changed, MIN_DISTANCE, MIN_DISTANCE + zoom_inv, 0.0, 360.0, 36, Color::BLUE);
+
+                d.draw_pixel_v(last_straight, Color::RED);
+                let straight_direction = (last_changed - last_straight).normalized();
+                let perp_a = Vector2 { x: -straight_direction.y, y:  straight_direction.x };
+                let perp_b = Vector2 { x:  straight_direction.y, y: -straight_direction.x };
+                d.draw_line_v(last_straight + perp_a * MIN_OPP_LENGTH, last_changed + perp_a * MIN_OPP_LENGTH, Color::RED);
+                d.draw_line_v(last_straight + perp_b * MIN_OPP_LENGTH, last_changed + perp_b * MIN_OPP_LENGTH, Color::RED);
+
+                d.draw_pixel_v(last_curved, Color::GREEN);
+            }
         }
     }
 }
