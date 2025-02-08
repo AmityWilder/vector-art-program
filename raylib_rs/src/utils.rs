@@ -20,3 +20,10 @@ macro_rules! tracelog {
         }, format!($($args)+))
     };
 }
+
+#[macro_export]
+macro_rules! tracelogd {
+    ($($args:tt)+) => {
+        tracelog!(LogDebug, $($args)+)
+    };
+}

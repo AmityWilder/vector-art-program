@@ -2,13 +2,10 @@
 name = "raylib_rs"
 version = "0.1.0"
 edition = "2024"
+build = "build.rs"
 
 [dependencies]
 raylib = "5.0.2"
 
 [features]
-graphics_api_opengl_11 = []
-graphics_api_opengl_33 = []
-graphics_api_opengl_es2 = []
-rlgl_enable_opengl_debug_context = []
-graphics_api_opengl_43 = []
+mesh_gpu_skinning = []

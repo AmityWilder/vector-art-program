@@ -1,9 +1,25 @@
-use crate::{tracelog, Matrix};
+use std::ptr::{null, null_mut};
+use crate::{external::glad::*, tracelog, tracelogd, utils::TraceLogLevel::*, Matrix};
+
+// Default internal render batch elements limits
+
+#[cfg(any(graphics_api = "opengl_11", graphics_api = "opengl_33"))]
+/// This is the maximum amount of elements (quads) per batch
+/// NOTE: Be careful with text, every letter maps to a quad
+const RL_DEFAULT_BATCH_BUFFER_ELEMENTS: usize = 8192;
+
+#[cfg(graphics_api = "opengl_es2")]
+/// We reduce memory sizes for embedded systems (RPI and HTML5)
+/// NOTE: On HTML5 (emscripten) this is allocated on heap,
+/// by default it's only 16MB!...just take care...
+const RL_DEFAULT_BATCH_BUFFER_ELEMENTS: usize = 2048;
 
 /// Default number of batch buffers (multi-buffering)
 const RL_DEFAULT_BATCH_BUFFERS: usize = 1;
+
 /// Default number of batch draw calls (by state changes: mode, texture)
 const RL_DEFAULT_BATCH_DRAWCALLS: usize = 256;
+
 /// Maximum number of textures units that can be activated on batch drawing (SetShaderValueTexture())
 const RL_DEFAULT_BATCH_MAX_TEXTURE_UNITS: usize = 4;
 
@@ -57,13 +73,17 @@ const RL_TEXTURE_WRAP_MIRROR_REPEAT: i32 = 0x8370;
 /// GL_MIRROR_CLAMP_EXT
 const RL_TEXTURE_WRAP_MIRROR_CLAMP: i32 = 0x8742;
 
-// Matrix modes (equivalent to OpenGL)
-/// GL_MODELVIEW
-const RL_MODELVIEW: i32 = 0x1700;
-/// GL_PROJECTION
-const RL_PROJECTION: i32 = 0x1701;
-/// GL_TEXTURE
-const RL_TEXTURE: i32 = 0x1702;
+/// Matrix modes (equivalent to OpenGL)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum MatrixMode {
+    /// GL_MODELVIEW
+    #[default]
+    Modelview = 0x1700,
+    /// GL_PROJECTION
+    Projection = 0x1701,
+    /// GL_TEXTURE
+    Texture = 0x1702,
+}
 
 // Primitive assembly draw modes
 /// GL_LINES
@@ -152,7 +172,7 @@ const RL_FUNC_SUBTRACT: i32 = 0x800A;
 const RL_FUNC_REVERSE_SUBTRACT: i32 = 0x800B;
 /// GL_BLEND_EQUATION
 const RL_BLEND_EQUATION: i32 = 0x8009;
-/// GL_BLEND_EQUATION_RGB   // (Same as BLEND_EQUATION)
+/// GL_BLEND_EQUATION_RGB (Same as BLEND_EQUATION)
 const RL_BLEND_EQUATION_RGB: i32 = 0x8009;
 /// GL_BLEND_EQUATION_ALPHA
 const RL_BLEND_EQUATION_ALPHA: i32 = 0x883D;
@@ -167,8 +187,31 @@ const RL_BLEND_SRC_ALPHA: i32 = 0x80CB;
 /// GL_BLEND_COLOR
 const RL_BLEND_COLOR: i32 = 0x8005;
 
+/// GL_READ_FRAMEBUFFER
+const RL_READ_FRAMEBUFFER: i32 = 0x8CA8;
+/// GL_DRAW_FRAMEBUFFER
+const RL_DRAW_FRAMEBUFFER: i32 = 0x8CA9;
+
+/// Default shader vertex attribute locations
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum DefaultShaderAttribLocation {
+    Position = 0,
+    TexCoord = 1,
+    Normal = 2,
+    Color = 3,
+
+    Tangent = 4,
+    TexCoord2 = 5,
+    Indices = 6,
+    #[cfg(feature = "mesh_gpu_skinning")]
+    BoneIds = 7,
+    #[cfg(feature = "mesh_gpu_skinning")]
+    BoneWeights = 8,
+}
+
 /// OpenGL version
-pub enum rlGlVersion {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum GlVersion {
     /// OpenGL 1.1
     Opengl11 = 1,
     /// OpenGL 2.1 (GLSL 120)
@@ -183,9 +226,20 @@ pub enum rlGlVersion {
     OpenglEs30,
 }
 
+const GRAPHICS_API: GlVersion = cfg_match! {{
+    graphics_api = "opengl_11"  => { GlVersion::Opengl11 }
+    graphics_api = "opengl_21"  => { GlVersion::Opengl21 }
+    graphics_api = "opengl_33"  => { GlVersion::Opengl33 }
+    graphics_api = "opengl_43"  => { GlVersion::Opengl43 }
+    graphics_api = "opengl_es2" => { GlVersion::OpenglEs20 }
+    graphics_api = "opengl_es3" => { GlVersion::OpenglEs30 }
+    _ => { panic!("invalid graphics_api") }
+}};
+
 /// Texture pixel formats
 /// NOTE: Support depends on OpenGL version
-pub enum rlPixelFormat {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum PixelFormat {
     /// 8 bit per pixel (no alpha)
     UncompressedGrayscale = 1,
     /// 8*2 bpp (2 channels)
@@ -239,7 +293,8 @@ pub enum rlPixelFormat {
 /// Texture parameters: filter mode
 /// NOTE 1: Filtering considers mipmaps if available in the texture
 /// NOTE 2: Filter is accordingly set for minification and magnification
-pub enum rlTextureFilter {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TextureFilter {
     /// No filter, just pixel approximation
     Point,
     /// Linear filtering
@@ -255,7 +310,8 @@ pub enum rlTextureFilter {
 }
 
 /// Color blending modes (pre-defined)
-pub enum rlBlendMode {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BlendMode {
     /// Blend textures considering alpha (default)
     Alpha,
     /// Blend textures adding colors
@@ -275,7 +331,8 @@ pub enum rlBlendMode {
 }
 
 /// Shader location point type
-pub enum rlShaderLocationIndex {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ShaderLocationIndex {
     /// Shader location: vertex attribute: position
     VertexPosition,
     /// Shader location: vertex attribute: texcoord01
@@ -331,13 +388,14 @@ pub enum rlShaderLocationIndex {
 }
 
 #[allow(non_upper_case_globals)]
-impl rlShaderLocationIndex {
+impl ShaderLocationIndex {
     pub const MapDiffuse: Self = Self::MapAlbedo;
     pub const MapSpecular: Self = Self::MapMetalness;
 }
 
 /// Shader uniform data type
-pub enum rlShaderUniformDataType {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ShaderUniformDataType {
     /// Shader uniform type: float
     Float,
     /// Shader uniform type: vec2 (2 float)
@@ -359,7 +417,8 @@ pub enum rlShaderUniformDataType {
 }
 
 /// Shader attribute data types
-pub enum rlShaderAttributeDataType {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ShaderAttributeDataType {
     /// Shader attribute type: float
     Float,
     /// Shader attribute type: vec2 (2 float)
@@ -372,7 +431,8 @@ pub enum rlShaderAttributeDataType {
 
 /// Framebuffer attachment type
 /// NOTE: By default up to 8 color channels defined, but it can be more
-pub enum rlFramebufferAttachType {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum FramebufferAttachType {
     /// Framebuffer attachment type: color 0
     ColorChannel0 = 0,
     /// Framebuffer attachment type: color 1
@@ -396,7 +456,8 @@ pub enum rlFramebufferAttachType {
 }
 
 /// Framebuffer texture attachment type
-pub enum rlFramebufferAttachTextureType {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum FramebufferAttachTextureType {
     /// Framebuffer texture attachment type: cubemap, +X side
     CubemapPositiveX = 0,
     /// Framebuffer texture attachment type: cubemap, -X side
@@ -416,28 +477,111 @@ pub enum rlFramebufferAttachTextureType {
 }
 
 /// Face culling mode
-pub enum rlCullMode {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CullMode {
     Front,
     Back,
 }
 
+const GL_SHADING_LANGUAGE_VERSION:         u32 = 0x8B8C;
+
+const GL_COMPRESSED_RGB_S3TC_DXT1_EXT:     u32 = 0x83F0;
+const GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:    u32 = 0x83F1;
+const GL_COMPRESSED_RGBA_S3TC_DXT3_EXT:    u32 = 0x83F2;
+const GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:    u32 = 0x83F3;
+const GL_ETC1_RGB8_OES:                    u32 = 0x8D64;
+const GL_COMPRESSED_RGB8_ETC2:             u32 = 0x9274;
+const GL_COMPRESSED_RGBA8_ETC2_EAC:        u32 = 0x9278;
+const GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG:  u32 = 0x8C00;
+const GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG: u32 = 0x8C02;
+#[allow(non_upper_case_globals)]
+const GL_COMPRESSED_RGBA_ASTC_4x4_KHR:     u32 = 0x93b0;
+#[allow(non_upper_case_globals)]
+const GL_COMPRESSED_RGBA_ASTC_8x8_KHR:     u32 = 0x93b7;
+
+const GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT:   u32 = 0x84FF;
+const GL_TEXTURE_MAX_ANISOTROPY_EXT:       u32 = 0x84FE;
+
+const GL_PROGRAM_POINT_SIZE:               u32 = 0x8642;
+
+const GL_LINE_WIDTH:                       u32 = 0x0B21;
+
+#[cfg(graphics_api = "opengl_11")]
+const GL_UNSIGNED_SHORT_5_6_5:   u32 = 0x8363;
+#[cfg(graphics_api = "opengl_11")]
+const GL_UNSIGNED_SHORT_5_5_5_1: u32 = 0x8034;
+#[cfg(graphics_api = "opengl_11")]
+const GL_UNSIGNED_SHORT_4_4_4_4: u32 = 0x8033;
+
+#[cfg(graphics_api = "opengl_21")]
+const GL_LUMINANCE: u32 = 0x1909;
+#[cfg(graphics_api = "opengl_21")]
+const GL_LUMINANCE_ALPHA: u32 = 0x190A;
+
+#[cfg(graphics_api = "opengl_es2")]
+use glClearDepthf as glClearDepth;
+#[cfg(all(graphics_api = "opengl_es2", not(graphics_api = "opengl_es3")))]
+const GL_READ_FRAMEBUFFER: u32 = GL_FRAMEBUFFER;
+#[cfg(all(graphics_api = "opengl_es2", not(graphics_api = "opengl_es3")))]
+const GL_DRAW_FRAMEBUFFER: u32 = GL_FRAMEBUFFER;
+
+// Default shader vertex attribute names to set location points
+/// Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_NAME_POSITION
+const RL_DEFAULT_SHADER_ATTRIB_NAME_POSITION:       &'static str = "vertexPosition";
+/// Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD
+const RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD:       &'static str = "vertexTexCoord";
+/// Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_NAME_NORMAL
+const RL_DEFAULT_SHADER_ATTRIB_NAME_NORMAL:         &'static str = "vertexNormal";
+/// Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_NAME_COLOR
+const RL_DEFAULT_SHADER_ATTRIB_NAME_COLOR:          &'static str = "vertexColor";
+/// Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_NAME_TANGENT
+const RL_DEFAULT_SHADER_ATTRIB_NAME_TANGENT:        &'static str = "vertexTangent";
+/// Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD2
+const RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD2:      &'static str = "vertexTexCoord2";
+/// Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_NAME_BONEIDS
+const RL_DEFAULT_SHADER_ATTRIB_NAME_BONEIDS:        &'static str = "vertexBoneIds";
+/// Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_NAME_BONEWEIGHTS
+const RL_DEFAULT_SHADER_ATTRIB_NAME_BONEWEIGHTS:    &'static str = "vertexBoneWeights";
+
+/// model-view-projection matrix
+const RL_DEFAULT_SHADER_UNIFORM_NAME_MVP:           &'static str = "mvp";
+/// view matrix
+const RL_DEFAULT_SHADER_UNIFORM_NAME_VIEW:          &'static str = "matView";
+/// projection matrix
+const RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION:    &'static str = "matProjection";
+/// model matrix
+const RL_DEFAULT_SHADER_UNIFORM_NAME_MODEL:         &'static str = "matModel";
+/// normal matrix (transpose(inverse(matModelView))
+const RL_DEFAULT_SHADER_UNIFORM_NAME_NORMAL:        &'static str = "matNormal";
+/// color diffuse (base tint color, multiplied by texture color)
+const RL_DEFAULT_SHADER_UNIFORM_NAME_COLOR:         &'static str = "colDiffuse";
+/// bone matrices
+const RL_DEFAULT_SHADER_UNIFORM_NAME_BONE_MATRICES: &'static str = "boneMatrices";
+/// texture0 (texture slot active 0)
+const RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0:    &'static str = "texture0";
+/// texture1 (texture slot active 1)
+const RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE1:    &'static str = "texture1";
+/// texture2 (texture slot active 2)
+const RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE2:    &'static str = "texture2";
+
 /// Dynamic vertex buffers (position + texcoords + colors + indices arrays)
-struct rlVertexBuffer {
+#[derive(Debug, Default)]
+struct VertexBuffer<'a> {
     /// Number of elements in the buffer (QUADS)
     element_count: i32,
 
     /// Vertex position (XYZ - 3 components per vertex) (shader-location = 0)
-    vertices: *mut f32,
+    vertices: Option<&'a mut [f32]>,
     /// Vertex texture coordinates (UV - 2 components per vertex) (shader-location = 1)
-    texcoords: *mut f32,
+    texcoords: Option<&'a mut [f32]>,
     /// Vertex colors (RGBA - 4 components per vertex) (shader-location = 3)
-    colors: *mut u8,
-    #[cfg(any(feature = "graphics_api_opengl_11", feature = "graphics_api_opengl_33"))]
+    colors: Option<&'a mut [u8]>,
+    #[cfg(any(graphics_api = "opengl_11", graphics_api = "opengl_33"))]
     /// Vertex indices (in case vertex data comes indexed) (6 indices per quad)
-    indices: *mut u32,
-    #[cfg(feature = "graphics_api_opengl_es2")]
+    indices: Option<&'a mut [u32]>,
+    #[cfg(graphics_api = "opengl_es2")]
     /// Vertex indices (in case vertex data comes indexed) (6 indices per quad)
-    indices: *mut u16,
+    indices: Option<&'a mut [u16]>,
     /// OpenGL Vertex Array Object id
     vao_id: u32,
     /// OpenGL Vertex Buffer Objects id (4 types of vertex data)
@@ -448,7 +592,8 @@ struct rlVertexBuffer {
 /// NOTE: Only texture changes register a new draw, other state-change-related elements are not
 /// used at this moment (vaoId, shaderId, matrices), raylib just forces a batch draw call if any
 /// of those state-change happens (this is done in core module)
-struct rlDrawCall {
+#[derive(Debug, Default)]
+struct DrawCall {
     /// Drawing mode: LINES, TRIANGLES, QUADS
     mode: i32,
     /// Number of vertex of the draw
@@ -469,16 +614,17 @@ struct rlDrawCall {
 }
 
 // rlRenderBatch type
-struct rlRenderBatch {
+#[derive(Debug, Default)]
+struct RenderBatch<'a> {
     /// Number of vertex buffers (multi-buffering support)
     buffer_count: i32,
     /// Current buffer tracking in case of multi-buffering
     current_buffer: i32,
     /// Dynamic buffer(s) for vertex data
-    vertex_buffer: *mut rlVertexBuffer,
+    vertex_buffer: Option<&'a mut [VertexBuffer<'a>]>,
 
     /// Draw calls array, depends on textureId
-    draws: *mut rlDrawCall,
+    draws: Option<&'a mut [DrawCall]>,
     /// Draw calls counter
     draw_counter: i32,
     /// Current depth value for next draw
@@ -486,7 +632,7 @@ struct rlRenderBatch {
 }
 
 #[derive(Debug, Default)]
-struct State {
+struct State<'a> {
     /// Current active render batch vertex counter (generic, used for all batches)
     vertex_counter: i32,
     /// Current active texture coordinate (added on glVertex*())
@@ -497,9 +643,9 @@ struct State {
     colorr: u8, colorg: u8, colorb: u8, colora: u8,
 
     /// Current matrix mode
-    current_matrix_mode: i32,
+    current_matrix_mode: MatrixMode,
     /// Current matrix pointer
-    current_matrix: *mut Matrix,
+    current_matrix: Option<&'a mut Matrix>,
     /// Default modelview matrix
     modelview: Matrix,
     /// Default projection matrix
@@ -522,11 +668,11 @@ struct State {
     /// Default shader program id, supports vertex color and diffuse texture
     default_shader_id: u32,
     /// Default shader locations pointer to be used on rendering
-    default_shader_locs: *mut i32,
+    default_shader_locs: Option<&'a mut [i32]>,
     /// Current shader id to be used on rendering (by default, defaultShaderId)
     current_shader_id: u32,
     /// Current shader locations pointer to be used on rendering (by default, defaultShaderLocs)
-    current_shader_locs: *mut i32,
+    current_shader_locs: Option<&'a mut [i32]>,
 
     /// Stereo rendering flag
     stereo_render: bool,
@@ -560,10 +706,9 @@ struct State {
     gl_custom_blend_mode_modified: bool,
 
     /// Current framebuffer width
-    framebuffer_width: i32,
+    framebuffer_width: u32,
     /// Current framebuffer height
-    framebuffer_height: i32,
-
+    framebuffer_height: u32,
 }
 
 #[derive(Debug, Default)]
@@ -605,128 +750,273 @@ struct ExtSupported {
     max_anisotropy_level: f32,
     /// Maximum bits for depth component
     max_depth_bits: i32,
-
 }
 
 #[derive(Debug, Default)]
-struct rlglData {
+pub struct RlglData<'a> {
     /// Current render batch
-    current_batch: *mut rlRenderBatch,
+    current_batch: Option<&'a mut RenderBatch<'a>>,
     /// Default internal render batch
-    default_batch: rlRenderBatch,
+    default_batch: RenderBatch<'a>,
     /// Renderer state
-    state: State,
+    state: State<'a>,
     /// Extensions supported flags
     ext_supported: ExtSupported,
 }
 
-/// Initialize rlgl: OpenGL extensions, default buffers/shaders/textures, OpenGL states
-fn rlglInit(width: u32, height: u32) -> rlglData {
-    let mut rlgl = rlglData::default();
+impl Drop for RlglData<'_> {
+    // Vertex Buffer Object deinitialization (memory free)
+    fn drop(&mut self) {
+        if cfg!(any(graphics_api = "opengl_33", graphics_api = "opengl_es2")) {
+            self.unload_render_batch(self.default_batch);
 
-    // Enable OpenGL debug context if required
-    if cfg!(all(feature = "rlgl_enable_opengl_debug_context", feature = "graphics_api_opengl_43")) {
-        if glDebugMessageCallback.is_some() && glDebugMessageControl.is_some() {
-            glDebugMessageCallback(rlDebugMessageCallback, 0);
-            // glDebugMessageControl(GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_ERROR, GL_DEBUG_SEVERITY_HIGH, 0, 0, GL_TRUE);
+            self.unload_shader_default();          // Unload default shader
 
-            // Debug context options:
-            //  - GL_DEBUG_OUTPUT - Faster version but not useful for breakpoints
-            //  - GL_DEBUG_OUTPUT_SYNCHRONUS - Callback is in sync with errors, so a breakpoint can be placed on the callback in order to get a stacktrace for the GL error
-            glEnable(GL_DEBUG_OUTPUT);
-            glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+            unsafe { glDeleteTextures(1, &mut self.state.default_texture_id); } // Unload default texture
+            tracelog!(LogInfo, "TEXTURE: [ID {}] Default texture unloaded successfully", self.state.default_texture_id);
+        }
+    }
+}
+
+impl<'a> RlglData<'a> {
+    /// Initialize rlgl: OpenGL extensions, default buffers/shaders/textures, OpenGL states
+    pub fn init(width: u32, height: u32) -> Self {
+        let mut rlgl = Self::default();
+
+        if cfg!(any(graphics_api = "opengl_33", graphics_api = "opengl_es2")) {
+            // Init default white texture
+            let pixels: [u8; 4] = [255, 255, 255, 255]; // 1 pixel RGBA (4 bytes)
+            let default_texture_id = rlgl.load_texture(&mut pixels, 1, 1, PixelFormat::UncompressedR8G8B8A8, 1);
+
+        } // GRAPHICS_API_OPENGL_33 || GRAPHICS_API_OPENGL_ES2
+
+        todo!();
+
+        rlgl
+    }
+
+    /// Textures data management
+    ///-----------------------------------------------------------------------------------------
+    /// Convert image data to OpenGL texture (returns OpenGL valid Id)
+    pub fn load_texture(&mut self, data: Option<&[u8]>, width: u32, height: u32, format: PixelFormat, mipmap_count: u32) -> Option<u32> {
+        unsafe { glBindTexture(GL_TEXTURE_2D, 0); } // Free any old binding
+
+        // Check texture format support by OpenGL 1.1 (compressed textures not supported)
+        if cfg!(graphics_api = "opengl_11") {
+            if format >= PixelFormat::CompressedDXT1RGB {
+                tracelog!(LogWarning, "GL: OpenGL 1.1 does not support GPU compressed texture formats");
+                return None;
+            }
+        } else {
+            if !self.ext_supported.tex_comp_dxt && matches!(format,
+                | PixelFormat::CompressedDXT1RGB
+                | PixelFormat::CompressedDXT1RGBA
+                | PixelFormat::CompressedDXT3RGBA
+                | PixelFormat::CompressedDXT5RGBA
+            ) {
+                tracelog!(LogWarning, "GL: DXT compressed texture format not supported");
+                return None;
+            }
+
+            if cfg!(any(graphics_api = "opengl_33", graphics_api = "opengl_es2")) {
+                if !self.ext_supported.tex_comp_etc1 && matches!(format, PixelFormat::CompressedETC1RGB) {
+                    tracelog!(LogWarning, "GL: ETC1 compressed texture format not supported");
+                    return None;
+                }
+
+                if !self.ext_supported.tex_comp_etc2 && matches!(format, PixelFormat::CompressedETC2RGB | PixelFormat::CompressedETC2EACRGBA) {
+                    tracelog!(LogWarning, "GL: ETC2 compressed texture format not supported");
+                    return None;
+                }
+
+                if !self.ext_supported.tex_comp_pvrt && matches!(format, PixelFormat::CompressedPVRTRGB | PixelFormat::CompressedPVRTRGBA) {
+                    tracelog!(LogWarning, "GL: PVRT compressed texture format not supported");
+                    return None;
+                }
+
+                if !self.ext_supported.tex_comp_astc && matches!(format, PixelFormat::CompressedASTC4x4RGBA | PixelFormat::CompressedASTC8x8RGBA) {
+                    tracelog!(LogWarning, "GL: ASTC compressed texture format not supported");
+                    return None;
+                }
+            }
+        } // GRAPHICS_API_OPENGL_11
+
+        let mut id: u32 = 0;
+        unsafe {
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+            glGenTextures(1, &mut id); // Generate texture id
+            glBindTexture(GL_TEXTURE_2D, id);
+        }
+
+        let mut mip_width = width;
+        let mut mip_height = height;
+        let mut mip_offset = 0; // Mipmap data offset, only used for tracelog
+
+        // NOTE: Added pointer math separately from function to avoid UBSAN complaining
+        let data_ptr = if let Some(data) = data { data.as_ptr() } else { null() };
+
+        // Load the different mipmap levels
+        for i in 0..mipmap_count {
+            let mip_size = get_pixel_data_size(mip_width, mip_height, format);
+
+            let (gl_internal_format, gl_format, gl_type) = get_gl_texture_formats(&self.ext_supported, format);
+
+            tracelogd!("TEXTURE: Load mipmap level {} ({} x {}), size: {}, offset: {}", i, mip_width, mip_height, mip_size, mip_offset);
+
+            if gl_internal_format != 0 {
+                unsafe {
+                    if format < PixelFormat::CompressedDXT1RGB { glTexImage2D(GL_TEXTURE_2D, i, gl_internal_format, mip_width, mip_height, 0, gl_format, gl_type, data_ptr.cast()); }
+                    else if cfg!(graphics_api = "opengl_11") { glCompressedTexImage2D(GL_TEXTURE_2D, i, gl_internal_format, mip_width, mip_height, 0, mip_size, data_ptr.cast()); }
+
+                    #[cfg(graphics_api = "opengl_33")] {
+                        if format == PixelFormat::UncompressedGrayscale {
+                            let swizzel_mask: [GLint; 4] = [GL_RED, GL_RED, GL_RED, GL_ONE];
+                            glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, swizzle_mask);
+                        } else if format == PixelFormat::UncompressedGrayAlpha {
+                            let swizzel_mask: [GLint; 4] = if cfg!(graphics_api = "opengl_21") {
+                                [GL_RED, GL_RED, GL_RED, GL_ALPHA]
+                            } else {
+                                [GL_RED, GL_RED, GL_RED, GL_GREEN]
+                            };
+                            glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, swizzle_mask);
+                        }
+                    }
+                }
+            }
+
+            mip_width  /= 2;
+            mip_height /= 2;
+            mip_offset += mip_size; // Increment offset position to next mipmap
+            if data.is_some() { data_ptr += mip_size; } // Increment data pointer to next mipmap
+
+            // Security check for NPOT textures
+            if mip_width  < 1 { mip_width  = 1; }
+            if mip_height < 1 { mip_height = 1; }
+        }
+
+        todo!()
+    }
+
+
+    // Choose the current matrix to be transformed
+    pub fn matrix_mode(&'a mut self, mode: MatrixMode) {
+        let rlgl = self;
+        match mode {
+            MatrixMode::Projection => rlgl.state.current_matrix = Some(&mut rlgl.state.projection),
+            MatrixMode::Modelview  => rlgl.state.current_matrix = Some(&mut rlgl.state.modelview ),
+            MatrixMode::Texture => unimplemented!("Not supported"),
+        }
+
+        rlgl.state.current_matrix_mode = mode;
+    }
+}
+
+/// Get OpenGL internal formats and data type from raylib PixelFormat
+///
+/// Returns `(gl_internal_format, gl_format, gl_type)`
+pub const fn get_gl_texture_formats(ext_supported: &ExtSupported, format: PixelFormat) -> (u32, u32, u32) {
+    use {PixelFormat::*, GlVersion::*};
+    match (GRAPHICS_API, format) {
+        // NOTE: on OpenGL ES 2.0 (WebGL), internalFormat must match format and options allowed are: GL_LUMINANCE, GL_RGB, GL_RGBA
+        #[cfg(any(graphics_api = "opengl_11", graphics_api = "opengl_21", graphics_api = "opengl_es2"))] UncompressedGrayscale    =>                                  return (GL_LUMINANCE,                        GL_LUMINANCE,       GL_UNSIGNED_BYTE         ),
+        #[cfg(any(graphics_api = "opengl_11", graphics_api = "opengl_21", graphics_api = "opengl_es2"))] UncompressedGrayAlpha    =>                                  return (GL_LUMINANCE_ALPHA,                  GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE         ),
+        #[cfg(any(graphics_api = "opengl_11", graphics_api = "opengl_21", graphics_api = "opengl_es2"))] UncompressedR5G6B5       =>                                  return (GL_RGB,                              GL_RGB,             GL_UNSIGNED_SHORT_5_6_5  ),
+        #[cfg(any(graphics_api = "opengl_11", graphics_api = "opengl_21", graphics_api = "opengl_es2"))] UncompressedR8G8B8       =>                                  return (GL_RGB,                              GL_RGB,             GL_UNSIGNED_BYTE         ),
+        #[cfg(any(graphics_api = "opengl_11", graphics_api = "opengl_21", graphics_api = "opengl_es2"))] UncompressedR5G5B5A1     =>                                  return (GL_RGBA,                             GL_RGBA,            GL_UNSIGNED_SHORT_5_5_5_1),
+        #[cfg(any(graphics_api = "opengl_11", graphics_api = "opengl_21", graphics_api = "opengl_es2"))] UncompressedR4G4B4A4     =>                                  return (GL_RGBA,                             GL_RGBA,            GL_UNSIGNED_SHORT_4_4_4_4),
+        #[cfg(any(graphics_api = "opengl_11", graphics_api = "opengl_21", graphics_api = "opengl_es2"))] UncompressedR8G8B8A8     =>                                  return (GL_RGBA,                             GL_RGBA,            GL_UNSIGNED_BYTE         ),
+        #[cfg(    graphics_api = "opengl_es3"                                                         )] UncompressedR32          => if ext_supported.tex_float32   { return (GL_R32F_EXT,                         GL_RED_EXT,         GL_FLOAT                 ) },
+        #[cfg(    graphics_api = "opengl_es3"                                                         )] UncompressedR32G32B32    => if ext_supported.tex_float32   { return (GL_RGB32F_EXT,                       GL_RGB,             GL_FLOAT                 ) },
+        #[cfg(    graphics_api = "opengl_es3"                                                         )] UncompressedR32G32B32A32 => if ext_supported.tex_float32   { return (GL_RGBA32F_EXT,                      GL_RGBA,            GL_FLOAT                 ) },
+        #[cfg(    graphics_api = "opengl_es3"                                                         )] UncompressedR16          => if ext_supported.tex_float16   { return (GL_R16F_EXT,                         GL_RED_EXT,         GL_HALF_FLOAT            ) },
+        #[cfg(    graphics_api = "opengl_es3"                                                         )] UncompressedR16G16B16    => if ext_supported.tex_float16   { return (GL_RGB16F_EXT,                       GL_RGB,             GL_HALF_FLOAT            ) },
+        #[cfg(    graphics_api = "opengl_es3"                                                         )] UncompressedR16G16B16A16 => if ext_supported.tex_float16   { return (GL_RGBA16F_EXT,                      GL_RGBA,            GL_HALF_FLOAT            ) },
+        #[cfg(any(graphics_api = "opengl_21", graphics_api = "opengl_es2")                            )] UncompressedR32          => if ext_supported.tex_float32   { return (GL_LUMINANCE,                        GL_LUMINANCE,       GL_FLOAT                 ) }, // NOTE: Requires extension OES_texture_float
+        #[cfg(any(graphics_api = "opengl_21", graphics_api = "opengl_es2")                            )] UncompressedR32G32B32    => if ext_supported.tex_float32   { return (GL_RGB,                              GL_RGB,             GL_FLOAT                 ) }, // NOTE: Requires extension OES_texture_float
+        #[cfg(any(graphics_api = "opengl_21", graphics_api = "opengl_es2")                            )] UncompressedR32G32B32A32 => if ext_supported.tex_float32   { return (GL_RGBA,                             GL_RGBA,            GL_FLOAT                 ) }, // NOTE: Requires extension OES_texture_float
+        #[cfg(    graphics_api = "opengl_21"                                                          )] UncompressedR16          => if ext_supported.tex_float16   { return (GL_LUMINANCE,                        GL_LUMINANCE,       GL_HALF_FLOAT_ARB        ) },
+        #[cfg(    graphics_api = "opengl_21"                                                          )] UncompressedR16G16B16    => if ext_supported.tex_float16   { return (GL_RGB,                              GL_RGB,             GL_HALF_FLOAT_ARB        ) },
+        #[cfg(    graphics_api = "opengl_21"                                                          )] UncompressedR16G16B16A16 => if ext_supported.tex_float16   { return (GL_RGBA,                             GL_RGBA,            GL_HALF_FLOAT_ARB        ) },
+        #[cfg(    graphics_api = "opengl_es2"                                                         )] UncompressedR16          => if ext_supported.tex_float16   { return (GL_LUMINANCE,                        GL_LUMINANCE,       GL_HALF_FLOAT_OES        ) }, // NOTE: Requires extension OES_texture_half_float
+        #[cfg(    graphics_api = "opengl_es2"                                                         )] UncompressedR16G16B16    => if ext_supported.tex_float16   { return (GL_RGB,                              GL_RGB,             GL_HALF_FLOAT_OES        ) }, // NOTE: Requires extension OES_texture_half_float
+        #[cfg(    graphics_api = "opengl_es2"                                                         )] UncompressedR16G16B16A16 => if ext_supported.tex_float16   { return (GL_RGBA,                             GL_RGBA,            GL_HALF_FLOAT_OES        ) }, // NOTE: Requires extension OES_texture_half_float
+        #[cfg(    graphics_api = "opengl_33"                                                          )] UncompressedGrayscale    =>                                  return (GL_R8,                               GL_RED,             GL_UNSIGNED_BYTE         ),
+        #[cfg(    graphics_api = "opengl_33"                                                          )] UncompressedGrayAlpha    =>                                  return (GL_RG8,                              GL_RG,              GL_UNSIGNED_BYTE         ),
+        #[cfg(    graphics_api = "opengl_33"                                                          )] UncompressedR5G6B5       =>                                  return (GL_RGB565,                           GL_RGB,             GL_UNSIGNED_SHORT_5_6_5  ),
+        #[cfg(    graphics_api = "opengl_33"                                                          )] UncompressedR8G8B8       =>                                  return (GL_RGB8,                             GL_RGB,             GL_UNSIGNED_BYTE         ),
+        #[cfg(    graphics_api = "opengl_33"                                                          )] UncompressedR5G5B5A1     =>                                  return (GL_RGB5_A1,                          GL_RGBA,            GL_UNSIGNED_SHORT_5_5_5_1),
+        #[cfg(    graphics_api = "opengl_33"                                                          )] UncompressedR4G4B4A4     =>                                  return (GL_RGBA4,                            GL_RGBA,            GL_UNSIGNED_SHORT_4_4_4_4),
+        #[cfg(    graphics_api = "opengl_33"                                                          )] UncompressedR8G8B8A8     =>                                  return (GL_RGBA8,                            GL_RGBA,            GL_UNSIGNED_BYTE         ),
+        #[cfg(    graphics_api = "opengl_33"                                                          )] UncompressedR32          => if ext_supported.tex_float32   { return (GL_R32F,                             GL_RED,             GL_FLOAT                 ) },
+        #[cfg(    graphics_api = "opengl_33"                                                          )] UncompressedR32G32B32    => if ext_supported.tex_float32   { return (GL_RGB32F,                           GL_RGB,             GL_FLOAT                 ) },
+        #[cfg(    graphics_api = "opengl_33"                                                          )] UncompressedR32G32B32A32 => if ext_supported.tex_float32   { return (GL_RGBA32F,                          GL_RGBA,            GL_FLOAT                 ) },
+        #[cfg(    graphics_api = "opengl_33"                                                          )] UncompressedR16          => if ext_supported.tex_float16   { return (GL_R16F,                             GL_RED,             GL_HALF_FLOAT            ) },
+        #[cfg(    graphics_api = "opengl_33"                                                          )] UncompressedR16G16B16    => if ext_supported.tex_float16   { return (GL_RGB16F,                           GL_RGB,             GL_HALF_FLOAT            ) },
+        #[cfg(    graphics_api = "opengl_33"                                                          )] UncompressedR16G16B16A16 => if ext_supported.tex_float16   { return (GL_RGBA16F,                          GL_RGBA,            GL_HALF_FLOAT            ) },
+        #[cfg(not(graphics_api = "opengl_11")                                                         )] CompressedDXT1RGB        => if ext_supported.tex_comp_dxt  { return (GL_COMPRESSED_RGB_S3TC_DXT1_EXT,     0,                  0                        ) },
+        #[cfg(not(graphics_api = "opengl_11")                                                         )] CompressedDXT1RGBA       => if ext_supported.tex_comp_dxt  { return (GL_COMPRESSED_RGBA_S3TC_DXT1_EXT,    0,                  0                        ) },
+        #[cfg(not(graphics_api = "opengl_11")                                                         )] CompressedDXT3RGBA       => if ext_supported.tex_comp_dxt  { return (GL_COMPRESSED_RGBA_S3TC_DXT3_EXT,    0,                  0                        ) },
+        #[cfg(not(graphics_api = "opengl_11")                                                         )] CompressedDXT5RGBA       => if ext_supported.tex_comp_dxt  { return (GL_COMPRESSED_RGBA_S3TC_DXT5_EXT,    0,                  0                        ) },
+        #[cfg(not(graphics_api = "opengl_11")                                                         )] CompressedETC1RGB        => if ext_supported.tex_comp_etc1 { return (GL_ETC1_RGB8_OES,                    0,                  0                        ) }, // NOTE: Requires OpenGL ES 2.0 or OpenGL 4.3
+        #[cfg(not(graphics_api = "opengl_11")                                                         )] CompressedETC2RGB        => if ext_supported.tex_comp_etc2 { return (GL_COMPRESSED_RGB8_ETC2,             0,                  0                        ) }, // NOTE: Requires OpenGL ES 3.0 or OpenGL 4.3
+        #[cfg(not(graphics_api = "opengl_11")                                                         )] CompressedETC2EACRGBA    => if ext_supported.tex_comp_etc2 { return (GL_COMPRESSED_RGBA8_ETC2_EAC,        0,                  0                        ) }, // NOTE: Requires OpenGL ES 3.0 or OpenGL 4.3
+        #[cfg(not(graphics_api = "opengl_11")                                                         )] CompressedPVRTRGB        => if ext_supported.tex_comp_pvrt { return (GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG,  0,                  0                        ) }, // NOTE: Requires PowerVR GPU
+        #[cfg(not(graphics_api = "opengl_11")                                                         )] CompressedPVRTRGBA       => if ext_supported.tex_comp_pvrt { return (GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG, 0,                  0                        ) }, // NOTE: Requires PowerVR GPU
+        #[cfg(not(graphics_api = "opengl_11")                                                         )] CompressedASTC4x4RGBA    => if ext_supported.tex_comp_astc { return (GL_COMPRESSED_RGBA_ASTC_4x4_KHR,     0,                  0                        ) }, // NOTE: Requires OpenGL ES 3.1 or OpenGL 4.3
+        #[cfg(not(graphics_api = "opengl_11")                                                         )] CompressedASTC8x8RGBA    => if ext_supported.tex_comp_astc { return (GL_COMPRESSED_RGBA_ASTC_8x8_KHR,     0,                  0                        ) }, // NOTE: Requires OpenGL ES 3.1 or OpenGL 4.3
+        _ => tracelog!(LogWarning, "TEXTURE: Current format not supported ({})", format),
+    }
+    (0, 0, 0)
+}
+
+/// Get pixel data size in bytes (image or texture)
+/// NOTE: Size depends on pixel format
+pub const fn get_pixel_data_size(width: u32, height: u32, format: PixelFormat) -> u32 {
+    const COMPRESSED_DXT1RGB:     isize = PixelFormat::CompressedDXT1RGB     as isize;
+    const COMPRESSED_DXT3RGBA:    isize = PixelFormat::CompressedDXT3RGBA    as isize;
+    const COMPRESSED_ASTC8X8RGBA: isize = PixelFormat::CompressedASTC8x8RGBA as isize;
+
+    // Bits per pixel
+    let bpp: u32 = match format {
+        PixelFormat::UncompressedGrayscale => 8,
+        PixelFormat::UncompressedGrayAlpha |
+        PixelFormat::UncompressedR5G6B5 |
+        PixelFormat::UncompressedR5G5B5A1 |
+        PixelFormat::UncompressedR4G4B4A4 => 16,
+        PixelFormat::UncompressedR8G8B8A8 => 32,
+        PixelFormat::UncompressedR8G8B8 => 24,
+        PixelFormat::UncompressedR32 => 32,
+        PixelFormat::UncompressedR32G32B32 => 32*3,
+        PixelFormat::UncompressedR32G32B32A32 => 32*4,
+        PixelFormat::UncompressedR16 => 16,
+        PixelFormat::UncompressedR16G16B16 => 16*3,
+        PixelFormat::UncompressedR16G16B16A16 => 16*4,
+        PixelFormat::CompressedDXT1RGB |
+        PixelFormat::CompressedDXT1RGBA |
+        PixelFormat::CompressedETC1RGB |
+        PixelFormat::CompressedETC2RGB |
+        PixelFormat::CompressedPVRTRGB |
+        PixelFormat::CompressedPVRTRGBA => 4,
+        PixelFormat::CompressedDXT3RGBA |
+        PixelFormat::CompressedDXT5RGBA |
+        PixelFormat::CompressedETC2EACRGBA |
+        PixelFormat::CompressedASTC4x4RGBA => 8,
+        PixelFormat::CompressedASTC8x8RGBA => 2,
+    };
+
+    let bytes_per_pixel: f64 = bpp as f64 / 8.0;
+    // Size in bytes
+    let mut data_size = (bytes_per_pixel * width as f64 * height as f64) as u32; // Total data size in bytes
+
+    // Most compressed formats works on 4x4 blocks,
+    // if texture is smaller, minimum dataSize is 8 or 16
+    if width < 4 && height < 4 {
+        match format as isize {
+            COMPRESSED_DXT1RGB ..COMPRESSED_DXT3RGBA    => data_size =  8,
+            COMPRESSED_DXT3RGBA..COMPRESSED_ASTC8X8RGBA => data_size = 16,
+            _ => (),
         }
     }
 
-    if cfg!(any(feature = "graphics_api_opengl_33", feature = "graphics_api_opengl_es2")) {
-        // Init default white texture
-        let pixels = [255, 255, 255, 255];   // 1 pixel RGBA (4 bytes)
-        rlgl.state.default_texture_id = rlLoadTexture(pixels, 1, 1, RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 1);
-
-        if rlgl.state.default_texture_id != 0 { tracelog!(RL_LOG_INFO, "TEXTURE: [ID %i] Default texture loaded successfully", rlgl.state.default_texture_id); }
-        else { tracelog!(RL_LOG_WARNING, "TEXTURE: Failed to load default texture"); }
-
-        // Init default Shader (customized for GL 3.3 and ES2)
-        // Loaded: rlgl.state.defaultShaderId + rlgl.state.defaultShaderLocs
-        rlLoadShaderDefault();
-        rlgl.state.current_shader_id = rlgl.state.default_shader_id;
-        rlgl.state.current_shader_locs = rlgl.state.default_shader_locs;
-
-        // Init default vertex arrays buffers
-        rlgl.sefault_batch = rlLoadRenderBatch(RL_DEFAULT_BATCH_BUFFERS, RL_DEFAULT_BATCH_BUFFER_ELEMENTS);
-        rlgl.surrent_batch = &rlgl.sefault_batch;
-
-        // Init stack matrices (emulating OpenGL 1.1)
-        for i in 0..RL_MAX_MATRIX_STACK_SIZE { rlgl.state.stack[i] = rlMatrixIdentity(); }
-
-        // Init internal matrices
-        rlgl.state.transform = rlMatrixIdentity();
-        rlgl.state.projection = rlMatrixIdentity();
-        rlgl.state.modelview = rlMatrixIdentity();
-        rlgl.state.current_matrix = &rlgl.state.modelview;
-    } // GRAPHICS_API_OPENGL_33 || GRAPHICS_API_OPENGL_ES2
-
-    // Initialize OpenGL default states
-    //----------------------------------------------------------
-    // Init state: Depth test
-    glDepthFunc(GL_LEQUAL);                                 // Type of depth testing to apply
-    glDisable(GL_DEPTH_TEST);                               // Disable depth testing for 2D (only used for 3D)
-
-    // Init state: Blending mode
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);      // Color blending function (how colors are mixed)
-    glEnable(GL_BLEND);                                     // Enable color blending (required to work with transparencies)
-
-    // Init state: Culling
-    // NOTE: All shapes/models triangles are drawn CCW
-    glCullFace(GL_BACK);                                    // Cull the back face (default)
-    glFrontFace(GL_CCW);                                    // Front face are defined counter clockwise (default)
-    glEnable(GL_CULL_FACE);                                 // Enable backface culling
-
-    // Init state: Cubemap seamless
-    if cfg!(feature = "graphics_api_opengl_33") {
-        glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);             // Seamless cubemaps (not supported on OpenGL ES 2.0)
-    }
-
-    if cfg!(feature = "graphics_api_opengl_11") {
-        // Init state: Color hints (deprecated in OpenGL 3.0+)
-        glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);  // Improve quality of color and texture coordinate interpolation
-        glShadeModel(GL_SMOOTH);                            // Smooth shading between vertex (vertex colors interpolation)
-    }
-
-    if cfg!(feature = "GRAPHICS_API_OPENGL_33", feature = "GRAPHICS_API_OPENGL_ES2") {
-        // Store screen size into global variables
-        rlgl.state.framebuffer_width = width;
-        rlgl.state.framebuffer_height = height;
-
-        tracelog!(RL_LOG_INFO, "RLGL: Default OpenGL state initialized successfully");
-        //----------------------------------------------------------
-    }
-
-    // Init state: Color/Depth buffers clear
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);                   // Set clear color (black)
-    glClearDepth(1.0f);                                     // Set clear depth value (default)
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);     // Clear color and depth buffers (depth buffer required for 3D)
-
-    rlgl
-}
-
-// Vertex Buffer Object deinitialization (memory free)
-fn rlglClose() {
-    if cfg!(any(feature = "graphics_api_opengl_33", feature = "graphics_api_opengl_es2")) {
-        rlUnloadRenderBatch(rlgl.default_batch);
-
-        rlUnloadShaderDefault();          // Unload default shader
-
-        glDeleteTextures(1, &rlgl.State.defaultTextureId); // Unload default texture
-        tracelog!(RL_LOG_INFO, "TEXTURE: [ID %i] Default texture unloaded successfully", rlgl.State.defaultTextureId);
-    }
-}
-
-// Choose the current matrix to be transformed
-fn rlMatrixMode(rlgl: &mut rlglData, mode: i32) {
-    if mode == RL_PROJECTION { rlgl.state.current_matrix = &mut rlgl.state.projection as *mut _; }
-    else if mode == RL_MODELVIEW { rlgl.state.current_matrix = &mut rlgl.state.modelview as *mut _; }
-    // else if mode == RL_TEXTURE // Not supported
-
-    rlgl.state.current_matrix_mode = mode;
+    data_size
 }
