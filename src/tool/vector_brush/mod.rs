@@ -102,7 +102,12 @@ impl PathSignal {
                 let adj_length = (delta_prev / distance_sqr_prev.sqrt()).dot(delta);
                 let opp_length_sqr = distance_sqr - adj_length * adj_length;
 
-                if adj_length < 0.0 || opp_length_sqr > MIN_OPP_LENGTH_SQR {
+                if adj_length < 0.0 {
+                    change_type = ChangeType::Curvature;
+
+                    self.last_curved = p;
+                    self.last_straight = p;
+                } else if opp_length_sqr > MIN_OPP_LENGTH_SQR {
                     change_type = ChangeType::Direction;
 
                     if self.last_curved != last_straight {
@@ -147,11 +152,11 @@ impl ActiveVectorBrush {
         }
     }
 
-    // sometimes two points will be created at the same position on high framerates, creating a division by zero error.
-    // this makes sure they become one point.
+    // At high speeds, a point can be made with a zero-length control, creating what looks like a distinct path.
+    // This function fixes that.
     fn merge_confirmed_verts(path: &mut VectorPath) {
         // join points confirmed to be no longer editing
-        if let Some(idx) = path.curve.points.len().checked_sub(4) && path.curve.points[idx].p.distance_sqr_to(path.curve.points[idx + 1].p) < 0.001 {
+        if let Some(idx) = path.curve.points.len().checked_sub(3) && path.curve.points[idx].p.distance_sqr_to(path.curve.points[idx + 1].p) < 0.001 {
             let b = path.curve.points.remove(idx + 1).expect("checked sub should ensure element existence");
             let a = &mut path.curve.points[idx];
             println!("merging points\n  {a:?}\n  {b:?}");
@@ -280,7 +285,7 @@ impl ToolType for VectorBrush {
     }
 
     fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable) {
-        const DRAW_DEBUG: bool = true;
+        const DRAW_DEBUG: bool = false;
         let zoom_inv = document.camera.zoom.recip();
         if let VectorBrush::Active(brush) = self {
             brush.draw(d, document, shader_table);
