@@ -1,4 +1,4 @@
-#![feature(portable_simd)]
+#![feature(portable_simd, more_float_constants)]
 
 pub mod vector;
 pub mod matrix;

@@ -100,3 +100,24 @@ impl SnapTo for Vector2 {
         self.distance_sqr_to(self.snap_to_segment(start, end))
     }
 }
+
+pub trait Rotate90 {
+    fn rotate90_cw(&self) -> Self;
+    fn rotate90_cc(&self) -> Self;
+}
+
+impl Rotate90 for Vector2 {
+    fn rotate90_cw(&self) -> Self {
+        Self {
+            x: -self.y,
+            y:  self.x,
+        }
+    }
+
+    fn rotate90_cc(&self) -> Self {
+        Self {
+            x:  self.y,
+            y: -self.x,
+        }
+    }
+}

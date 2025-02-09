@@ -119,6 +119,15 @@ impl Rect2 {
     pub fn height(&self) -> f32 {
         self.ymax - self.ymin
     }
+
+    pub fn grow(self, amnt: f32) -> Self {
+        Self {
+            xmin: self.xmin - amnt,
+            ymin: self.ymin - amnt,
+            xmax: self.xmax + amnt,
+            ymax: self.ymax + amnt,
+        }
+    }
 }
 
 impl From<Rectangle> for Rect2 {

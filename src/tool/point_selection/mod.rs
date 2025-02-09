@@ -71,14 +71,38 @@ impl PointSelection {
             }
         }
 
+        // // test
+        // let mouse_world_pos = Vector2::from(unsafe { ffi::GetScreenToWorld2D(ffi::GetMousePosition(), document.camera.into()) });
+        // d.draw_circle_v(mouse_world_pos, 5.0, Color::RED);
+        // for layer in document.layers.shallow_iter().cdir::<BackToFore>() {
+        //     if let Layer::Path(path) = layer {
+        //         let path = path.read();
+        //         for bez in path.curve.slices() {
+        //             if bez.bounds().grow(HOVER_RADIUS_SQR).is_overlapping_point(mouse_world_pos) &&
+        //                 let Some((_t, p)) = bez.estimate_time_at(mouse_world_pos) &&
+        //                 p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR
+        //             {
+        //                 d.draw_circle_v(p, 4.0, Color::GREEN);
+        //             }
+        //         }
+        //     }
+        // }
+
         let hovered_point = document.layers
             .shallow_iter_mut()
             .cdir::<ForeToBack>()
             .find_map(|layer| {
                 if let Layer::Path(path) = layer {
-                    let idx = path.read().curve.points.iter()
+                    let path_borrow = path.read();
+                    let curve = &path_borrow.curve;
+                    let idx = curve.points.iter()
                         .position(|pp| pp.p.rec_distance_to(mouse_world_pos) <= HOVER_RADIUS);
-                    if let Some(idx) = idx {
+                    if idx.is_some() || curve.slices()
+                        .any(|bez|
+                            bez.bounds().grow(HOVER_RADIUS).is_overlapping_point(mouse_world_pos) &&
+                            bez.estimate_time_at(mouse_world_pos).is_some_and(|(_, p)| p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR))
+                    {
+                        drop(path_borrow);
                         return Some((path, idx));
                     }
                 }
@@ -133,7 +157,7 @@ impl PointSelection {
                     SelectionState {
                         selection: match &selected[..] {
                             [SelectionPiece { target, points }] if points.len() == 1
-                                => Selection::Singular(SingleSelect { target: target.clone_mut(), pt_idx: points[0], part: PPPart::Anchor }),
+                                => Selection::Singular(SingleSelect { target: target.clone_mut(), pt_idx: Some(points[0]), part: PPPart::Anchor }),
                             [..]
                                 => Selection::Multiple(MultiSelect { pieces: selected }),
                         },

@@ -7,3 +7,5 @@ edition = "2021"
 raylib = "5.0.2"
 amylib = { path = "../amylib" }
 amymath = { path = "../amymath" }
+rltest = { path = "../rltest" }
+num = "0.4.3"
