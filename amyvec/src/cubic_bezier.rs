@@ -1,6 +1,6 @@
-use amymath::prelude::{DistanceSqr, Rect2};
+use amymath::prelude::{DistanceSqr, Matrix2x2, Rect2};
 use raylib::prelude::*;
-use num::complex::Complex32;
+use crate::polynomial::*;
 
 pub struct CubicBezier {
     pub p1:     Vector2,
@@ -12,163 +12,6 @@ pub struct CubicBezier {
 impl CubicBezier {
     pub(super) fn new(p1: Vector2, c1_out: Vector2, c2_in: Vector2, p2: Vector2) -> Self {
         Self { p1, c1_out, c2_in, p2 }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum LinearZeros {
-    NoSolution,
-    InfiniteSolutions,
-    OneSolution(f32),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum QuadraticZeros {
-    NoSolution,
-    InfiniteSolutions,
-    OneSolution(f32),
-    TwoSolutions(f32, f32),
-}
-
-impl From<LinearZeros> for QuadraticZeros {
-    fn from(value: LinearZeros) -> Self {
-        match value {
-            LinearZeros::NoSolution => Self::NoSolution,
-            LinearZeros::InfiniteSolutions => Self::InfiniteSolutions,
-            LinearZeros::OneSolution(x) => Self::OneSolution(x),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum CubicZeros {
-    NoSolution,
-    InfiniteSolutions,
-    OneSolution(f32),
-    TwoSolutions(f32, f32),
-    ThreeSolutions(f32, f32, f32),
-}
-
-impl From<QuadraticZeros> for CubicZeros {
-    fn from(value: QuadraticZeros) -> Self {
-        match value {
-            QuadraticZeros::NoSolution => Self::NoSolution,
-            QuadraticZeros::InfiniteSolutions => Self::InfiniteSolutions,
-            QuadraticZeros::OneSolution(x) => Self::OneSolution(x),
-            QuadraticZeros::TwoSolutions(x0, x1) => Self::TwoSolutions(x0, x1),
-        }
-    }
-}
-
-pub fn linear_zero(m: f32, b: f32) -> LinearZeros {
-    if m != 0.0 {
-        LinearZeros::OneSolution(-b / m)
-    } else if b == 0.0 {
-        LinearZeros::InfiniteSolutions
-    } else {
-        LinearZeros::NoSolution
-    }
-}
-
-pub fn quadratic_zero(a: f32, b: f32, c: f32) -> QuadraticZeros {
-    if a != 0.0 {
-        let b2_4ac = b*b - 4.0*a*c;
-        if b2_4ac > 0.0 {
-            let denom = (2.0 * a).recip();
-            let parts = (-b * denom, b2_4ac.sqrt() * denom);
-            QuadraticZeros::TwoSolutions(parts.0 + parts.1, parts.0 - parts.1)
-        } else if b2_4ac == 0.0 {
-            QuadraticZeros::OneSolution(-b / (2.0 * a))
-        } else {
-            QuadraticZeros::NoSolution
-        }
-    } else {
-        linear_zero(b, c).into()
-    }
-}
-
-pub fn cubic_zero(a: f32, b: f32, c: f32, d: f32) -> CubicZeros {
-    #[allow(non_snake_case, non_upper_case_globals)]
-    if a != 0.0 {
-        const w1: Complex32 = Complex32::new(-0.5, std::f32::consts::SQRT_3 *  0.5);
-        const w2: Complex32 = Complex32::new(-0.5, std::f32::consts::SQRT_3 * -0.5);
-        let b_3a = -b/(3.0*a);
-        let P = b_3a*b_3a*b_3a + (b*c)/(6.0*a*a) - d/(2.0*a);
-        let Q = c/(3.0*a) - b_3a*b_3a;
-        let sqrt = Complex32::new(P*P + Q*Q*Q, 0.0).sqrt();
-        let radicals = ((P - sqrt).cbrt(), (P + sqrt).cbrt());
-        let x1 =    radicals.0 +    radicals.1 + b_3a;
-        let x2 = w1*radicals.0 + w2*radicals.1 + b_3a;
-        let x3 = w2*radicals.0 + w1*radicals.1 + b_3a;
-        match (
-            (x1.im.abs() <= f32::EPSILON && x1.re.is_normal()).then_some(x1.re),
-            (x2.im.abs() <= f32::EPSILON && x2.re.is_normal()).then_some(x2.re),
-            (x3.im.abs() <= f32::EPSILON && x3.re.is_normal()).then_some(x3.re),
-        ) {
-            (None, None, None) => CubicZeros::NoSolution,
-            (Some(x1), Some(x2), Some(x3)) => CubicZeros::ThreeSolutions(x1, x2, x3),
-
-            | (Some(x1), None, None)
-            | (None, Some(x1), None)
-            | (None, None, Some(x1))
-                => CubicZeros::OneSolution(x1),
-
-            | (Some(x1), Some(x2), None)
-            | (Some(x1), None, Some(x2))
-            | (None, Some(x1), Some(x2))
-                => CubicZeros::TwoSolutions(x1, x2),
-        }
-    } else {
-        quadratic_zero(b, c, d).into()
-    }
-}
-
-#[cfg(test)]
-mod quadratic_tests {
-    use super::*;
-
-    #[test]
-    fn test_two_solutions() {
-        // x^2 + 5x + 6 = 0
-        assert_eq!(quadratic_zero(1.0, 5.0, 6.0), QuadraticZeros::TwoSolutions(-2.0, -3.0));
-    }
-
-    #[test]
-    fn test_one_solution() {
-        // 1x^2 + 0x + 0 = 0
-        assert_eq!(quadratic_zero(1.0, 0.0, 0.0), QuadraticZeros::OneSolution(0.0));
-    }
-
-    #[test]
-    fn test_no_solutions() {
-        // 0.5x^2 + 3x + 7 = 0
-        assert_eq!(quadratic_zero(0.5, 3.0, 7.0), QuadraticZeros::NoSolution);
-    }
-
-    #[test]
-    fn test_three_solutions() {
-        let p0 = Vector2::new(-0.3, 0.2);
-        let p1 = Vector2::new(0.117, 0.55);
-        let p2 = Vector2::new(0.98, 0.62);
-        let p3 = Vector2::new(1.46, 0.043);
-        let pt = Vector2::new(0.492, 0.475);
-        let (p0, p1, p2, p3, p) = (p0.x - p0.y, p1.x - p1.y, p2.x - p2.y, p3.x - p3.y, pt.x - pt.y);
-        let a = p3 + 3.0*(p1 - p2) - p0;
-        assert!((a - -0.462).abs() < 0.001);
-        let b = 3.0*(p2 - 2.0*p1 + p0);
-        assert!((b - 2.178).abs() < 0.001);
-        let c = 3.0*(p1 - p0);
-        assert!((c - 0.201).abs() < 0.001);
-        let d = p0 - p;
-        assert!((d - -0.517).abs() < 0.001);
-        let zeros = cubic_zero(a, b, c, d);
-        if let CubicZeros::ThreeSolutions(x1, x2, x3) = zeros {
-            assert!((x1 - 4.7562).abs() < 0.0001);
-            assert!((x2 - 0.4645).abs() < 0.0001);
-            assert!((x3 + 0.5065).abs() < 0.0001);
-        } else {
-            assert!(false, "{:?}", zeros);
-        }
     }
 }
 
@@ -288,7 +131,42 @@ impl CubicBezier {
         }
     }
 
+    /// Reciprocal radius (or "radians per meter") at time along curve
+    pub fn curvature_at(&self, t: f32) -> f32 {
+        // Larger assembly, but ~99.5% speed increase :)
+
+        // const EXPERIMENTAL_IMPL: bool = true;
+        // if EXPERIMENTAL_IMPL {
+            let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
+            let Vector2 { x: a, y: x } = p0;
+            let Vector2 { x: b, y    } = p1;
+            let Vector2 { x: c, y: z } = p2;
+            let Vector2 { x: d, y: w } = p3;
+            (2.0 * ((
+                (1.0 - t)*(1.0 - t)*(1.0 - t)*(a*(y - z) - b*(x - z) + c*(x - y)) +
+                (1.0 - t)*(1.0 - t)*       t *(a*(y - w) - b*(x - w) + d*(x - y)) +
+                (1.0 - t)*       t *       t *(a*(z - w) - b*(x - w) + d*(x - z)) +
+                       t *       t *       t *(b*(z - w) - c*(y - w) + d*(y - z))
+            ))) /
+            (3.0 * (
+                    (1.0 - t)*(1.0 - t)*(1.0 - t)*(1.0 - t)*((a - b)*(a - b) + (x - y)*(x - y)) +
+                4.0*(1.0 - t)*(1.0 - t)*(1.0 - t)*       t *((a - b)*(b - c) + (x - y)*(y - z)) +
+                2.0*(1.0 - t)*(1.0 - t)*       t *       t *((b - a)*(d - c) + (y - x)*(w - z) + 2.0*((c - b)*(c - b) + (z - y)*(z - y))) +
+                4.0*(1.0 - t)*       t *       t *       t *((b - c)*(c - d) + (w - z)*(z - y)) +
+                           t *       t *       t *       t *((c - d)*(c - d) + (w - z)*(w - z))
+            ).sqrt().powi(3))
+        // } else {
+        //     let vel = self.velocity_at(t); // P'
+        //     let acc = self.acceleration_at(t); // P''
+        //     Matrix2x2::from_basis(vel, acc).det() / vel.length().powi(3)
+        // }
+    }
+
     /// Time along curve closest to the position
+    ///
+    /// ## Notes about current implementation
+    /// Loses accuracy the further the point is from the curve.
+    /// Excessively sensitive to this at start and end of the curve.
     pub fn estimate_time_at(&self, pt: Vector2) -> Option<(f32, Vector2)> {
         let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
         let (p0, p1, p2, p3, p) = (p0.x - p0.y, p1.x - p1.y, p2.x - p2.y, p3.x - p3.y, pt.x - pt.y);
@@ -310,5 +188,65 @@ impl CubicBezier {
             })
             .reduce(|best, curr| if curr.2 < best.2 { curr } else { best })
             .map(|(t, p, _dist_sqr)| (t, p))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[bench]
+    fn benchmark_old(b: &mut ::test::Bencher) {
+        let bez = ::test::black_box(CubicBezier::new(
+            Vector2::new(53.0256, 6.7564),
+            Vector2::new(643.0254, -357.3653),
+            Vector2::new(-125.364, 24.563),
+            Vector2::new(564.2646, -463.2665),
+        ));
+        let t = 0.768456;
+        let n = ::test::black_box(1000);
+
+        b.iter(|| {
+            (0..n).fold(0.0, |_a, _b| {
+                let vel = bez.velocity_at(t); // P'
+                let acc = bez.acceleration_at(t); // P''
+                Matrix2x2::from_basis(vel, acc).det() / vel.length().powi(3)
+            })
+        });
+    }
+
+    #[bench]
+    fn benchmark_new(b: &mut ::test::Bencher) {
+        let bez = ::test::black_box(CubicBezier::new(
+            Vector2::new(53.0256, 6.7564),
+            Vector2::new(643.0254, -357.3653),
+            Vector2::new(-125.364, 24.563),
+            Vector2::new(564.2646, -463.2665),
+        ));
+        let t = 0.768456;
+        let n = ::test::black_box(1000);
+
+        b.iter(|| {
+            (0..n).fold(0.0, |_a, _b| {
+                let (p0, p1, p2, p3) = (bez.p1, bez.c1_out, bez.c2_in, bez.p2);
+                let Vector2 { x: a, y: x } = p0;
+                let Vector2 { x: b, y    } = p1;
+                let Vector2 { x: c, y: z } = p2;
+                let Vector2 { x: d, y: w } = p3;
+                (2.0 * ((
+                    (1.0 - t)*(1.0 - t)*(1.0 - t)*(a*(y - z) - b*(x - z) + c*(x - y)) +
+                    (1.0 - t)*(1.0 - t)*       t *(a*(y - w) - b*(x - w) + d*(x - y)) +
+                    (1.0 - t)*       t *       t *(a*(z - w) - b*(x - w) + d*(x - z)) +
+                           t *       t *       t *(b*(z - w) - c*(y - w) + d*(y - z))
+                ))) /
+                (3.0 * (
+                        (1.0 - t)*(1.0 - t)*(1.0 - t)*(1.0 - t)*((a - b)*(a - b) + (x - y)*(x - y)) +
+                    4.0*(1.0 - t)*(1.0 - t)*(1.0 - t)*       t *((a - b)*(b - c) + (x - y)*(y - z)) +
+                    2.0*(1.0 - t)*(1.0 - t)*       t *       t *((b - a)*(d - c) + (y - x)*(w - z) + 2.0*((c - b)*(c - b) + (z - y)*(z - y))) +
+                    4.0*(1.0 - t)*       t *       t *       t *((b - c)*(c - d) + (w - z)*(z - y)) +
+                               t *       t *       t *       t *((c - d)*(c - d) + (w - z)*(w - z))
+                ).sqrt().powi(3))
+            })
+        });
     }
 }

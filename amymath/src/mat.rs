@@ -18,6 +18,13 @@ impl Matrix2x2 {
         m10: 0.0, m11: 1.0,
     };
 
+    pub const fn from_basis(v1: Vector2, v2: Vector2) -> Self {
+        Self {
+            m00: v1.x, m01: v1.y,
+            m10: v2.x, m11: v2.y,
+        }
+    }
+
     pub const fn identity() -> Self {
         Self::IDENTITY
     }
@@ -43,11 +50,8 @@ impl Matrix2x2 {
         }
     }
 
-    pub fn mul(&self, rhs: Vector2) -> Vector2 {
-        Vector2 {
-            x: self.m00 * rhs.x + self.m01 * rhs.y,
-            y: self.m10 * rhs.x + self.m11 * rhs.y,
-        }
+    pub fn det(&self) -> f32 {
+        self.m00*self.m11 - self.m01*self.m10
     }
 }
 
@@ -99,6 +103,18 @@ impl std::ops::Mul for Matrix2x2 {
     }
 }
 
+impl std::ops::Mul for &Matrix2x2 {
+    type Output = Matrix2x2;
+    fn mul(self, rhs: Self) -> Self::Output {
+        Matrix2x2 {
+            m00: self.m00 * rhs.m00 + self.m01 * rhs.m10,
+            m01: self.m00 * rhs.m01 + self.m01 * rhs.m11,
+            m10: self.m10 * rhs.m00 + self.m11 * rhs.m10,
+            m11: self.m10 * rhs.m01 + self.m11 * rhs.m11,
+        }
+    }
+}
+
 impl std::ops::MulAssign for Matrix2x2 {
     fn mul_assign(&mut self, rhs: Self) {
         *self = *self * rhs;
@@ -106,6 +122,16 @@ impl std::ops::MulAssign for Matrix2x2 {
 }
 
 impl std::ops::Mul<Vector2> for Matrix2x2 {
+    type Output = Vector2;
+    fn mul(self, rhs: Vector2) -> Self::Output {
+        Vector2 {
+            x: self.m00 * rhs.x + self.m01 * rhs.y,
+            y: self.m10 * rhs.x + self.m11 * rhs.y,
+        }
+    }
+}
+
+impl std::ops::Mul<Vector2> for &Matrix2x2 {
     type Output = Vector2;
     fn mul(self, rhs: Vector2) -> Self::Output {
         Vector2 {

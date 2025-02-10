@@ -104,6 +104,11 @@ fn main() {
         .resizable()
         .build();
 
+    {
+        let icon_img = Image::gen_image_color(32, 32, Color::BLUEVIOLET);
+        rl.set_window_icon(&icon_img);
+    }
+
     // maximize window
     rl.set_window_state(WindowState::set_window_maximized(rl.get_window_state(), true));
     rl.set_target_fps(60);

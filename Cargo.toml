@@ -13,7 +13,3 @@ amymath = { path = "amymath" }
 amygui = { path = "amygui" }
 amyvec = { path = "amyvec" }
 rltest = { path = "rltest" }
-# raylib_rs = { path = "raylib_rs" }
-
-# [raylib_rs.cfg]
-# graphics_api = "opengl_33"

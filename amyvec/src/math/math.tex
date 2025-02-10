@@ -1,0 +1,1784 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Define Article %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass{article}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Using Packages %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{empheq}
+\usepackage{mdframed}
+\usepackage{booktabs}
+\usepackage{lipsum}
+\usepackage{graphicx}
+\usepackage{color}
+\usepackage{psfrag}
+\usepackage{pgfplots}
+\usepackage{bm}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Other Settings
+
+%%%%%%%%%%%%%%%%%%%%%%%%%% Page Setting %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\geometry{a4paper}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%% Define some useful colors %%%%%%%%%%%%%%%%%%%%%%%%%%
+\definecolor{ocre}{RGB}{243,102,25}
+\definecolor{mygray}{RGB}{243,243,244}
+\definecolor{deepGreen}{RGB}{26,111,0}
+\definecolor{shallowGreen}{RGB}{235,255,255}
+\definecolor{deepBlue}{RGB}{61,124,222}
+\definecolor{shallowBlue}{RGB}{235,249,255}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%% Define an orangebox command %%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand\orangebox[1]{\fcolorbox{ocre}{mygray}{\hspace{1em}#1\hspace{1em}}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%% English Environments %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newtheoremstyle{mytheoremstyle}{3pt}{3pt}{\normalfont}{0cm}{\rmfamily\bfseries}{}{1em}{{\color{black}\thmname{#1}~\thmnumber{#2}}\thmnote{\,--\,#3}}
+\newtheoremstyle{myproblemstyle}{3pt}{3pt}{\normalfont}{0cm}{\rmfamily\bfseries}{}{1em}{{\color{black}\thmname{#1}~\thmnumber{#2}}\thmnote{\,--\,#3}}
+\theoremstyle{mytheoremstyle}
+\newmdtheoremenv[linewidth=1pt,backgroundcolor=shallowGreen,linecolor=deepGreen,leftmargin=0pt,innerleftmargin=20pt,innerrightmargin=20pt,]{theorem}{Theorem}[section]
+\theoremstyle{mytheoremstyle}
+\newmdtheoremenv[linewidth=1pt,backgroundcolor=shallowBlue,linecolor=deepBlue,leftmargin=0pt,innerleftmargin=20pt,innerrightmargin=20pt,]{definition}{Definition}[section]
+\theoremstyle{myproblemstyle}
+\newmdtheoremenv[linecolor=black,leftmargin=0pt,innerleftmargin=10pt,innerrightmargin=10pt,]{problem}{Problem}[section]
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Plotting Settings %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepgfplotslibrary{colorbrewer}
+\pgfplotsset{width=8cm,compat=1.9}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Title & Author %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\title{Vector Math}
+\author{Amy Wilder}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\allowdisplaybreaks
+
+\begin{document}
+    \maketitle
+
+    \begin{align*}
+        P_0 &= \langle {\color{gray}\text{constant}},{\color{gray}\text{constant}} \rangle \\
+        P_1 &= \langle {\color{gray}\text{constant}},{\color{gray}\text{constant}} \rangle \\
+        P_2 &= \langle {\color{gray}\text{constant}},{\color{gray}\text{constant}} \rangle \\
+        P_3 &= \langle {\color{gray}\text{constant}},{\color{gray}\text{constant}} \rangle
+    \end{align*}
+
+    \begin{align*}
+        B(t) &= {(1-t)}^3P_0 + 3{(1-t)}^2tP_1 + 3{(1-t)}t^2P_2 + t^3P_3 \\[1em]
+        V(t) &= 3{(1-t)}^2(P_1 - P_0) + 6(1-t)t(P_2 - P_1) + 3t^2(P_3 - P_2) \\[1em]
+        A(t) &= 6(1-t)((P_2 - P_1) - (P_1 - P_0)) + 6t((P_3 - P_2) - (P_2 - P_1)) \\
+             &= 6(1-t)(P_2 - 2P_1 + P_0) + 6t(P_3 - 2P_2 + P_1)
+    \end{align*}
+
+    \begin{align*}
+        \frac{\det(V(t),A(t))}{{\lVert V(t) \rVert}^3}
+        &= \frac{V(t)_x A(t)_y - A(t)_x V(t)_y}{{\left(V(t)_x^2 + V(t)_y^2\right)}^{\frac{3}{2}}} \\[1em]
+        &= \scalebox{0.75}{\ensuremath{\frac{
+            \left(\begin{aligned}
+                3{(1-t)}^2&(P_{1x} - P_{0x})
+                \\&+\\
+                6(1-t)t&(P_{2x} - P_{1x})
+                \\&+\\
+                3t^2&(P_{3x} - P_{2x})
+            \end{aligned}\right)
+            \left(\begin{aligned}
+                6(1-t)&\left(\begin{gathered}
+                    (P_{2y} - P_{1y})
+                    \\-\\
+                    (P_{1y} - P_{0y})
+                \end{gathered}\right)
+                \\&+\\
+                6t&\left(\begin{gathered}
+                    (P_{3y} - P_{2y})
+                    \\-\\
+                    (P_{2y} - P_{1y})
+                \end{gathered}\right)
+            \end{aligned}\right)
+            -
+            \left(\begin{aligned}
+                3{(1-t)}^2&(P_{1y} - P_{0y})
+                \\&+\\
+                6(1-t)t&(P_{2y} - P_{1y})
+                \\&+\\
+                3t^2&(P_{3y} - P_{2y})
+            \end{aligned}\right)
+            \left(\begin{aligned}
+                6(1-t)&\left(\begin{gathered}
+                    (P_{2x} - P_{1x})
+                    \\-\\
+                    (P_{1x} - P_{0x})
+                \end{gathered}\right)
+                \\&+\\
+                6t&\left(\begin{gathered}
+                    (P_{3x} - P_{2x})
+                    \\-\\
+                    (P_{2x} - P_{1x})
+                \end{gathered}\right)
+            \end{aligned}\right)
+        }{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1x} - P_{0x})
+                    \\&+\\
+                    6(1-t)t&(P_{2x} - P_{1x})
+                    \\&+\\
+                    3t^2&(P_{3x} - P_{2x})
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1y} - P_{0y})
+                    \\&+\\
+                    6(1-t)t&(P_{2y} - P_{1y})
+                    \\&+\\
+                    3t^2&(P_{3y} - P_{2y})
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &= \scalebox{0.75}{\ensuremath{\frac{
+            \left(\begin{aligned}
+                6(1-t)\left(\begin{gathered}
+                    (P_{2y} - P_{1y})
+                    \\-\\
+                    (P_{1y} - P_{0y})
+                \end{gathered}\right)
+                &\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1x} - P_{0x})
+                    \\&+\\
+                    6(1-t)t&(P_{2x} - P_{1x})
+                    \\&+\\
+                    3t^2&(P_{3x} - P_{2x})
+                \end{aligned}\right)
+                \\&+\\
+                6t\left(\begin{gathered}
+                    (P_{3y} - P_{2y})
+                    \\-\\
+                    (P_{2y} - P_{1y})
+                \end{gathered}\right)
+                &\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1x} - P_{0x})
+                    \\&+\\
+                    6(1-t)t&(P_{2x} - P_{1x})
+                    \\&+\\
+                    3t^2&(P_{3x} - P_{2x})
+                \end{aligned}\right)
+            \end{aligned}\right)
+            -
+            \left(\begin{aligned}
+                6(1-t)\left(\begin{gathered}
+                    (P_{2x} - P_{1x})
+                    \\-\\
+                    (P_{1x} - P_{0x})
+                \end{gathered}\right)
+                &\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1y} - P_{0y})
+                    \\&+\\
+                    6(1-t)t&(P_{2y} - P_{1y})
+                    \\&+\\
+                    3t^2&(P_{3y} - P_{2y})
+                \end{aligned}\right)
+                \\&+\\
+                6t\left(\begin{gathered}
+                    (P_{3x} - P_{2x})
+                    \\-\\
+                    (P_{2x} - P_{1x})
+                \end{gathered}\right)
+                &\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1y} - P_{0y})
+                    \\&+\\
+                    6(1-t)t&(P_{2y} - P_{1y})
+                    \\&+\\
+                    3t^2&(P_{3y} - P_{2y})
+                \end{aligned}\right)
+            \end{aligned}\right)
+        }{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1x} - P_{0x})
+                    \\&+\\
+                    6(1-t)t&(P_{2x} - P_{1x})
+                    \\&+\\
+                    3t^2&(P_{3x} - P_{2x})
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1y} - P_{0y})
+                    \\&+\\
+                    6(1-t)t&(P_{2y} - P_{1y})
+                    \\&+\\
+                    3t^2&(P_{3y} - P_{2y})
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &= \scalebox{0.75}{\ensuremath{\frac{
+            \left(\begin{aligned}
+                \left(\begin{gathered}
+                    (P_{2y} - P_{1y})
+                    \\-\\
+                    (P_{1y} - P_{0y})
+                \end{gathered}\right)
+                &\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1x} - P_{0x})6(1-t)
+                    \\&+\\
+                    6(1-t)t&(P_{2x} - P_{1x})6(1-t)
+                    \\&+\\
+                    3t^2&(P_{3x} - P_{2x})6(1-t)
+                \end{aligned}\right)
+                \\&+\\
+                \left(\begin{gathered}
+                    (P_{3y} - P_{2y})
+                    \\-\\
+                    (P_{2y} - P_{1y})
+                \end{gathered}\right)
+                &\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1x} - P_{0x})6t
+                    \\&+\\
+                    6(1-t)t&(P_{2x} - P_{1x})6t
+                    \\&+\\
+                    3t^2&(P_{3x} - P_{2x})6t
+                \end{aligned}\right)
+            \end{aligned}\right)
+            -
+            \left(\begin{aligned}
+                \left(\begin{gathered}
+                    (P_{2x} - P_{1x})
+                    \\-\\
+                    (P_{1x} - P_{0x})
+                \end{gathered}\right)
+                &\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1y} - P_{0y})6(1-t)
+                    \\&+\\
+                    6(1-t)t&(P_{2y} - P_{1y})6(1-t)
+                    \\&+\\
+                    3t^2&(P_{3y} - P_{2y})6(1-t)
+                \end{aligned}\right)
+                \\&+\\
+                \left(\begin{gathered}
+                    (P_{3x} - P_{2x})
+                    \\-\\
+                    (P_{2x} - P_{1x})
+                \end{gathered}\right)
+                &\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1y} - P_{0y})6t
+                    \\&+\\
+                    6(1-t)t&(P_{2y} - P_{1y})6t
+                    \\&+\\
+                    3t^2&(P_{3y} - P_{2y})6t
+                \end{aligned}\right)
+            \end{aligned}\right)
+        }{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1x} - P_{0x})
+                    \\&+\\
+                    6(1-t)t&(P_{2x} - P_{1x})
+                    \\&+\\
+                    3t^2&(P_{3x} - P_{2x})
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1y} - P_{0y})
+                    \\&+\\
+                    6(1-t)t&(P_{2y} - P_{1y})
+                    \\&+\\
+                    3t^2&(P_{3y} - P_{2y})
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &= \scalebox{0.75}{\ensuremath{\frac{
+            \left(\begin{aligned}
+                \left(\begin{gathered}
+                    (P_{2y} - P_{1y})
+                    \\-\\
+                    (P_{1y} - P_{0y})
+                \end{gathered}\right)
+                &\left(\begin{aligned}
+                    18{(1-t)}^3&(P_{1x} - P_{0x})
+                    \\&+\\
+                    36{(1-t)}^2t&(P_{2x} - P_{1x})
+                    \\&+\\
+                    18(1-t)t^2&(P_{3x} - P_{2x})
+                \end{aligned}\right)
+                \\&+\\
+                \left(\begin{gathered}
+                    (P_{3y} - P_{2y})
+                    \\-\\
+                    (P_{2y} - P_{1y})
+                \end{gathered}\right)
+                &\left(\begin{aligned}
+                    18{(1-t)}^2t&(P_{1x} - P_{0x})
+                    \\&+\\
+                    36(1-t)t^2&(P_{2x} - P_{1x})
+                    \\&+\\
+                    18t^3&(P_{3x} - P_{2x})
+                \end{aligned}\right)
+            \end{aligned}\right)
+            -
+            \left(\begin{aligned}
+                \left(\begin{gathered}
+                    (P_{2x} - P_{1x})
+                    \\-\\
+                    (P_{1x} - P_{0x})
+                \end{gathered}\right)
+                &\left(\begin{aligned}
+                    18{(1-t)}^3&(P_{1y} - P_{0y})
+                    \\&+\\
+                    36{(1-t)}^2t&(P_{2y} - P_{1y})
+                    \\&+\\
+                    18(1-t)t^2&(P_{3y} - P_{2y})
+                \end{aligned}\right)
+                \\&+\\
+                \left(\begin{gathered}
+                    (P_{3x} - P_{2x})
+                    \\-\\
+                    (P_{2x} - P_{1x})
+                \end{gathered}\right)
+                &\left(\begin{aligned}
+                    18{(1-t)}^2t&(P_{1y} - P_{0y})
+                    \\&+\\
+                    36(1-t)t^2&(P_{2y} - P_{1y})
+                    \\&+\\
+                    18t^3&(P_{3y} - P_{2y})
+                \end{aligned}\right)
+            \end{aligned}\right)
+        }{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1x} - P_{0x})
+                    \\&+\\
+                    6(1-t)t&(P_{2x} - P_{1x})
+                    \\&+\\
+                    3t^2&(P_{3x} - P_{2x})
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1y} - P_{0y})
+                    \\&+\\
+                    6(1-t)t&(P_{2y} - P_{1y})
+                    \\&+\\
+                    3t^2&(P_{3y} - P_{2y})
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &= \scalebox{0.75}{\ensuremath{\frac{
+            \left(\begin{aligned}
+                \left(\begin{gathered}
+                    (P_{2y} - P_{1y})
+                    \\-\\
+                    (P_{1y} - P_{0y})
+                \end{gathered}\right)
+                &\left(\begin{aligned}
+                    18{(1-t)}^3&(P_{1x} - P_{0x})
+                    \\&+\\
+                    36{(1-t)}^2t&(P_{2x} - P_{1x})
+                    \\&+\\
+                    18(1-t)t^2&(P_{3x} - P_{2x})
+                \end{aligned}\right)
+                \\&+\\
+                \left(\begin{gathered}
+                    (P_{3y} - P_{2y})
+                    \\-\\
+                    (P_{2y} - P_{1y})
+                \end{gathered}\right)
+                &\left(\begin{aligned}
+                    18{(1-t)}^2t&(P_{1x} - P_{0x})
+                    \\&+\\
+                    36(1-t)t^2&(P_{2x} - P_{1x})
+                    \\&+\\
+                    18t^3&(P_{3x} - P_{2x})
+                \end{aligned}\right)
+                \\&-\\
+                \left(\begin{gathered}
+                    (P_{2x} - P_{1x})
+                    \\-\\
+                    (P_{1x} - P_{0x})
+                \end{gathered}\right)
+                &\left(\begin{aligned}
+                    18{(1-t)}^3&(P_{1y} - P_{0y})
+                    \\&+\\
+                    36{(1-t)}^2t&(P_{2y} - P_{1y})
+                    \\&+\\
+                    18(1-t)t^2&(P_{3y} - P_{2y})
+                \end{aligned}\right)
+                \\&-\\
+                \left(\begin{gathered}
+                    (P_{3x} - P_{2x})
+                    \\-\\
+                    (P_{2x} - P_{1x})
+                \end{gathered}\right)
+                &\left(\begin{aligned}
+                    18{(1-t)}^2t&(P_{1y} - P_{0y})
+                    \\&+\\
+                    36(1-t)t^2&(P_{2y} - P_{1y})
+                    \\&+\\
+                    18t^3&(P_{3y} - P_{2y})
+                \end{aligned}\right)
+            \end{aligned}\right)
+        }{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1x} - P_{0x})
+                    \\&+\\
+                    6(1-t)t&(P_{2x} - P_{1x})
+                    \\&+\\
+                    3t^2&(P_{3x} - P_{2x})
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1y} - P_{0y})
+                    \\&+\\
+                    6(1-t)t&(P_{2y} - P_{1y})
+                    \\&+\\
+                    3t^2&(P_{3y} - P_{2y})
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &= \scalebox{0.75}{\ensuremath{\frac{
+            \left(\begin{gathered}
+                \left(\begin{aligned}
+                    18{(1-t)}^3(P_{1x} - P_{0x})
+                    &\left(\begin{gathered}
+                        (P_{2y} - P_{1y})
+                        \\-\\
+                        (P_{1y} - P_{0y})
+                    \end{gathered}\right)
+                    \\&+\\
+                    36{(1-t)}^2t(P_{2x} - P_{1x})
+                    &\left(\begin{gathered}
+                        (P_{2y} - P_{1y})
+                        \\-\\
+                        (P_{1y} - P_{0y})
+                    \end{gathered}\right)
+                    \\&+\\
+                    18(1-t)t^2(P_{3x} - P_{2x})
+                    &\left(\begin{gathered}
+                        (P_{2y} - P_{1y})
+                        \\-\\
+                        (P_{1y} - P_{0y})
+                    \end{gathered}\right)
+                \end{aligned}\right)
+                \\+\\
+                \left(\begin{aligned}
+                    18{(1-t)}^2t(P_{1x} - P_{0x})
+                    &\left(\begin{gathered}
+                        (P_{3y} - P_{2y})
+                        \\-\\
+                        (P_{2y} - P_{1y})
+                    \end{gathered}\right)
+                    \\&+\\
+                    36(1-t)t^2(P_{2x} - P_{1x})
+                    &\left(\begin{gathered}
+                        (P_{3y} - P_{2y})
+                        \\-\\
+                        (P_{2y} - P_{1y})
+                    \end{gathered}\right)
+                    \\&+\\
+                    18t^3(P_{3x} - P_{2x})
+                    &\left(\begin{gathered}
+                        (P_{3y} - P_{2y})
+                        \\-\\
+                        (P_{2y} - P_{1y})
+                    \end{gathered}\right)
+                \end{aligned}\right)
+                \\-\\
+                \left(\begin{aligned}
+                    18{(1-t)}^3(P_{1y} - P_{0y})
+                    &\left(\begin{gathered}
+                        (P_{2x} - P_{1x})
+                        \\-\\
+                        (P_{1x} - P_{0x})
+                    \end{gathered}\right)
+                    \\&+\\
+                    36{(1-t)}^2t(P_{2y} - P_{1y})
+                    &\left(\begin{gathered}
+                        (P_{2x} - P_{1x})
+                        \\-\\
+                        (P_{1x} - P_{0x})
+                    \end{gathered}\right)
+                    \\&+\\
+                    18(1-t)t^2(P_{3y} - P_{2y})
+                    &\left(\begin{gathered}
+                        (P_{2x} - P_{1x})
+                        \\-\\
+                        (P_{1x} - P_{0x})
+                    \end{gathered}\right)
+                \end{aligned}\right)
+                \\-\\
+                \left(\begin{aligned}
+                    18{(1-t)}^2t(P_{1y} - P_{0y})
+                    &\left(\begin{gathered}
+                        (P_{3x} - P_{2x})
+                        \\-\\
+                        (P_{2x} - P_{1x})
+                    \end{gathered}\right)
+                    \\&+\\
+                    36(1-t)t^2(P_{2y} - P_{1y})
+                    &\left(\begin{gathered}
+                        (P_{3x} - P_{2x})
+                        \\-\\
+                        (P_{2x} - P_{1x})
+                    \end{gathered}\right)
+                    \\&+\\
+                    18t^3(P_{3y} - P_{2y})
+                    &\left(\begin{gathered}
+                        (P_{3x} - P_{2x})
+                        \\-\\
+                        (P_{2x} - P_{1x})
+                    \end{gathered}\right)
+                \end{aligned}\right)
+            \end{gathered}\right)
+        }{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1x} - P_{0x})
+                    \\&+\\
+                    6(1-t)t&(P_{2x} - P_{1x})
+                    \\&+\\
+                    3t^2&(P_{3x} - P_{2x})
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(P_{1y} - P_{0y})
+                    \\&+\\
+                    6(1-t)t&(P_{2y} - P_{1y})
+                    \\&+\\
+                    3t^2&(P_{3y} - P_{2y})
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}}
+    \end{align*}
+
+    To avoid mistakes, let
+    \begin{align*}
+        P_0 &= \langle a,x \rangle \\
+        P_1 &= \langle b,y \rangle \\
+        P_2 &= \langle c,z \rangle \\
+        P_3 &= \langle d,w \rangle
+    \end{align*}
+
+    \begin{align*}
+        &=\scalebox{0.75}{\ensuremath{\frac{
+            \left(
+                \left(\begin{aligned}
+                    18{(1-t)}^3(b - a)
+                    &\left(\begin{gathered}
+                        (z - y)
+                        \\-\\
+                        (y - x)
+                    \end{gathered}\right)
+                    \\&+\\
+                    36{(1-t)}^2t(c - b)
+                    &\left(\begin{gathered}
+                        (z - y)
+                        \\-\\
+                        (y - x)
+                    \end{gathered}\right)
+                    \\&+\\
+                    18(1-t)t^2(d - c)
+                    &\left(\begin{gathered}
+                        (z - y)
+                        \\-\\
+                        (y - x)
+                    \end{gathered}\right)
+                \end{aligned}\right)
+                +
+                \left(\begin{aligned}
+                    18{(1-t)}^2t(b - a)
+                    &\left(\begin{gathered}
+                        (w - z)
+                        \\-\\
+                        (z - y)
+                    \end{gathered}\right)
+                    \\&+\\
+                    36(1-t)t^2(c - b)
+                    &\left(\begin{gathered}
+                        (w - z)
+                        \\-\\
+                        (z - y)
+                    \end{gathered}\right)
+                    \\&+\\
+                    18t^3(d - c)
+                    &\left(\begin{gathered}
+                        (w - z)
+                        \\-\\
+                        (z - y)
+                    \end{gathered}\right)
+                \end{aligned}\right)
+                -
+                \left(\begin{aligned}
+                    18{(1-t)}^3(y - x)
+                    &\left(\begin{gathered}
+                        (c - b)
+                        \\-\\
+                        (b - a)
+                    \end{gathered}\right)
+                    \\&+\\
+                    36{(1-t)}^2t(z - y)
+                    &\left(\begin{gathered}
+                        (c - b)
+                        \\-\\
+                        (b - a)
+                    \end{gathered}\right)
+                    \\&+\\
+                    18(1-t)t^2(w - z)
+                    &\left(\begin{gathered}
+                        (c - b)
+                        \\-\\
+                        (b - a)
+                    \end{gathered}\right)
+                \end{aligned}\right)
+                -
+                \left(\begin{aligned}
+                    18{(1-t)}^2t(y - x)
+                    &\left(\begin{gathered}
+                        (d - c)
+                        \\-\\
+                        (c - b)
+                    \end{gathered}\right)
+                    \\&+\\
+                    36(1-t)t^2(z - y)
+                    &\left(\begin{gathered}
+                        (d - c)
+                        \\-\\
+                        (c - b)
+                    \end{gathered}\right)
+                    \\&+\\
+                    18t^3(w - z)
+                    &\left(\begin{gathered}
+                        (d - c)
+                        \\-\\
+                        (c - b)
+                    \end{gathered}\right)
+                \end{aligned}\right)
+            \right)
+        }{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{
+            \left(\begin{aligned}
+                18{(1-t)}^3(b - a)
+                &\left(\begin{gathered}
+                    (z - y)
+                    \\-\\
+                    (y - x)
+                \end{gathered}\right)
+                \\&+\\
+                36{(1-t)}^2t(c - b)
+                &\left(\begin{gathered}
+                    (z - y)
+                    \\-\\
+                    (y - x)
+                \end{gathered}\right)
+                \\&+\\
+                18(1-t)t^2(d - c)
+                &\left(\begin{gathered}
+                    (z - y)
+                    \\-\\
+                    (y - x)
+                \end{gathered}\right)
+                \\&+\\
+                18{(1-t)}^2t(b - a)
+                &\left(\begin{gathered}
+                    (w - z)
+                    \\-\\
+                    (z - y)
+                \end{gathered}\right)
+                \\&+\\
+                36(1-t)t^2(c - b)
+                &\left(\begin{gathered}
+                    (w - z)
+                    \\-\\
+                    (z - y)
+                \end{gathered}\right)
+                \\&+\\
+                18t^3(d - c)
+                &\left(\begin{gathered}
+                    (w - z)
+                    \\-\\
+                    (z - y)
+                \end{gathered}\right)
+                \\&-\\
+                18{(1-t)}^3(y - x)
+                &\left(\begin{gathered}
+                    (c - b)
+                    \\-\\
+                    (b - a)
+                \end{gathered}\right)
+                \\&-\\
+                36{(1-t)}^2t(z - y)
+                &\left(\begin{gathered}
+                    (c - b)
+                    \\-\\
+                    (b - a)
+                \end{gathered}\right)
+                \\&-\\
+                18(1-t)t^2(w - z)
+                &\left(\begin{gathered}
+                    (c - b)
+                    \\-\\
+                    (b - a)
+                \end{gathered}\right)
+                \\&-\\
+                18{(1-t)}^2t(y - x)
+                &\left(\begin{gathered}
+                    (d - c)
+                    \\-\\
+                    (c - b)
+                \end{gathered}\right)
+                \\&-\\
+                36(1-t)t^2(z - y)
+                &\left(\begin{gathered}
+                    (d - c)
+                    \\-\\
+                    (c - b)
+                \end{gathered}\right)
+                \\&-\\
+                18t^3(w - z)
+                &\left(\begin{gathered}
+                    (d - c)
+                    \\-\\
+                    (c - b)
+                \end{gathered}\right)
+            \end{aligned}\right)
+        }{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{
+            \left(\begin{aligned}
+                18{(1-t)}^3(b - a)
+                \left(\begin{gathered}
+                    (z - y)
+                    \\-\\
+                    (y - x)
+                \end{gathered}\right)
+                &-
+                18{(1-t)}^3(y - x)
+                \left(\begin{gathered}
+                    (c - b)
+                    \\-\\
+                    (b - a)
+                \end{gathered}\right)
+                \\&+\\
+                36{(1-t)}^2t(c - b)
+                \left(\begin{gathered}
+                    (z - y)
+                    \\-\\
+                    (y - x)
+                \end{gathered}\right)
+                &-
+                36{(1-t)}^2t(z - y)
+                \left(\begin{gathered}
+                    (c - b)
+                    \\-\\
+                    (b - a)
+                \end{gathered}\right)
+                \\&+\\
+                18(1-t)t^2(d - c)
+                \left(\begin{gathered}
+                    (z - y)
+                    \\-\\
+                    (y - x)
+                \end{gathered}\right)
+                &-
+                18(1-t)t^2(w - z)
+                \left(\begin{gathered}
+                    (c - b)
+                    \\-\\
+                    (b - a)
+                \end{gathered}\right)
+                \\&+\\
+                18{(1-t)}^2t(b - a)
+                \left(\begin{gathered}
+                    (w - z)
+                    \\-\\
+                    (z - y)
+                \end{gathered}\right)
+                &-
+                18{(1-t)}^2t(y - x)
+                \left(\begin{gathered}
+                    (d - c)
+                    \\-\\
+                    (c - b)
+                \end{gathered}\right)
+                \\&+\\
+                36(1-t)t^2(c - b)
+                \left(\begin{gathered}
+                    (w - z)
+                    \\-\\
+                    (z - y)
+                \end{gathered}\right)
+                &-
+                36(1-t)t^2(z - y)
+                \left(\begin{gathered}
+                    (d - c)
+                    \\-\\
+                    (c - b)
+                \end{gathered}\right)
+                \\&+\\
+                18t^3(d - c)
+                \left(\begin{gathered}
+                    (w - z)
+                    \\-\\
+                    (z - y)
+                \end{gathered}\right)
+                &-
+                18t^3(w - z)
+                \left(\begin{gathered}
+                    (d - c)
+                    \\-\\
+                    (c - b)
+                \end{gathered}\right)
+            \end{aligned}\right)
+        }{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{
+            \left(\begin{aligned}
+                18{(1-t)}^3&\left(
+                    (b - a)
+                    \left(\begin{gathered}
+                        (z - y)
+                        \\-\\
+                        (y - x)
+                    \end{gathered}\right)
+                    -
+                    (y - x)
+                    \left(\begin{gathered}
+                        (c - b)
+                        \\-\\
+                        (b - a)
+                    \end{gathered}\right)
+                \right)
+                \\&+\\
+                36{(1-t)}^2t&\left(
+                    (c - b)
+                    \left(\begin{gathered}
+                        (z - y)
+                        \\-\\
+                        (y - x)
+                    \end{gathered}\right)
+                    -
+                    (z - y)
+                    \left(\begin{gathered}
+                        (c - b)
+                        \\-\\
+                        (b - a)
+                    \end{gathered}\right)
+                \right)
+                \\&+\\
+                18(1-t)t^2&\left(
+                    (d - c)
+                    \left(\begin{gathered}
+                        (z - y)
+                        \\-\\
+                        (y - x)
+                    \end{gathered}\right)
+                    -
+                    (w - z)
+                    \left(\begin{gathered}
+                        (c - b)
+                        \\-\\
+                        (b - a)
+                    \end{gathered}\right)
+                \right)
+                \\&+\\
+                18{(1-t)}^2t&\left(
+                    (b - a)
+                    \left(\begin{gathered}
+                        (w - z)
+                        \\-\\
+                        (z - y)
+                    \end{gathered}\right)
+                    -
+                    (y - x)
+                    \left(\begin{gathered}
+                        (d - c)
+                        \\-\\
+                        (c - b)
+                    \end{gathered}\right)
+                \right)
+                \\&+\\
+                36(1-t)t^2&\left(
+                    (c - b)
+                    \left(\begin{gathered}
+                        (w - z)
+                        \\-\\
+                        (z - y)
+                    \end{gathered}\right)
+                    -
+                    (z - y)
+                    \left(\begin{gathered}
+                        (d - c)
+                        \\-\\
+                        (c - b)
+                    \end{gathered}\right)
+                \right)
+                \\&+\\
+                18t^3&\left(
+                    (d - c)
+                    \left(\begin{gathered}
+                        (w - z)
+                        \\-\\
+                        (z - y)
+                    \end{gathered}\right)
+                    -
+                    (w - z)
+                    \left(\begin{gathered}
+                        (d - c)
+                        \\-\\
+                        (c - b)
+                    \end{gathered}\right)
+                \right)
+            \end{aligned}\right)
+        }{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{
+            \left(\begin{aligned}
+                18{(1-t)}^3&\left(
+                    \left(\begin{gathered}
+                        (z - y)(b - a)
+                        \\-\\
+                        (y - x)(b - a)
+                    \end{gathered}\right)
+                    -
+                    \left(\begin{gathered}
+                        (c - b)(y - x)
+                        \\-\\
+                        (b - a)(y - x)
+                    \end{gathered}\right)
+                \right)
+                \\&+\\
+                36{(1-t)}^2t&\left(
+                    \left(\begin{gathered}
+                        (z - y)(c - b)
+                        \\-\\
+                        (y - x)(c - b)
+                    \end{gathered}\right)
+                    -
+                    \left(\begin{gathered}
+                        (c - b)(z - y)
+                        \\-\\
+                        (b - a)(z - y)
+                    \end{gathered}\right)
+                \right)
+                \\&+\\
+                18(1-t)t^2&\left(
+                    \left(\begin{gathered}
+                        (z - y)(d - c)
+                        \\-\\
+                        (y - x)(d - c)
+                    \end{gathered}\right)
+                    -
+                    \left(\begin{gathered}
+                        (c - b)(w - z)
+                        \\-\\
+                        (b - a)(w - z)
+                    \end{gathered}\right)
+                \right)
+                \\&+\\
+                18{(1-t)}^2t&\left(
+                    \left(\begin{gathered}
+                        (w - z)(b - a)
+                        \\-\\
+                        (z - y)(b - a)
+                    \end{gathered}\right)
+                    -
+                    \left(\begin{gathered}
+                        (d - c)(y - x)
+                        \\-\\
+                        (c - b)(y - x)
+                    \end{gathered}\right)
+                \right)
+                \\&+\\
+                36(1-t)t^2&\left(
+                    \left(\begin{gathered}
+                        (w - z)(c - b)
+                        \\-\\
+                        (z - y)(c - b)
+                    \end{gathered}\right)
+                    -
+                    \left(\begin{gathered}
+                        (d - c)(z - y)
+                        \\-\\
+                        (c - b)(z - y)
+                    \end{gathered}\right)
+                \right)
+                \\&+\\
+                18t^3&\left(
+                    \left(\begin{gathered}
+                        (w - z)(d - c)
+                        \\-\\
+                        (z - y)(d - c)
+                    \end{gathered}\right)
+                    -
+                    \left(\begin{gathered}
+                        (d - c)(w - z)
+                        \\-\\
+                        (c - b)(w - z)
+                    \end{gathered}\right)
+                \right)
+            \end{aligned}\right)
+        }{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.65}{\ensuremath{\frac{
+            18{(1-t)}^3\left(\begin{gathered}
+                (z - y)(b - a)
+                \\-\\
+                (y - x)(b - a)
+                \\-\\
+                (c - b)(y - x)
+                \\+\\
+                (b - a)(y - x)
+            \end{gathered}\right)
+            +
+            36{(1-t)}^2t\left(\begin{gathered}
+                (z - y)(c - b)
+                \\-\\
+                (y - x)(c - b)
+                \\-\\
+                (c - b)(z - y)
+                \\+\\
+                (b - a)(z - y)
+            \end{gathered}\right)
+            +
+            18(1-t)t^2\left(\begin{gathered}
+                (z - y)(d - c)
+                \\-\\
+                (y - x)(d - c)
+                \\-\\
+                (c - b)(w - z)
+                \\+\\
+                (b - a)(w - z)
+            \end{gathered}\right)
+            +
+            18{(1-t)}^2t\left(\begin{gathered}
+                (w - z)(b - a)
+                \\-\\
+                (z - y)(b - a)
+                \\-\\
+                (d - c)(y - x)
+                \\+\\
+                (c - b)(y - x)
+            \end{gathered}\right)
+            +
+            36(1-t)t^2\left(\begin{gathered}
+                (w - z)(c - b)
+                \\-\\
+                (z - y)(c - b)
+                \\-\\
+                (d - c)(z - y)
+                \\+\\
+                (c - b)(z - y)
+            \end{gathered}\right)
+            +
+            18t^3\left(\begin{gathered}
+                (w - z)(d - c)
+                \\-\\
+                (z - y)(d - c)
+                \\-\\
+                (d - c)(w - z)
+                \\+\\
+                (c - b)(w - z)
+            \end{gathered}\right)
+        }{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.5}{\ensuremath{\frac{
+            18{(1-t)}^3\left(\begin{gathered}
+                (zb - yb - za + ya)
+                \\-\\
+                (yb - xb - ya + xa)
+                \\-\\
+                (cy - by - cx + bx)
+                \\+\\
+                (by - ay - bx + ax)
+            \end{gathered}\right)
+            +
+            36{(1-t)}^2t\left(\begin{gathered}
+                (zc - yc - zb + yb)
+                \\-\\
+                (yc - xc - yb + xb)
+                \\-\\
+                (cz - bz - cy + by)
+                \\+\\
+                (bz - az - by + ay)
+            \end{gathered}\right)
+            +
+            18(1-t)t^2\left(\begin{gathered}
+                (zd - yd - zc + yc)
+                \\-\\
+                (yd - xd - yc + xc)
+                \\-\\
+                (cw - bw - cz + bz)
+                \\+\\
+                (bw - aw - bz + az)
+            \end{gathered}\right)
+            +
+            18{(1-t)}^2t\left(\begin{gathered}
+                (wb - zb - wa + za)
+                \\-\\
+                (zb - yb - za + ya)
+                \\-\\
+                (dy - cy - dx + cx)
+                \\+\\
+                (cy - by - cx + bx)
+            \end{gathered}\right)
+            +
+            36(1-t)t^2\left(\begin{gathered}
+                (wc - zc - wb + zb)
+                \\-\\
+                (zc - yc - zb + yb)
+                \\-\\
+                (dz - cz - dy + cy)
+                \\+\\
+                (cz - bz - cy + by)
+            \end{gathered}\right)
+            +
+            18t^3\left(\begin{gathered}
+                (wd - zd - wc + zc)
+                \\-\\
+                (zd - yd - zc + yc)
+                \\-\\
+                (dw - cw - dz + cz)
+                \\+\\
+                (cw - bw - cz + bz)
+            \end{gathered}\right)
+        }{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.5}{\ensuremath{\frac{
+            18{(1-t)}^3\left(\begin{gathered}
+                bz - by - az + ay \\-\\
+                by + bx + ay - ax \\-\\
+                cy + by + cx - bx \\+\\
+                by - ay - bx + ax
+            \end{gathered}\right)
+            +
+            36{(1-t)}^2t\left(\begin{gathered}
+                cz - cy - bz + by \\-\\
+                cy + cx + by - bx \\-\\
+                cz + bz + cy - by \\+\\
+                bz - az - by + ay
+            \end{gathered}\right)
+            +
+            18(1-t)t^2\left(\begin{gathered}
+                dz - dy - cz + cy \\-\\
+                dy + dx + cy - cx \\-\\
+                cw + bw + cz - bz \\+\\
+                bw - aw - bz + az
+            \end{gathered}\right)
+            +
+            18{(1-t)}^2t\left(\begin{gathered}
+                bw - bz - aw + az \\-\\
+                bz + by + az - ay \\-\\
+                dy + cy + dx - cx \\+\\
+                cy - by - cx + bx
+            \end{gathered}\right)
+            +
+            36(1-t)t^2\left(\begin{gathered}
+                cw - cz - bw + bz \\-\\
+                cz + cy + bz - by \\-\\
+                dz + cz + dy - cy \\+\\
+                cz - bz - cy + by
+            \end{gathered}\right)
+            +
+            18t^3\left(\begin{gathered}
+                dw - dz - cw + cz \\-\\
+                dz + dy + cz - cy \\-\\
+                dw + cw + dz - cz \\+\\
+                cw - bw - cz + bz
+            \end{gathered}\right)
+        }{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{18\left(\begin{aligned}
+            {(1-t)}^3   & \left( bz - by - by + by + by - az + ay + ay - ay + bx - bx - bx - ax + ax - cy + cx \right) +\\
+            2{(1-t)}^2t & \left( cz - cz - cy - cy + cy - bz + bz + bz + by + by - by - by + cx - bx - az + ay \right) +\\
+             {(1-t)}^2t & \left( bw - bz - bz - aw + az + az + by - by - ay - dy + cy + cy + dx - cx - cx + bx \right) +\\
+             (1-t)t^2   & \left( dz - dy - dy - cz + cz + cy + cy + dx - cx - cw + bw + bw - bz - bz - aw + az \right) +\\
+            2(1-t)t^2   & \left( cw - cz - cz + cz + cz - bw + bz + bz - bz + cy - cy - cy - by + by - dz + dy \right) +\\
+            t^3         & \left( dw - dw - dz - dz + dz - cw + cw + cw + cz + cz - cz - cz + dy - cy - bw + bz \right)
+        \end{aligned}\right)}{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{18\left(\begin{aligned}
+            {(1-t)}^3   & \left( bz - az + ay - bx - cy + cx \right) +\\
+            2{(1-t)}^2t & \left( bz + cx - bx - az + ay - cy \right) +\\
+             {(1-t)}^2t & \left( bw - 2bz - aw + 2az - ay - dy + 2cy + dx - 2cx + bx \right) +\\
+             (1-t)t^2   & \left( dz - 2dy + 2cy + dx - cx - cw + 2bw - 2bz - aw + az \right) +\\
+            2(1-t)t^2   & \left( cw - bw + bz - cy - dz + dy \right) +\\
+            t^3         & \left( cw + dy - cy - bw + bz - dz \right)
+        \end{aligned}\right)}{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{18\left(\begin{aligned}
+            {(1-t)}^3  & \left( bz - az + ay - bx - cy + cx \right) +\\
+            {(1-t)}^2t & (2\left( bz + cx - bx - az + ay - cy \right) + \left( bw - 2bz - aw + 2az - ay - dy + 2cy + dx - 2cx + bx \right)) +\\
+             (1-t)t^2  & (2\left( cw - bw + bz - cy - dz + dy \right) + \left( dz - 2dy + 2cy + dx - cx - cw + 2bw - 2bz - aw + az \right)) +\\
+            t^3        & \left( cw + dy - cy - bw + bz - dz \right)
+        \end{aligned}\right)}{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{18\left(\begin{aligned}
+            {(1-t)}^3  & (bz - az + ay - bx - cy + cx) +\\
+            {(1-t)}^2t & (2bz - 2bz + 2cx - 2cx - 2bx + bx - 2az + 2az + 2ay - ay - 2cy + 2cy + bw - aw - dy + dx) +\\
+             (1-t)t^2  & (2cw - cw - 2bw + 2bw + 2bz - 2bz - 2cy + 2cy - 2dz + dz + 2dy - 2dy + dx - cx - aw + az) +\\
+            t^3        & (cw + dy - cy - bw + bz - dz)
+        \end{aligned}\right)}{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{18\left(\begin{aligned}
+            {(1-t)}^3    & (a(y - z) - b(x - z) + c(x - y)) +\\
+            {(1-t)}^2t   & (a(y - w) - b(x - w) + d(x - y)) +\\
+            {(1-t)}  t^2 & (a(z - w) - c(x - w) + d(x - z)) +\\
+                     t^3 & (b(z - w) - c(y - w) + d(y - z))
+        \end{aligned}\right)}{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{18\left(\begin{aligned}
+              (ay{(1-t)}^3  &+ ay{(1-t)}^2t) \\
+            - (az{(1-t)}^3  &- az{(1-t)}t^2) \\
+            - (aw{(1-t)}^2t &+ aw{(1-t)}t^2) \\
+            - (bx{(1-t)}^3  &+ bx{(1-t)}^2t) \\
+            + (bz{(1-t)}^3  &+ bzt^3) \\
+            + (bw{(1-t)}^2t &- bwt^3) \\
+            + (cx{(1-t)}^3  &- cx{(1-t)}t^2) \\
+            - (cy{(1-t)}^3  &+ cyt^3) \\
+            + (cw{(1-t)}t^2 &+ cwt^3) \\
+            + (dx{(1-t)}^2t &+ dx{(1-t)}t^2) \\
+            - (dy{(1-t)}^2t &- dyt^3) \\
+            - (dz{(1-t)}t^2 &+ dzt^3) \\
+        \end{aligned}\right)}{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{18\left(\begin{aligned}
+              ({(1-t)}   &+ t)ay{(1-t)}^2 \\
+            - ({(1-t)}   &- t^2)az{(1-t)} \\
+            - ({(1-t)}   &+ t)aw{(1-t)}t \\
+            - ({(1-t)}   &+ t)bx{(1-t)}^2 \\
+            + ({(1-t)}^3 &+ t^3)bz \\
+            + ({(1-t)}^2 &- t^2)bwt \\
+            + ({(1-t)}^3 &- {(1-t)}t^2)cx \\
+            - ({(1-t)}^3 &+ t^3)cy \\
+            + ({(1-t)}   &+ t)cwt^2 \\
+            + ({(1-t)}   &+ t)dx{(1-t)}t \\
+            - ({(1-t)}^2 &- t^2)dyt \\
+            - ({(1-t)}   &+ t)dzt^2 \\
+        \end{aligned}\right)}{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{18\left(\begin{aligned}
+              a\left(({(1-t)} + t)y{(1-t)}^2 - ({(1-t)} - t^2)z{(1-t)} - ({(1-t)} + t)w{(1-t)}t\right) \\
+            - b\left(({(1-t)} + t)x{(1-t)}^2 - ({(1-t)}^3 + t^3)z - ({(1-t)}^2 - t^2)wt\right) \\
+            + c\left(({(1-t)}^3 - {(1-t)}t^2)x - ({(1-t)}^3 + t^3)y + ({(1-t)} + t)wt^2\right) \\
+            + d\left(({(1-t)} + t)x{(1-t)}t - ({(1-t)}^2 - t^2)yt - ({(1-t)} + t)zt^2\right)
+        \end{aligned}\right)}{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{18\left(\begin{aligned}
+              a\left(y{(1-t)} - z({(1-t)} - t^2) - wt\right){(1-t)} \\
+            - b\left(x{(1-t)}^2 - z({(1-t)}^3 + t^3) - w(1 - 2t)t\right) \\
+            + c\left(x(1 - 2t){(1-t)} - y({(1-t)}^3 + t^3) + wt^2\right) \\
+            + d\left(x{(1-t)} - y(1 - 2t) - zt\right)t
+        \end{aligned}\right)}{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{18\left(\begin{aligned}
+              a\left(y{(t - 1)}^2 - z(t(t^2 - 2) + 1) + w((t - 1)t)\right) \\
+            - b\left(x{(t - 1)}^2 + z(3(t - 1)t + 1) + w(t(2t - 1))\right) \\
+            + c\left(x(t(2t - 3) + 1) + y(3(t - 1)t + 1) + wt^2\right) \\
+            - d\left(x((t - 1)t) - y(t(2t - 1)) + zt^2\right)
+        \end{aligned}\right)}{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}}
+    \end{align*}
+
+    Resuming from earlier because it's cleaner,
+    \begin{align*}
+        &=\scalebox{0.75}{\ensuremath{\frac{18\left(\begin{aligned}
+            {(1-t)}^3    & (a(y - z) - b(x - z) + c(x - y)) +\\
+            {(1-t)}^2t   & (a(y - w) - b(x - w) + d(x - y)) +\\
+            {(1-t)}  t^2 & (a(z - w) - c(x - w) + d(x - z)) +\\
+                     t^3 & (b(z - w) - c(y - w) + d(y - z))
+        \end{aligned}\right)}{
+            {\left(
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(b - a)
+                    \\&+\\
+                    6(1-t)t&(c - b)
+                    \\&+\\
+                    3t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    3{(1-t)}^2&(y - x)
+                    \\&+\\
+                    6(1-t)t&(z - y)
+                    \\&+\\
+                    3t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{18\left(\begin{aligned}
+            {(1-t)}^3    & (a(y - z) - b(x - z) + c(x - y)) +\\
+            {(1-t)}^2t   & (a(y - w) - b(x - w) + d(x - y)) +\\
+            {(1-t)}  t^2 & (a(z - w) - c(x - w) + d(x - z)) +\\
+                     t^3 & (b(z - w) - c(y - w) + d(y - z))
+        \end{aligned}\right)}{
+            27{\left(
+                {\left(\begin{aligned}
+                    {(1-t)}^2&(b - a) + \\
+                    2(1-t)t&(c - b) + \\
+                    t^2&(d - c)
+                \end{aligned}\right)}^2
+                +
+                {\left(\begin{aligned}
+                    {(1-t)}^2&(y - x) + \\
+                    2(1-t)t&(z - y) + \\
+                    t^2&(w - z)
+                \end{aligned}\right)}^2
+            \right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{18\left(\begin{aligned}
+            {(1-t)}^3    & (a(y - z) - b(x - z) + c(x - y)) +\\
+            {(1-t)}^2t   & (a(y - w) - b(x - w) + d(x - y)) +\\
+            {(1-t)}  t^2 & (a(z - w) - c(x - w) + d(x - z)) +\\
+                     t^3 & (b(z - w) - c(y - w) + d(y - z))
+        \end{aligned}\right)}{
+            27{\left(\begin{aligned}
+                {(1-t)}^2(b - a){(1-t)}^2(b - a) + \\
+                2{(1-t)}t(c - b){(1-t)}^2(b - a) + \\
+                t^2(d - c){(1-t)}^2(b - a) + \\
+                {(1-t)}^2(b - a)2{(1-t)}t(c - b) + \\
+                2{(1-t)}t(c - b)2{(1-t)}t(c - b) + \\
+                t^2(d - c)2{(1-t)}t(c - b) + \\
+                {(1-t)}^2(b - a)t^2(d - c) + \\
+                2{(1-t)}t(c - b)t^2(d - c) + \\
+                t^2(d - c)t^2(d - c) + \\
+                {(1-t)}^2(y - x){(1-t)}^2(y - x) + \\
+                2{(1-t)}t(z - y){(1-t)}^2(y - x) + \\
+                t^2(w - z){(1-t)}^2(y - x) + \\
+                {(1-t)}^2(y - x)2{(1-t)}t(z - y) + \\
+                2{(1-t)}t(z - y)2{(1-t)}t(z - y) + \\
+                t^2(w - z)2{(1-t)}t(z - y) + \\
+                {(1-t)}^2(y - x)t^2(w - z) + \\
+                2{(1-t)}t(z - y)t^2(w - z) + \\
+                t^2(w - z)t^2(w - z) \\
+            \end{aligned}\right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{2\left(\begin{aligned}
+            {(1-t)}^3    & (a(y - z) - b(x - z) + c(x - y)) +\\
+            {(1-t)}^2t   & (a(y - w) - b(x - w) + d(x - y)) +\\
+            {(1-t)}  t^2 & (a(z - w) - c(x - w) + d(x - z)) +\\
+                     t^3 & (b(z - w) - c(y - w) + d(y - z))
+        \end{aligned}\right)}{
+            3{\left(\begin{aligned}
+                {(1-t)}^4&{(b - a)}^2 + \\
+                2{(1-t)}^3t&(c - b)(b - a) + \\
+                {(1-t)}^2t^2&(d - c)(b - a) + \\
+                2{(1-t)}^3t&(b - a)(c - b) + \\
+                4{(1-t)}^2t^2&{(c - b)}^2 + \\
+                2{(1-t)}t^3&(d - c)(c - b) + \\
+                {(1-t)}^2t^2&(b - a)(d - c) + \\
+                2{(1-t)}t^3&(c - b)(d - c) + \\
+                t^4&{(d - c)}^2 + \\
+                {(1-t)}^4&{(y - x)}^2 + \\
+                2{(1-t)}^3t&(z - y)(y - x) + \\
+                {(1-t)}^2t^2&(w - z)(y - x) + \\
+                2{(1-t)}^3t&(y - x)(z - y) + \\
+                4{(1-t)}^2t^2&{(z - y)}^2 + \\
+                2{(1-t)}t^3&(w - z)(z - y) + \\
+                {(1-t)}^2t^2&(y - x)(w - z) + \\
+                2{(1-t)}t^3&(z - y)(w - z) + \\
+                t^4&{(w - z)}^2 \\
+            \end{aligned}\right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{2\left(\begin{aligned}
+            {(1-t)}^3    & (a(y - z) - b(x - z) + c(x - y)) +\\
+            {(1-t)}^2t   & (a(y - w) - b(x - w) + d(x - y)) +\\
+            {(1-t)}  t^2 & (a(z - w) - c(x - w) + d(x - z)) +\\
+                     t^3 & (b(z - w) - c(y - w) + d(y - z))
+        \end{aligned}\right)}{
+            3{\left(\begin{aligned}
+                 {(1-t)}^4   &{(b - a)}^2     + \\
+                 {(1-t)}^4   &{(y - x)}^2     + \\
+                2{(1-t)}^3t  & (b - a)(c - b) + \\
+                2{(1-t)}^3t  & (b - a)(c - b) + \\
+                2{(1-t)}^3t  & (y - x)(z - y) + \\
+                2{(1-t)}^3t  & (y - x)(z - y) + \\
+                 {(1-t)}^2t^2& (b - a)(d - c) + \\
+                 {(1-t)}^2t^2& (b - a)(d - c) + \\
+                 {(1-t)}^2t^2& (y - x)(w - z) + \\
+                 {(1-t)}^2t^2& (y - x)(w - z) + \\
+                4{(1-t)}^2t^2&{(c - b)}^2     + \\
+                4{(1-t)}^2t^2&{(z - y)}^2     + \\
+                2{(1-t)}  t^3& (c - b)(d - c) + \\
+                2{(1-t)}  t^3& (c - b)(d - c) + \\
+                2{(1-t)}  t^3& (z - y)(w - z) + \\
+                2{(1-t)}  t^3& (z - y)(w - z) + \\
+                          t^4&{(d - c)}^2     + \\
+                          t^4&{(w - z)}^2       \\
+            \end{aligned}\right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{2\left(\begin{aligned}
+            {(1-t)}^3    & (a(y - z) - b(x - z) + c(x - y)) +\\
+            {(1-t)}^2t   & (a(y - w) - b(x - w) + d(x - y)) +\\
+            {(1-t)}  t^2 & (a(z - w) - c(x - w) + d(x - z)) +\\
+                     t^3 & (b(z - w) - c(y - w) + d(y - z))
+        \end{aligned}\right)}{
+            3{\left(\begin{aligned}
+                 {(1-t)}^4   &{(b - a)}^2     + \\
+                 {(1-t)}^4   &{(y - x)}^2     + \\
+                4{(1-t)}^3t  & (b - a)(c - b) + \\
+                4{(1-t)}^3t  & (y - x)(z - y) + \\
+                2{(1-t)}^2t^2& (b - a)(d - c) + \\
+                2{(1-t)}^2t^2& (y - x)(w - z) + \\
+                4{(1-t)}^2t^2&{(c - b)}^2     + \\
+                4{(1-t)}^2t^2&{(z - y)}^2     + \\
+                4{(1-t)}  t^3& (c - b)(d - c) + \\
+                4{(1-t)}  t^3& (z - y)(w - z) + \\
+                          t^4&{(d - c)}^2     + \\
+                          t^4&{(w - z)}^2       \\
+            \end{aligned}\right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{2\left(\begin{aligned}
+            {(1-t)}^3    & (a(y - z) - b(x - z) + c(x - y)) +\\
+            {(1-t)}^2t   & (a(y - w) - b(x - w) + d(x - y)) +\\
+            {(1-t)}  t^2 & (a(z - w) - c(x - w) + d(x - z)) +\\
+                     t^3 & (b(z - w) - c(y - w) + d(y - z))
+        \end{aligned}\right)}{
+            3{\left(\begin{aligned}
+                 {(1-t)}^4    &({(b - a)}^2     + {(y - x)}^2    ) + \\
+                4{(1-t)}^3t   &( (b - a)(c - b) +  (y - x)(z - y)) + \\
+                2{(1-t)}^2t^2 &( (b - a)(d - c) +  (y - x)(w - z)) + \\
+                4{(1-t)}^2t^2 &({(c - b)}^2     + {(z - y)}^2    ) + \\
+                4{(1-t)}  t^3 &( (c - b)(d - c) +  (z - y)(w - z)) + \\
+                          t^4 &({(d - c)}^2     + {(w - z)}^2    )
+            \end{aligned}\right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{2\left(\begin{aligned}
+            {(1-t)}^3    & (a(y - z) - b(x - z) + c(x - y)) +\\
+            {(1-t)}^2t   & (a(y - w) - b(x - w) + d(x - y)) +\\
+            {(1-t)}  t^2 & (a(z - w) - c(x - w) + d(x - z)) +\\
+                     t^3 & (b(z - w) - c(y - w) + d(y - z))
+        \end{aligned}\right)}{
+            3{\left(\begin{aligned}
+                 {(1-t)}^4    &((b - a)(b - a) + (y - x)(y - x)) + \\
+                4{(1-t)}^3t   &((b - a)(c - b) + (y - x)(z - y)) + \\
+                2{(1-t)}^2t^2 &((b - a)(d - c) + (y - x)(w - z) + 2(c - b)(c - b) + 2(z - y)(z - y)) + \\
+                4{(1-t)}  t^3 &((c - b)(d - c) + (z - y)(w - z)) + \\
+                          t^4 &((d - c)(d - c) + (w - z)(w - z))
+            \end{aligned}\right)}^{\frac{3}{2}}
+        }}} \\[1em]
+        &=\scalebox{0.75}{\ensuremath{\frac{2\left(\begin{aligned}
+            {(1-t)}^3    & (a(y - z) - b(x - z) + c(x - y)) +\\
+            {(1-t)}^2t   & (a(y - w) - b(x - w) + d(x - y)) +\\
+            {(1-t)}  t^2 & (a(z - w) - c(x - w) + d(x - z)) +\\
+                     t^3 & (b(z - w) - c(y - w) + d(y - z))
+        \end{aligned}\right)}{
+            3{\left(\begin{aligned}
+                 {(1-t)}^4    &({(a - b)}^2 + {(x - y)}^2) + \\
+                4{(1-t)}^3t   &((a - b)(b - c) + (x - y)(y - z)) + \\
+                2{(1-t)}^2t^2 &(a(c - d) + b(d - 5c) + x(z - w) + y(w - 5z) + 2(b^2 + c^2 + y^2 + z^2)) + \\
+                4{(1-t)}  t^3 &((b - c)(c - d) + (w - z)(z - y)) + \\
+                          t^4 &({(c - d)}^2 + {(w - z)}^2)
+            \end{aligned}\right)}^{\frac{3}{2}}
+        }}}
+    \end{align*}
+\end{document}

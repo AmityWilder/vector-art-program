@@ -64,7 +64,7 @@ impl Ctrl2 {
             &Exact(c2) => c2,
             &Reflect => c1.reflected_over(p),
             &Mirror(s2) => c1.reflected_to(p, s2),
-            Transformed(m2) => p + m2.mul(c1 - p),
+            Transformed(m2) => p + m2 * (c1 - p),
         }
     }
 }

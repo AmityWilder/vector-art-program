@@ -1,7 +1,7 @@
-#![feature(portable_simd, more_float_constants)]
+#![feature(portable_simd, more_float_constants, test)]
+extern crate test;
 
-pub mod vector;
-pub mod matrix;
+pub mod polynomial;
 pub mod path_point;
 pub mod curve;
 pub mod cubic_bezier;
