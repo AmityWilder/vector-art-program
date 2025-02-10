@@ -187,6 +187,28 @@ impl ToolType for PointSelection {
         if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
             self.end_dragging(document, mouse_world_pos);
         }
+
+        if rl.is_key_pressed(KeyboardKey::KEY_DELETE) && let Some(selection_state) = self.state.as_mut() {
+            match &mut selection_state.selection {
+                Selection::Singular(single_select) => {
+                    let mut path = single_select.target.write();
+                    if let Some(idx) = single_select.pt_idx {
+                        path.curve.points.remove(idx).expect("should not select a point that is not within the curve");
+                    } else {
+                        path.curve.points.clear();
+                    }
+                }
+                Selection::Multiple(multi_select) => {
+                    for piece in &mut multi_select.pieces {
+                        let mut path = piece.target.write();
+                        let mut remove = piece.points.iter().peekable();
+                        let mut keep = (0..path.curve.points.len()).map(|i| remove.next_if_eq(&&i).is_none());
+                        path.curve.points.retain(|_| keep.next().expect("should visit 0..len elements"));
+                    }
+                }
+            }
+            self.state = None;
+        }
     }
 
     fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32, viewport: &Rect2) {

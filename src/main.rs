@@ -147,7 +147,7 @@ fn main() {
 
             // debug
             {
-                const DRAW_DEBUG: bool = true;
+                const DRAW_DEBUG: bool = false;
 
                 if DRAW_DEBUG {
                     if let Some(editor) = engine.get_active_editor() {
