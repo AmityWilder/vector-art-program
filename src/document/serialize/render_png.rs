@@ -33,11 +33,7 @@ impl Document {
             (width as u32, height as u32)
         };
 
-        let (artboard_x, artboard_y) = {
-            assert!(artboard.xmin.ilog2() < f32::MANTISSA_DIGITS && artboard.ymin.ilog2() < f32::MANTISSA_DIGITS);
-            #[allow(clippy::cast_precision_loss, reason = "guarded by assertion `artboard.x.ilog2() < f32::MANTISSA_DIGITS && artboard.y.ilog2() < f32::MANTISSA_DIGITS`")]
-            (artboard.xmin as f32, artboard.ymin as f32)
-        };
+        let (artboard_x, artboard_y) = (artboard.xmin as f32, artboard.ymin as f32);
 
         let mut rtex = rl.load_render_texture(
             thread,
