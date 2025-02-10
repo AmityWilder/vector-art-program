@@ -198,7 +198,7 @@ impl ToolType for Pen {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, _shader_table: &ShaderTable, px_world_size: f32) {
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, _shader_table: &ShaderTable, px_world_size: f32, viewport: &Rect2) {
         let info = match self {
             Self::Active(ActivePen { target, direction, .. }) => Some((target, Some(direction))),
             Self::Inactive(InactivePen(Some(target))) => Some((target, None)),
@@ -230,10 +230,14 @@ impl ToolType for Pen {
                     // }
                     if let Some(last_idx) = path.curve.points.len().checked_sub(1) {
                         let pp = &path.curve.points[last_idx];
-                        d.draw_path_point(pp, px_world_size, color, false, false, false);
+                        if viewport.is_overlapping_point(pp.p) {
+                            d.draw_path_point(pp, px_world_size, color, false, false, false);
+                        }
                         if path.curve.points.len() > 1 {
                             let pp = &path.curve.points[0];
-                            d.draw_path_point(pp, px_world_size, color, false, false, false);
+                            if viewport.is_overlapping_point(pp.p) {
+                                d.draw_path_point(pp, px_world_size, color, false, false, false);
+                            }
                         }
                     }
                 }

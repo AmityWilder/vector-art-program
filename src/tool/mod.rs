@@ -1,4 +1,5 @@
 use amylib::prelude::StrongMut;
+use amymath::prelude::Rect2;
 use raylib::prelude::*;
 use crate::{raster::{raster_brush::{self, RasterBrush}, Raster}, shaders::ShaderTable, Document};
 
@@ -16,7 +17,7 @@ use self::{
 
 pub trait ToolType {
     fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, document: &mut Document, mouse_world_pos: Vector2);
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32);
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32, viewport: &Rect2);
 }
 
 pub enum Tool {
@@ -80,13 +81,13 @@ impl ToolType for Tool {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32) {
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32, viewport: &Rect2) {
         match self {
-            Tool::BasicSelection(tool) => tool.draw(d, document, shader_table, px_world_size),
-            Tool::PointSelection(tool) => tool.draw(d, document, shader_table, px_world_size),
-            Tool::Pen           (tool) => tool.draw(d, document, shader_table, px_world_size),
-            Tool::VectorBrush   (tool) => tool.draw(d, document, shader_table, px_world_size),
-            Tool::RasterBrush   (tool) => tool.draw(d, document, shader_table, px_world_size),
+            Tool::BasicSelection(tool) => tool.draw(d, document, shader_table, px_world_size, viewport),
+            Tool::PointSelection(tool) => tool.draw(d, document, shader_table, px_world_size, viewport),
+            Tool::Pen           (tool) => tool.draw(d, document, shader_table, px_world_size, viewport),
+            Tool::VectorBrush   (tool) => tool.draw(d, document, shader_table, px_world_size, viewport),
+            Tool::RasterBrush   (tool) => tool.draw(d, document, shader_table, px_world_size, viewport),
         }
     }
 }

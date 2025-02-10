@@ -147,25 +147,27 @@ fn main() {
 
             // debug
             {
-                const DRAW_BOUNDING_BOXES: bool = true;
+                const DRAW_DEBUG: bool = false;
 
-                if DRAW_BOUNDING_BOXES && let Some(editor) = engine.get_active_editor() {
-                    let mut d = d.begin_mode2D(editor.document.camera);
-                    for layer in editor.document.layers.dfs_iter(|_| true) {
-                        if let Layer::Path(path) = layer {
-                            let path = path.read();
-                            if let Some(bounds) = path.curve.bounds() {
-                                d.draw_rectangle_lines_rect2(bounds, Color::MAGENTA);
-                            }
-                            for bounds in path.curve.slices().map(|bez| bez.bounds()) {
-                                d.draw_rectangle_lines_rect2(bounds, Color::BLUE);
+                if DRAW_DEBUG {
+                    if let Some(editor) = engine.get_active_editor() {
+                        let mut d = d.begin_mode2D(editor.document.camera);
+                        for layer in editor.document.layers.dfs_iter(|_| true) {
+                            if let Layer::Path(path) = layer {
+                                let path = path.read();
+                                if let Some(bounds) = path.curve.bounds() {
+                                    d.draw_rectangle_lines_rect2(bounds, Color::MAGENTA);
+                                }
+                                for bounds in path.curve.slices().map(|bez| bez.bounds()) {
+                                    d.draw_rectangle_lines_rect2(bounds, Color::BLUE);
+                                }
                             }
                         }
                     }
+
+                    d.draw_fps(0, 0);
                 }
             }
-
-            d.draw_fps(0, 0);
         }
     }
 }

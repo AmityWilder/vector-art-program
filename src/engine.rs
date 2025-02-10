@@ -136,6 +136,12 @@ impl Engine {
 
         d.clear_background(self.config.background_color);
         for editor in editors.iter().filter(|e| e.is_visible) {
+            let viewport: Rect2 = {
+                let Vector2 { x: xmin, y: ymin } = d.get_screen_to_world2D(rvec2(window_rect.xmin, window_rect.ymin), editor.document.camera);
+                let Vector2 { x: xmax, y: ymax } = d.get_screen_to_world2D(rvec2(window_rect.xmax, window_rect.ymax), editor.document.camera);
+                Rect2 { xmin, ymin, xmax, ymax }
+            };
+
             editor.draw_background(self, d);
 
             editor.draw_rendered(&mut d.begin_texture_mode(thread, trim_rtex));
@@ -146,7 +152,7 @@ impl Engine {
                 draw_artwork(d, trim_rtex);
             }
 
-            editor.draw_foreground(d, shader_table);
+            editor.draw_foreground(d, shader_table, &viewport);
         }
 
         if let Some(active_editor) = self.get_active_editor() {

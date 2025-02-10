@@ -189,7 +189,7 @@ impl ToolType for PointSelection {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32) {
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32, viewport: &Rect2) {
         let selection_rec = self.selection_points.as_ref().copied().map(|(start, end)|
             start.minmax_rec(end)
         );
@@ -215,10 +215,14 @@ impl ToolType for PointSelection {
                 for layer in document.layers.shallow_iter().cdir::<BackToFore>() {
                     if let Layer::Path(path) = layer {
                         let path = path.read();
-                        path.draw_selected(d, px_world_size);
-                        for pp in &path.curve.points {
-                            let is_selected = selection_rec.is_some_and(|rec| rec.check_collision_point_rec(pp.p));
-                            d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
+                        if path.curve.bounds().is_some_and(|bounds| viewport.is_overlapping(&bounds)) {
+                            path.draw_selected(d, px_world_size);
+                            for pp in &path.curve.points {
+                                let is_selected = selection_rec.is_some_and(|rec| rec.check_collision_point_rec(pp.p));
+                                if viewport.is_overlapping_point(pp.p) {
+                                    d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
+                                }
+                            }
                         }
                     }
                 }

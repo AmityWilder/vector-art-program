@@ -1,3 +1,4 @@
+use amymath::prelude::Rect2;
 use raylib::prelude::*;
 use crate::shaders::ShaderTable;
 use super::ToolType;
@@ -18,7 +19,7 @@ impl ToolType for BasicSelection {
         todo!()
     }
 
-    fn draw(&self, _d: &mut impl RaylibDraw, _document: &crate::Document, _shader_table: &ShaderTable, _px_world_size: f32) {
+    fn draw(&self, _d: &mut impl RaylibDraw, _document: &crate::Document, _shader_table: &ShaderTable, _px_world_size: f32, _viewport: &Rect2) {
         todo!()
     }
 }
