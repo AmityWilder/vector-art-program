@@ -1,4 +1,5 @@
 use std::ops::{Bound, RangeBounds};
+use raylib::prelude::RaylibDrawGui;
 
 pub trait NumericInput {
     type Value;
@@ -32,16 +33,8 @@ impl<T: Copy + PartialOrd> NumberInput<T> {
         }
     }
 
-    pub fn set_value(&mut self, value: T) {
-        self.value = match (self.min, self.max) {
-            (Some(min), _) if value <= min => min,
-            (_, Some(max)) if max <= value => max,
-            _ => value,
-        }
-    }
-
-    pub fn reset(&mut self) {
-        self.value = self.default;
+    pub fn tick(&mut self, d: &mut impl RaylibDrawGui) {
+        // d.gui_value_box(self., text, value, min_value, max_value, edit_mode)
     }
 }
 

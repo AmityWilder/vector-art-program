@@ -112,7 +112,7 @@ fn main() {
 
     // maximize window
     rl.set_window_state(WindowState::set_window_maximized(rl.get_window_state(), true));
-    rl.set_target_fps(60);
+    // rl.set_target_fps(60);
 
     let mut window_rect = IRect2 {
         xmin: 0,
@@ -147,7 +147,7 @@ fn main() {
 
             // debug
             {
-                const DRAW_DEBUG: bool = false;
+                const DRAW_DEBUG: bool = true;
 
                 if DRAW_DEBUG {
                     if let Some(editor) = engine.get_active_editor() {
