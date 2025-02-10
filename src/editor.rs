@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, path::Path, time::Instant};
 
 use amylib::prelude::DirectibleDoubleEndedIterator;
-use amymath::prelude::{FlipRectangle, IRect2, MinMaxRectangle};
+use amymath::prelude::{DrawRect2Lines, IRect2, RaylibRlglDraw, RaylibRlglExt, Rect2};
 use raylib::prelude::*;
 use crate::{appearance::Blending, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Change, Document}, engine::{Config, Engine}, raster::{raster_brush, RasterTex}, shaders::ShaderTable, tool::{Tool, ToolType}};
 
@@ -66,10 +66,10 @@ fn handle_serialization(
 
 const fn serialization_key(key: Option<KeyboardKey>) -> Option<SerializationKind> {
     match key {
-        Some(KEY_R) => Some(SerializationKind::RenderPNG),
-        Some(KEY_S) => Some(SerializationKind::SaveBinary),
-        Some(KEY_O) => Some(SerializationKind::LoadBinary),
-        Some(KEY_P) => Some(SerializationKind::ExportSVG),
+        Some(KeyboardKey::KEY_R) => Some(SerializationKind::RenderPNG),
+        Some(KeyboardKey::KEY_S) => Some(SerializationKind::SaveBinary),
+        Some(KeyboardKey::KEY_O) => Some(SerializationKind::LoadBinary),
+        Some(KeyboardKey::KEY_P) => Some(SerializationKind::ExportSVG),
         _ => None,
     }
 }
@@ -252,10 +252,31 @@ impl Editor {
         for board in &self.document.artboards {
             let board_rec = &board.rect;
             if board_rec.is_overlapping(window_rec) {
-                let (tl_screen, br_screen) = board.get_screen_tl_br(|v| d.get_world_to_screen2D(v, self.document.camera));
-                let rect_screen = tl_screen.minmax_rec(br_screen);
-                let rect_screen_inv = rect_screen.flipped();
-                d.draw_texture_pro(trim_rtex, rect_screen_inv, rect_screen, Vector2::zero(), 0.0, Color::WHITE);
+                let (Vector2 { y: top, x: left }, Vector2 { y: bottom, x: right })
+                    = board.get_screen_tl_br(|v| d.get_world_to_screen2D(v, self.document.camera));
+                let inv_width  = (trim_rtex.width () as f32).recip();
+                let inv_height = (trim_rtex.height() as f32).recip();
+
+                {
+                    let mut d = d.begin_rlgl();
+                    let mut d = d.rl_set_texture(trim_rtex.texture());
+                    let mut d = d.rl_begin_quads();
+
+                    d.rl_color4ub(255, 255, 255, 255);
+                    d.rl_normal3f(0.0, 0.0, 1.0);
+
+                    d.rl_tex_coord2f(left*inv_width, -top*inv_height);
+                    d.rl_vertex2f(left, top);
+
+                    d.rl_tex_coord2f(left*inv_width, -bottom*inv_height);
+                    d.rl_vertex2f(left, bottom);
+
+                    d.rl_tex_coord2f(right*inv_width, -bottom*inv_height);
+                    d.rl_vertex2f(right, bottom);
+
+                    d.rl_tex_coord2f(right*inv_width, -top*inv_height);
+                    d.rl_vertex2f(right, top);
+                }
             }
         }
     }
@@ -276,15 +297,10 @@ impl Editor {
         for board in &self.document.artboards {
             let (tl, br) = board.get_screen_tl_br(|v| d.get_world_to_screen2D(v, self.document.camera));
             d.draw_text(&board.name, tl.x.floor() as i32, tl.y.floor() as i32 - FONT_SIZE, FONT_SIZE, Color::WHITE);
-            d.draw_line_strip(&[
-                tl,
-                Vector2::new(tl.x, br.y),
-                br,
-                Vector2::new(br.x, tl.y),
-                tl,
-            ], Color::BLACK);
+            d.draw_rectangle_lines_rect2(Rect2::minmax_rec(tl, br), Color::BLACK);
         }
         let mut d = d.begin_mode2D(self.document.camera);
-        self.current_tool.draw(&mut d, &self.document, &shader_table);
+        let px_world_size = self.document.camera.zoom.recip();
+        self.current_tool.draw(&mut d, &self.document, &shader_table, px_world_size);
     }
 }

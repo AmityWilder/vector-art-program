@@ -7,6 +7,7 @@ pub struct Matrix2x2 {
 }
 
 impl Default for Matrix2x2 {
+    #[inline]
     fn default() -> Self {
         Self::identity()
     }
@@ -18,6 +19,7 @@ impl Matrix2x2 {
         m10: 0.0, m11: 1.0,
     };
 
+    #[inline]
     pub const fn from_basis(v1: Vector2, v2: Vector2) -> Self {
         Self {
             m00: v1.x, m01: v1.y,
@@ -25,10 +27,12 @@ impl Matrix2x2 {
         }
     }
 
+    #[inline]
     pub const fn identity() -> Self {
         Self::IDENTITY
     }
 
+    #[inline]
     pub fn rotation(angle: f32) -> Self {
         let (s, c) = angle.sin_cos();
         Self {
@@ -37,12 +41,14 @@ impl Matrix2x2 {
         }
     }
 
+    #[inline]
     pub fn set_rotation(&mut self, angle: f32) {
         let (s, c) = angle.sin_cos();
         self.m00 = c; self.m01 = -s;
         self.m10 = s; self.m11 =  c;
     }
 
+    #[inline]
     pub const fn transpose(self) -> Self {
         Self {
             m00: self.m00, m01: self.m10,
@@ -50,6 +56,7 @@ impl Matrix2x2 {
         }
     }
 
+    #[inline]
     pub fn det(&self) -> f32 {
         self.m00*self.m11 - self.m01*self.m10
     }
@@ -57,6 +64,7 @@ impl Matrix2x2 {
 
 impl std::ops::Add for Matrix2x2 {
     type Output = Self;
+    #[inline]
     fn add(self, rhs: Self) -> Self::Output {
         Self {
             m00: self.m00 + rhs.m00,
@@ -68,6 +76,7 @@ impl std::ops::Add for Matrix2x2 {
 }
 
 impl std::ops::AddAssign for Matrix2x2 {
+    #[inline]
     fn add_assign(&mut self, rhs: Self) {
         *self = *self + rhs;
     }
@@ -75,6 +84,7 @@ impl std::ops::AddAssign for Matrix2x2 {
 
 impl std::ops::Sub for Matrix2x2 {
     type Output = Self;
+    #[inline]
     fn sub(self, rhs: Self) -> Self::Output {
         Self {
             m00: self.m00 - rhs.m00,
@@ -86,6 +96,7 @@ impl std::ops::Sub for Matrix2x2 {
 }
 
 impl std::ops::SubAssign for Matrix2x2 {
+    #[inline]
     fn sub_assign(&mut self, rhs: Self) {
         *self = *self - rhs;
     }
@@ -93,6 +104,7 @@ impl std::ops::SubAssign for Matrix2x2 {
 
 impl std::ops::Mul for Matrix2x2 {
     type Output = Self;
+    #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
         Self {
             m00: self.m00 * rhs.m00 + self.m01 * rhs.m10,
@@ -105,6 +117,7 @@ impl std::ops::Mul for Matrix2x2 {
 
 impl std::ops::Mul for &Matrix2x2 {
     type Output = Matrix2x2;
+    #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
         Matrix2x2 {
             m00: self.m00 * rhs.m00 + self.m01 * rhs.m10,
@@ -116,6 +129,7 @@ impl std::ops::Mul for &Matrix2x2 {
 }
 
 impl std::ops::MulAssign for Matrix2x2 {
+    #[inline]
     fn mul_assign(&mut self, rhs: Self) {
         *self = *self * rhs;
     }
@@ -123,6 +137,7 @@ impl std::ops::MulAssign for Matrix2x2 {
 
 impl std::ops::Mul<Vector2> for Matrix2x2 {
     type Output = Vector2;
+    #[inline]
     fn mul(self, rhs: Vector2) -> Self::Output {
         Vector2 {
             x: self.m00 * rhs.x + self.m01 * rhs.y,
@@ -133,6 +148,7 @@ impl std::ops::Mul<Vector2> for Matrix2x2 {
 
 impl std::ops::Mul<Vector2> for &Matrix2x2 {
     type Output = Vector2;
+    #[inline]
     fn mul(self, rhs: Vector2) -> Self::Output {
         Vector2 {
             x: self.m00 * rhs.x + self.m01 * rhs.y,

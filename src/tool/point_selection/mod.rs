@@ -189,9 +189,7 @@ impl ToolType for PointSelection {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable) {
-        let px_world_size = document.camera.zoom.recip();
-
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32) {
         let selection_rec = self.selection_points.as_ref().copied().map(|(start, end)|
             start.minmax_rec(end)
         );

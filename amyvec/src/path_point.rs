@@ -8,6 +8,7 @@ pub enum Ctrl {
 }
 
 impl Ctrl {
+    #[inline]
     pub const fn opposite(self) -> Self {
         match self {
             Ctrl::In  => Ctrl::Out,
@@ -47,18 +48,22 @@ pub enum Ctrl2 {
 use Ctrl2::*;
 
 impl Ctrl2 {
+    #[inline]
     pub const fn is_reflect(&self) -> bool {
         matches!(self, Reflect)
     }
 
+    #[inline]
     pub const fn is_mirror(&self) -> bool {
         matches!(self, Mirror(_))
     }
 
+    #[inline]
     pub const fn is_exact(&self) -> bool {
         matches!(self, Exact(_))
     }
 
+    #[inline]
     pub fn calculate(&self, p: Vector2, c1: Vector2) -> Vector2 {
         match self {
             &Exact(c2) => c2,
@@ -92,6 +97,7 @@ impl PathPoint {
         self.c2().is_none()
     }
 
+    #[inline]
     pub const fn c2(&self) -> Option<&Ctrl2> {
         match &self.c {
             Some(Ctrl1 { c2, .. }) => c2.as_ref(),
@@ -99,6 +105,7 @@ impl PathPoint {
         }
     }
 
+    #[inline]
     pub const fn c2_mut(&mut self) -> Option<&mut Ctrl2> {
         match &mut self.c {
             Some(Ctrl1 { c2, .. }) => c2.as_mut(),
@@ -106,6 +113,7 @@ impl PathPoint {
         }
     }
 
+    #[inline]
     pub fn calculate(&self) -> (Vector2, Vector2, Vector2) {
         let (c_in, c_out) = match &self.c {
             Some(Ctrl1 { c1: (c1_side, c1), c2 }) => {
@@ -122,12 +130,14 @@ impl PathPoint {
         (c_in, self.p, c_out)
     }
 
+    #[inline]
     pub fn ctrl(&self, side: Ctrl) -> Option<Ctrl2> {
         self.c.as_ref().and_then(|Ctrl1 { c1: (c1_side, c1), c2 }|
             if c1_side == &side { Some(Exact(*c1)) } else { *c2 }
         )
     }
 
+    #[inline]
     pub fn ctrl_pov(&self, side: Ctrl) -> (Option<Ctrl2>, Option<Ctrl2>) {
         if let Some(Ctrl1 { c1: (c1_side, c1), c2 }) = self.c.as_ref() {
             let (c1, c2) = (Some(Exact(*c1)), *c2);
@@ -138,6 +148,7 @@ impl PathPoint {
     }
 
     /// Translate the point and controls while keeping the controls' relative positions
+    #[inline]
     pub fn move_point(&mut self, delta: Vector2) {
         self.p += delta;
         if let Some(Ctrl1 { c1: (_, c1), c2 }) = self.c.as_mut() {
@@ -149,6 +160,7 @@ impl PathPoint {
     }
 
     /// Move the point and controls while keeping the controls' relative positions
+    #[inline]
     pub fn set_point(&mut self, p: Vector2) {
         self.move_point(p - self.p);
     }

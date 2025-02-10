@@ -81,7 +81,8 @@
 #[allow(clippy::enum_glob_use, reason = "every frickin one of these is prefixed with its type name >:T")]
 pub use {KeyboardKey::*, MouseButton::*};
 
-use amymath::prelude::IRect2;
+use amymath::prelude::{DrawRect2Lines, IRect2};
+use document::layer::Layer;
 use raylib::prelude::*;
 use editor::Editor;
 use engine::Engine;
@@ -143,6 +144,28 @@ fn main() {
         {
             let mut d = rl.begin_drawing(&thread);
             engine.draw(&mut d, &thread, &mut trim_rtex, &window_rect);
+
+            // debug
+            {
+                const DRAW_BOUNDING_BOXES: bool = true;
+
+                if DRAW_BOUNDING_BOXES && let Some(editor) = engine.get_active_editor() {
+                    let mut d = d.begin_mode2D(editor.document.camera);
+                    for layer in editor.document.layers.dfs_iter(|_| true) {
+                        if let Layer::Path(path) = layer {
+                            let path = path.read();
+                            if let Some(bounds) = path.curve.bounds() {
+                                d.draw_rectangle_lines_rect2(bounds, Color::MAGENTA);
+                            }
+                            for bounds in path.curve.slices().map(|bez| bez.bounds()) {
+                                d.draw_rectangle_lines_rect2(bounds, Color::BLUE);
+                            }
+                        }
+                    }
+                }
+            }
+
+            d.draw_fps(0, 0);
         }
     }
 }

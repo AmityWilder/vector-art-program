@@ -198,8 +198,7 @@ impl ToolType for Pen {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, _shader_table: &ShaderTable) {
-        let px_world_size = document.camera.zoom.recip();
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, _shader_table: &ShaderTable, px_world_size: f32) {
         let info = match self {
             Self::Active(ActivePen { target, direction, .. }) => Some((target, Some(direction))),
             Self::Inactive(InactivePen(Some(target))) => Some((target, None)),

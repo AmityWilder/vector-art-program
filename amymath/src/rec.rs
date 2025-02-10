@@ -12,6 +12,7 @@ pub trait RectangleCenter {
 }
 
 impl RectangleCenter for Rectangle {
+    #[inline]
     fn center(&self) -> Vector2 {
         Vector2 {
             x: self.x + 0.5 * self.width,
@@ -19,6 +20,7 @@ impl RectangleCenter for Rectangle {
         }
     }
 
+    #[inline]
     fn extent(&self) -> Vector2 {
         Vector2 {
             x: 0.5 * self.width,
@@ -28,6 +30,7 @@ impl RectangleCenter for Rectangle {
 }
 
 impl RectangleCenter for Rect2 {
+    #[inline]
     fn center(&self) -> Vector2 {
         Vector2 {
             x: self.xmin.midpoint(self.xmax),
@@ -35,6 +38,7 @@ impl RectangleCenter for Rect2 {
         }
     }
 
+    #[inline]
     fn extent(&self) -> Vector2 {
         Vector2 {
             x: 0.5 * self.width (),
@@ -44,6 +48,7 @@ impl RectangleCenter for Rect2 {
 }
 
 impl RectangleCenter for IRect2 {
+    #[inline]
     fn center(&self) -> Vector2 {
         Vector2 {
             x: (self.xmin as f32).midpoint(self.xmax as f32),
@@ -51,6 +56,7 @@ impl RectangleCenter for IRect2 {
         }
     }
 
+    #[inline]
     fn extent(&self) -> Vector2 {
         Vector2 {
             x: 0.5 * self.width () as f32,
@@ -65,6 +71,7 @@ pub trait MinMaxRectangle {
 }
 
 impl MinMaxRectangle for Vector2 {
+    #[inline]
     fn minmax_rec(&self, other: Self) -> Rectangle {
         Rectangle {
             x: self.x.min(other.x),
@@ -74,6 +81,7 @@ impl MinMaxRectangle for Vector2 {
         }
     }
 
+    #[inline]
     fn midpoint(&self, other: Self) -> Self {
         Self {
             x: self.x.midpoint(other.x),
@@ -91,6 +99,7 @@ pub struct Rect2 {
 }
 
 impl From<IRect2> for Rect2 {
+    #[inline]
     fn from(IRect2 { xmin, ymin, xmax, ymax }: IRect2) -> Self {
         Self {
             xmin: xmin as f32,
@@ -102,24 +111,29 @@ impl From<IRect2> for Rect2 {
 }
 
 impl Rect2 {
+    #[inline]
     pub fn is_overlapping_point(&self, point: Vector2) -> bool {
         self.xmin <= point.x && point.x < self.xmax &&
         self.ymin <= point.y && point.y < self.ymax
     }
 
+    #[inline]
     pub fn is_overlapping(&self, rec: &Self) -> bool {
         self.xmin < rec.xmax && rec.xmin < self.xmax &&
         self.ymin < rec.ymax && rec.ymin < self.ymax
     }
 
+    #[inline]
     pub fn width(&self) -> f32 {
         self.xmax - self.xmin
     }
 
+    #[inline]
     pub fn height(&self) -> f32 {
         self.ymax - self.ymin
     }
 
+    #[inline]
     pub fn grow(self, amnt: f32) -> Self {
         Self {
             xmin: self.xmin - amnt,
@@ -128,9 +142,57 @@ impl Rect2 {
             ymax: self.ymax + amnt,
         }
     }
+
+    /// Returns a rectangle that can entirely contain both input rects
+    #[inline]
+    pub fn max(self, other: Self) -> Self {
+        Self {
+            xmin: self.xmin.min(other.xmin),
+            ymin: self.ymin.min(other.ymin),
+            xmax: self.xmax.max(other.xmax),
+            ymax: self.ymax.max(other.ymax),
+        }
+    }
+
+    /// Adds the point to the bounds of this rect
+    #[inline]
+    pub fn max_pt(self, p: Vector2) -> Self {
+        Self {
+            xmin: self.xmin.min(p.x),
+            ymin: self.ymin.min(p.y),
+            xmax: self.xmax.max(p.x),
+            ymax: self.ymax.max(p.y),
+        }
+    }
+
+    #[inline]
+    pub fn minmax_rec(p1: Vector2, p2: Vector2) -> Self {
+        Self {
+            xmin: p1.x.min(p2.x),
+            ymin: p1.y.min(p2.y),
+            xmax: p1.x.max(p2.x),
+            ymax: p1.y.max(p2.y),
+        }
+    }
 }
 
+pub trait DrawRect2Lines: RaylibDraw {
+    #[inline]
+    fn draw_rectangle_lines_rect2(&mut self, rec: Rect2, color: Color) {
+        self.draw_line_strip(&[
+            Vector2::new(rec.xmin, rec.ymin),
+            Vector2::new(rec.xmax, rec.ymin),
+            Vector2::new(rec.xmax, rec.ymax),
+            Vector2::new(rec.xmin, rec.ymax),
+            Vector2::new(rec.xmin, rec.ymin),
+        ], color);
+    }
+}
+
+impl<D: RaylibDraw> DrawRect2Lines for D {}
+
 impl From<Rectangle> for Rect2 {
+    #[inline]
     fn from(Rectangle { x, y, width, height }: Rectangle) -> Self {
         Self {
             xmin: x,
@@ -142,6 +204,7 @@ impl From<Rectangle> for Rect2 {
 }
 
 impl From<Rect2> for Rectangle {
+    #[inline]
     fn from(Rect2 { xmin, ymin, xmax, ymax }: Rect2) -> Self {
         Self {
             x: xmin,
@@ -153,6 +216,7 @@ impl From<Rect2> for Rectangle {
 }
 
 impl From<Rect2> for ffi::Rectangle {
+    #[inline]
     fn from(Rect2 { xmin, ymin, xmax, ymax }: Rect2) -> Self {
         Self {
             x: xmin,
@@ -177,16 +241,19 @@ impl IRect2 {
         self.is_overlapping_point(point.x.trunc() as i32, point.y.trunc() as i32)
     }
 
+    #[inline]
     pub fn is_overlapping_point(&self, x: i32, y: i32) -> bool {
         self.xmin <= x && x < self.xmax &&
         self.ymin <= y && y < self.ymax
     }
 
+    #[inline]
     pub fn is_overlapping(&self, rec: &Self) -> bool {
         self.xmin < rec.xmax && rec.xmin < self.xmax &&
         self.ymin < rec.ymax && rec.ymin < self.ymax
     }
 
+    #[inline]
     pub fn offset(&mut self, x: i32, y: i32) {
         self.xmin += x;
         self.ymin += y;
@@ -194,6 +261,7 @@ impl IRect2 {
         self.ymax += y;
     }
 
+    #[inline]
     pub fn with_offset(&self, x: i32, y: i32) -> Self {
         Self {
             xmin: self.xmin + x,
@@ -203,6 +271,7 @@ impl IRect2 {
         }
     }
 
+    #[inline]
     pub fn intersect(&self, other: &Self) -> Self {
         Self {
             xmin: self.xmin.max(other.xmin),
@@ -223,16 +292,19 @@ impl IRect2 {
     }
 
     /// Iterate over `x` coordinates
+    #[inline]
     pub fn iter_x(&self) -> impl Iterator<Item = i32> {
         self.xmin..=self.xmax
     }
 
     /// Iterate over `y` coordinates
+    #[inline]
     pub fn iter_y(&self) -> impl Iterator<Item = i32> {
         self.ymin..=self.ymax
     }
 
     /// Iterate over `x`,`y` coordinates by `for y { for x { ... } }`
+    #[inline]
     pub fn iter_xy_row_col(&self) -> impl Iterator<Item = (i32, i32)> {
         let (xmin, xmax) = (self.xmin, self.xmax);
         (self.ymin..=(self.ymax))
@@ -241,6 +313,7 @@ impl IRect2 {
     }
 
     /// Iterate over `x`,`y` coordinates by `for x { for y { ... } }`
+    #[inline]
     pub fn iter_xy_col_row(&self) -> impl Iterator<Item = (i32, i32)> {
         let (ymin, ymax) = (self.ymin, self.ymax);
         (self.xmin..=self.xmax)
@@ -250,6 +323,7 @@ impl IRect2 {
 }
 
 impl From<Rectangle> for IRect2 {
+    #[inline]
     fn from(Rectangle { x, y, width, height }: Rectangle) -> Self {
         Self {
             xmin: x as i32,
@@ -261,6 +335,7 @@ impl From<Rectangle> for IRect2 {
 }
 
 impl From<IRect2> for Rectangle {
+    #[inline]
     fn from(IRect2 { xmin, ymin, xmax, ymax }: IRect2) -> Self {
         Self {
             x: xmin as f32,
@@ -272,6 +347,7 @@ impl From<IRect2> for Rectangle {
 }
 
 impl From<IRect2> for ffi::Rectangle {
+    #[inline]
     fn from(IRect2 { xmin, ymin, xmax, ymax }: IRect2) -> Self {
         Self {
             x: xmin as f32,
@@ -305,6 +381,7 @@ pub struct IntRectangle {
 }
 
 impl From<IntRectangle> for Rectangle {
+    #[inline]
     fn from(value: IntRectangle) -> Self {
         Rectangle {
             x:      value.x      as f32,
@@ -316,11 +393,13 @@ impl From<IntRectangle> for Rectangle {
 }
 
 impl IntRectangle {
+    #[inline]
     pub fn offset(&mut self, x: i32, y: i32) {
         self.x += x;
         self.y += y;
     }
 
+    #[inline]
     pub fn with_offset(&self, x: i32, y: i32) -> Self {
         Self {
             x: self.x + x,
@@ -330,6 +409,7 @@ impl IntRectangle {
         }
     }
 
+    #[inline]
     pub fn intersect(&self, container: &Self) -> Self {
         let x = self.x.max(container.x);
         let y = self.y.max(container.y);
@@ -338,30 +418,37 @@ impl IntRectangle {
         Self { x, y, width, height }
     }
 
+    #[inline]
     pub const fn left(&self) -> i32 {
         self.x
     }
+    #[inline]
     pub const fn right(&self) -> i32 {
         self.x + self.width
     }
+    #[inline]
     pub const fn top(&self) -> i32 {
         self.y
     }
+    #[inline]
     pub const fn bottom(&self) -> i32 {
         self.y + self.height
     }
 
     /// Iterate over `x` coordinates
+    #[inline]
     pub fn iter_x(&self) -> impl Iterator<Item = i32> {
         self.x..=(self.x + self.width)
     }
 
     /// Iterate over `y` coordinates
+    #[inline]
     pub fn iter_y(&self) -> impl Iterator<Item = i32> {
         self.y..=(self.y + self.height)
     }
 
     /// Iterate over `x`,`y` coordinates by `for y { for x { ... } }`
+    #[inline]
     pub fn iter_xy_row_col(&self) -> impl Iterator<Item = (i32, i32)> {
         let x = self.x;
         let width = self.width;
@@ -371,6 +458,7 @@ impl IntRectangle {
     }
 
     /// Iterate over `x`,`y` coordinates by `for x { for y { ... } }`
+    #[inline]
     pub fn iter_xy_col_row(&self) -> impl Iterator<Item = (i32, i32)> {
         let y = self.y;
         let height = self.height;
@@ -380,12 +468,14 @@ impl IntRectangle {
     }
 
     /// Iterate over normalized `x` coordinates (`self.x` = 0, `self.x + self.width` = 1)
+    #[inline]
     pub fn iter_u(&self) -> impl Iterator<Item = f32> {
         let inv_width = (self.width as f32).recip();
         (0..=self.width).map(move |x| inv_width * x as f32)
     }
 
     /// Iterate over normalized `y` coordinates (`self.y` = 0, `self.y + self.height` = 1)
+    #[inline]
     pub fn iter_v(&self) -> impl Iterator<Item = f32> {
         let inv_height = (self.height as f32).recip();
         (0..=self.height).map(move |y| inv_height * y as f32)
@@ -425,6 +515,7 @@ impl IntRectangle {
         })
     }
 
+    #[inline]
     pub const fn index_of(&self, x: i32, y: i32) -> usize {
         assert!(self.x <= x && x < self.x + self.width && self.y <= y && y < self.y + self.height);
         (y - self.y) as usize * self.width as usize + (x - self.x) as usize
@@ -432,6 +523,7 @@ impl IntRectangle {
 }
 
 impl From<IntRectangle> for ffi::Rectangle {
+    #[inline]
     fn from(value: IntRectangle) -> Self {
         ffi::Rectangle {
             x:      value.x      as f32,

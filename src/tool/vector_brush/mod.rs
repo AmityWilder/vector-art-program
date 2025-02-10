@@ -284,9 +284,8 @@ impl ToolType for VectorBrush {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable) {
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32) {
         const DRAW_DEBUG: bool = false;
-        let zoom_inv = document.camera.zoom.recip();
         if let VectorBrush::Active(brush) = self {
             brush.draw(d, document, shader_table);
 
@@ -296,7 +295,7 @@ impl ToolType for VectorBrush {
                 let last_curved = brush.signal.last_curved;
 
                 d.draw_pixel_v(last_changed, Color::BLUE);
-                d.draw_ring(last_changed, MIN_DISTANCE, MIN_DISTANCE + zoom_inv, 0.0, 360.0, 36, Color::BLUE);
+                d.draw_ring(last_changed, MIN_DISTANCE, MIN_DISTANCE + px_world_size, 0.0, 360.0, 36, Color::BLUE);
 
                 d.draw_pixel_v(last_straight, Color::RED);
                 let straight_direction = (last_changed - last_straight).normalized();

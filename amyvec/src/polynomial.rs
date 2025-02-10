@@ -16,6 +16,7 @@ pub enum QuadraticZeros {
 }
 
 impl From<LinearZeros> for QuadraticZeros {
+    #[inline]
     fn from(value: LinearZeros) -> Self {
         match value {
             LinearZeros::NoSolution => Self::NoSolution,
@@ -35,6 +36,7 @@ pub enum CubicZeros {
 }
 
 impl From<QuadraticZeros> for CubicZeros {
+    #[inline]
     fn from(value: QuadraticZeros) -> Self {
         match value {
             QuadraticZeros::NoSolution => Self::NoSolution,
@@ -45,6 +47,7 @@ impl From<QuadraticZeros> for CubicZeros {
     }
 }
 
+#[inline]
 pub fn linear_zero(m: f32, b: f32) -> LinearZeros {
     if m != 0.0 {
         LinearZeros::OneSolution(-b / m)
@@ -55,6 +58,7 @@ pub fn linear_zero(m: f32, b: f32) -> LinearZeros {
     }
 }
 
+#[inline]
 pub fn quadratic_zero(a: f32, b: f32, c: f32) -> QuadraticZeros {
     if a != 0.0 {
         let b2_4ac = b*b - 4.0*a*c;

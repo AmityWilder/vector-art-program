@@ -20,6 +20,7 @@ impl NormalizedColor {
         }
     }
 
+    #[inline]
     pub fn saturate(self) -> Self {
         Self {
             r: self.r.clamp(0.0, 1.0),
@@ -29,6 +30,7 @@ impl NormalizedColor {
         }
     }
 
+    #[inline]
     pub fn add_rgb(self, rhs: f32) -> Self {
         Self {
             r: self.r + rhs,
@@ -38,6 +40,7 @@ impl NormalizedColor {
         }
     }
 
+    #[inline]
     pub fn add_rgba(self, rhs: f32) -> Self {
         Self {
             r: self.r + rhs,
@@ -47,6 +50,7 @@ impl NormalizedColor {
         }
     }
 
+    #[inline]
     pub fn sub_rgb(self, rhs: f32) -> Self {
         Self {
             r: self.r - rhs,
@@ -56,6 +60,7 @@ impl NormalizedColor {
         }
     }
 
+    #[inline]
     pub fn sub_rgba(self, rhs: f32) -> Self {
         Self {
             r: self.r - rhs,
@@ -65,6 +70,7 @@ impl NormalizedColor {
         }
     }
 
+    #[inline]
     pub fn mul_rgb(self, rhs: f32) -> Self {
         Self {
             r: self.r * rhs,
@@ -74,6 +80,7 @@ impl NormalizedColor {
         }
     }
 
+    #[inline]
     pub fn mul_rgba(self, rhs: f32) -> Self {
         Self {
             r: self.r * rhs,
@@ -83,6 +90,7 @@ impl NormalizedColor {
         }
     }
 
+    #[inline]
     pub fn div_rgb(self, rhs: f32) -> Self {
         let rhs_inv = rhs.recip();
         Self {
@@ -93,6 +101,7 @@ impl NormalizedColor {
         }
     }
 
+    #[inline]
     pub fn div_rgba(self, rhs: f32) -> Self {
         let rhs_inv = rhs.recip();
         Self {
@@ -106,6 +115,7 @@ impl NormalizedColor {
 
 impl std::ops::Add for NormalizedColor {
     type Output = Self;
+    #[inline]
     fn add(self, rhs: Self) -> Self::Output {
         Self {
             r: self.r + rhs.r,
@@ -118,6 +128,7 @@ impl std::ops::Add for NormalizedColor {
 
 impl std::ops::Sub for NormalizedColor {
     type Output = Self;
+    #[inline]
     fn sub(self, rhs: Self) -> Self::Output {
         Self {
             r: self.r - rhs.r,
@@ -130,6 +141,7 @@ impl std::ops::Sub for NormalizedColor {
 
 impl std::ops::Mul for NormalizedColor {
     type Output = Self;
+    #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
         Self {
             r: self.r * rhs.r,
@@ -142,6 +154,7 @@ impl std::ops::Mul for NormalizedColor {
 
 impl std::ops::Div for NormalizedColor {
     type Output = Self;
+    #[inline]
     fn div(self, rhs: Self) -> Self::Output {
         Self {
             r: self.r / rhs.r,
@@ -153,24 +166,28 @@ impl std::ops::Div for NormalizedColor {
 }
 
 impl std::ops::AddAssign for NormalizedColor {
+    #[inline]
     fn add_assign(&mut self, rhs: Self) {
         *self = *self + rhs;
     }
 }
 
 impl std::ops::SubAssign for NormalizedColor {
+    #[inline]
     fn sub_assign(&mut self, rhs: Self) {
         *self = *self - rhs;
     }
 }
 
 impl std::ops::MulAssign for NormalizedColor {
+    #[inline]
     fn mul_assign(&mut self, rhs: Self) {
         *self = *self * rhs;
     }
 }
 
 impl std::ops::DivAssign for NormalizedColor {
+    #[inline]
     fn div_assign(&mut self, rhs: Self) {
         *self = *self / rhs;
     }
@@ -186,6 +203,7 @@ pub trait ColorMath {
 }
 
 impl ColorMath for Color {
+    #[inline]
     fn mix(self, other: Self, amount: f32) -> Self {
         Self {
             r: lerp(self.r as f32, other.r as f32, amount) as u8,
@@ -195,6 +213,7 @@ impl ColorMath for Color {
         }
     }
 
+    #[inline]
     fn add(self, rhs: Self) -> Self {
         Self {
             r: self.r.saturating_add(rhs.r),
@@ -204,6 +223,7 @@ impl ColorMath for Color {
         }
     }
 
+    #[inline]
     fn sub(self, rhs: Self) -> Self {
         Self {
             r: self.r.saturating_sub(rhs.r),
@@ -213,6 +233,7 @@ impl ColorMath for Color {
         }
     }
 
+    #[inline]
     fn mul(self, rhs: Self) -> Self {
         Self {
             r: ((self.r as f32 * rhs.r as f32) * FRAC_1_255) as u8,
@@ -222,6 +243,7 @@ impl ColorMath for Color {
         }
     }
 
+    #[inline]
     fn div(self, rhs: Self) -> Self {
         Self {
             r: (self.r as f32 / rhs.r as f32) as u8,
@@ -231,6 +253,7 @@ impl ColorMath for Color {
         }
     }
 
+    #[inline]
     fn to_normalized(self) -> NormalizedColor {
         NormalizedColor {
             r: self.r as f32 * FRAC_1_255,

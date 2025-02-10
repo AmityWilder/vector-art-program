@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use amymath::prelude::Rect2;
 use raylib::prelude::*;
 use crate::{
     cubic_bezier::CubicBezier,
@@ -11,6 +12,7 @@ pub struct Curve {
 }
 
 impl Default for Curve {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -24,6 +26,7 @@ impl Curve {
         }
     }
 
+    #[inline]
     pub fn slice(&self, start_index: usize) -> Option<CubicBezier> {
         if let (Some(pp1), Some(pp2)) = (
             self.points.get(start_index),
@@ -36,14 +39,25 @@ impl Curve {
         None
     }
 
+    /// Calculate the bounding box of the entire curve
+    ///
+    /// Returns [`None`] if the curve is empty
+    pub fn bounds(&self) -> Option<Rect2> {
+        self.slices()
+            .map(|bez| bez.bounds())
+            .reduce(|acc, e| acc.max(e))
+    }
+
     pub fn edge_distance_to(&self, _pt: Vector2) -> f32 {
         todo!()
     }
 
+    #[inline]
     pub fn calculate(&self) -> Calculate<impl Iterator<Item = &'_ PathPoint>> {
         Calculate::new(self.points.iter(), self.is_closed)
     }
 
+    #[inline]
     pub fn slices(&self) -> Slices<impl Iterator<Item = &'_ PathPoint>> {
         Slices::new(self.calculate())
     }

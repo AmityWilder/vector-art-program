@@ -7,6 +7,7 @@ pub trait CrossProduct<Rhs = Self> {
 
 impl CrossProduct<Vector2> for f32 {
     type Output = Vector2;
+    #[inline]
     fn cross(self, rhs: Vector2) -> Self::Output {
         Vector2 {
             x: -self * rhs.y,
@@ -17,6 +18,7 @@ impl CrossProduct<Vector2> for f32 {
 
 impl CrossProduct for Vector2 {
     type Output = f32;
+    #[inline]
     fn cross(self, rhs: Vector2) -> Self::Output {
         self.x * rhs.y - self.y * rhs.x
     }
@@ -29,6 +31,7 @@ pub trait ReflectVector {
 }
 
 impl ReflectVector for Vector2 {
+    #[inline]
     fn reflected_over(&self, across: Self) -> Self {
         Self {
             x: across.x * 2.0 - self.x,
@@ -36,6 +39,7 @@ impl ReflectVector for Vector2 {
         }
     }
 
+    #[inline]
     fn reflected_at(&self, across: Self, scale: f32) -> Self {
         let delta = *self - across;
         Self {
@@ -44,6 +48,7 @@ impl ReflectVector for Vector2 {
         }
     }
 
+    #[inline]
     fn reflected_to(&self, across: Self, mut length: f32) -> Self {
         let delta = *self - across;
         length /= delta.length();
@@ -68,14 +73,17 @@ pub trait DistanceSqr {
 }
 
 impl DistanceSqr for Vector2 {
+    #[inline]
     fn distance_sqr_to(&self, v: Self) -> f32 {
         (*self - v).length()
     }
 
+    #[inline]
     fn rec_distance_to(&self, v: Self) -> f32 {
         (self.x - v.x).abs().max((self.y - v.y).abs())
     }
 
+    #[inline]
     fn dia_distance_to(&self, v: Self) -> f32 {
         (self.x - v.x).abs() + (self.y - v.y).abs()
     }
@@ -96,6 +104,7 @@ impl SnapTo for Vector2 {
         start * (1.0 - t) + *self * t
     }
 
+    #[inline]
     fn distance_sqr_to_segment(&self, start: Self, end: Self) -> f32 {
         self.distance_sqr_to(self.snap_to_segment(start, end))
     }
@@ -107,6 +116,7 @@ pub trait Rotate90 {
 }
 
 impl Rotate90 for Vector2 {
+    #[inline]
     fn rotate90_cw(&self) -> Self {
         Self {
             x: -self.y,
@@ -114,6 +124,7 @@ impl Rotate90 for Vector2 {
         }
     }
 
+    #[inline]
     fn rotate90_cc(&self) -> Self {
         Self {
             x:  self.y,

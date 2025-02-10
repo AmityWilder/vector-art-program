@@ -1,6 +1,26 @@
 use raylib::prelude::*;
 
 pub trait RaylibRlglExt {
+    /// Example
+    /// ```no_run
+    /// let mut d = d.begin_rlgl();
+    /// {
+    ///     let mut d = d.rl_set_texture(&texture);
+    ///     {
+    ///         let mut d = d.rl_begin_quads();
+    ///         d.rl_color4ub(255, 255, 255, 255);
+    ///         d.rl_normal3f(0.0, 0.0, 1.0);
+    ///         d.rl_tex_coord2f(0.0, 0.0);
+    ///         d.rl_vertex2f(0.0, 0.0);
+    ///         d.rl_tex_coord2f(0.0, 1.0);
+    ///         d.rl_vertex2f(0.0, 32.0);
+    ///         d.rl_tex_coord2f(1.0, 1.0);
+    ///         d.rl_vertex2f(32.0, 32.0);
+    ///         d.rl_tex_coord2f(1.0, 0.0);
+    ///         d.rl_vertex2f(32.0, 0.0);
+    ///     }
+    /// }
+    /// ```
     fn begin_rlgl(&mut self) -> RlglHandle<'_, Self> {
         RlglHandle(self)
     }

@@ -135,11 +135,10 @@ impl ToolType for RasterBrush {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, _shader_table: &ShaderTable) {
-        let inv_zoom = document.camera.zoom.recip();
+    fn draw(&self, d: &mut impl RaylibDraw, _document: &Document, _shader_table: &ShaderTable, px_world_size: f32) {
         let raster = self.target.read();
         let (src_rec, dest_rec) = (raster.texture.src_rec.flipped(), raster.texture.dest_rec);
         Self::draw_buffer(d, &self.buffer, self.shader.as_ref(), src_rec, dest_rec, &self.stroke);
-        d.draw_ring(self.mouse_curr, (self.stroke.thick - inv_zoom) * 0.5, (self.stroke.thick + inv_zoom) * 0.5, 0.0, 360.0, 72, Color::WHITE);
+        d.draw_ring(self.mouse_curr, (self.stroke.thick - px_world_size) * 0.5, (self.stroke.thick + px_world_size) * 0.5, 0.0, 360.0, 72, Color::WHITE);
     }
 }

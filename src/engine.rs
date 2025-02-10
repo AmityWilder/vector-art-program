@@ -166,6 +166,21 @@ fn draw_artwork(d: &mut RaylibDrawHandle<'_>, trim_rtex: &RenderTexture2D) {
         #[allow(clippy::cast_precision_loss, reason = "16 million is an absurd number of pixels wide/tall")]
         (width as f32, height as f32);
 
-    let rect = Rectangle::new(0.0, 0.0, width, height);
-    d.draw_texture_pro(trim_rtex, rect.flipped(), rect, Vector2::zero(), 0.0, Color::MAGENTA);
+    {
+        let mut d = d.begin_rlgl();
+        let mut d = d.rl_set_texture(trim_rtex.texture());
+        let mut d = d.rl_begin_quads();
+
+        d.rl_color4ub(255, 0, 255, 255);
+        d.rl_normal3f(0.0, 0.0, 1.0);
+
+        d.rl_tex_coord2f(0.0, 1.0);
+        d.rl_vertex2f(0.0, 0.0);
+        d.rl_tex_coord2f(0.0, 0.0);
+        d.rl_vertex2f(0.0, height);
+        d.rl_tex_coord2f(1.0, 0.0);
+        d.rl_vertex2f(width, height);
+        d.rl_tex_coord2f(1.0, 1.0);
+        d.rl_vertex2f(width, 0.0);
+    }
 }
