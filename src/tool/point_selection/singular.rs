@@ -4,7 +4,7 @@ use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{prelude::DirectibleDoubleEndedIterator, rc::prelude::*};
 use crate::{document::layer::Layer, layer::{BackToFore, LayerType}, shaders::ShaderTable, vector_path::{path_point::{Ctrl1, Ctrl2, PPPart, PathPoint}, VectorPath, DrawPathPoint}, Change, Document};
-use super::{multiple::{EnumerateSelectedPoints, SelectionPiece}, HOVER_RADIUS, HOVER_RADIUS_SQR};
+use super::{HOVER_RADIUS, HOVER_RADIUS_SQR};
 
 struct EditSinglePointAction {
     target: StrongMut<VectorPath>,
@@ -94,24 +94,17 @@ impl SingleSelect {
     pub fn draw(&self, d: &mut impl RaylibDraw, document: &Document, px_world_size: f32, selection_rec: Option<Rectangle>, _shader_table: &ShaderTable) {
         if let Some(selection_rec) = selection_rec {
             // draw selection options
-            let idx = self.pt_idx.expect("pt_idx should not be None when selecting with rectangle");
-            let piece = SelectionPiece { target: self.target.clone_mut(), points: vec![idx] };
-            for layer in document.layers.shallow_iter().cdir::<BackToFore>() {
+            let selected_idx = self.pt_idx.expect("pt_idx should not be None when selecting with rectangle");
+            for (has_selected, path) in document.layers.shallow_iter().cdir::<BackToFore>().filter_map(|layer|
                 if let Layer::Path(path) = layer {
-                    let selected = (path == &self.target).then_some(&piece);
-                    let path = path.read();
-                    path.draw_selected(d, px_world_size);
-                    if let Some(selected) = selected {
-                        for (is_point_selected, pp) in path.enumerate_selected_points(selected) {
-                            let is_selected = is_point_selected || selection_rec.check_collision_point_rec(pp.p);
-                            d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
-                        }
-                    } else {
-                        for pp in &path.curve.points {
-                            let is_selected = selection_rec.check_collision_point_rec(pp.p);
-                            d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
-                        }
-                    }
+                    Some((&self.target == path, path.clone_ref()))
+                } else { None })
+            {
+                let path = path.read();
+                path.draw_selected(d, px_world_size);
+                for (is_point_selected, pp) in path.curve.points.iter().enumerate().map(|(i, pp)| (has_selected && i == selected_idx, pp)) {
+                    let is_selected = is_point_selected || selection_rec.check_collision_point_rec(pp.p);
+                    d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
                 }
             }
         } else {

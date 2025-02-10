@@ -3,7 +3,7 @@ use std::fmt;
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::rc::prelude::*;
-use crate::{document::layer::Layer, layer::LayerType, shaders::ShaderTable, vector_path::{path_point::PathPoint, VectorPath, DrawPathPoint}, Change, Document};
+use crate::{document::layer::Layer, layer::LayerType, shaders::ShaderTable, vector_path::{VectorPath, DrawPathPoint}, Change, Document};
 use super::HOVER_RADIUS;
 
 struct EditMultiPointAction {
@@ -55,20 +55,28 @@ impl MultiSelect {
 
     pub fn draw(&self, d: &mut impl RaylibDraw, document: &Document, px_world_size: f32, selection_rec: Option<Rectangle>, _shader_table: &ShaderTable) {
         if let Some(selection_rec) = selection_rec {
-            for (selected, layer) in document.layers.shallow_iter().enumerate_selected_layers(self) {
-                if let Layer::Path(path) = layer {
-                    let path = path.read();
-                    path.draw_selected(d, px_world_size);
-                    if let Some(selected) = selected {
-                        for (is_point_selected, pp) in path.enumerate_selected_points(selected) {
-                            let is_selected = is_point_selected || selection_rec.check_collision_point_rec(pp.p);
-                            d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
-                        }
-                    } else {
-                        for pp in &path.curve.points {
-                            let is_selected = selection_rec.check_collision_point_rec(pp.p);
-                            d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
-                        }
+            let mut selected_layers = self.pieces.iter().peekable();
+            for (selected, path) in document.layers.shallow_iter()
+                .filter_map(|layer|
+                    if let Layer::Path(path) = layer {
+                        Some((selected_layers.next_if(|selected| path == &selected.target), path.clone_ref()))
+                    } else { None })
+            {
+                let path = path.read();
+                path.draw_selected(d, px_world_size);
+                if let Some(selected) = selected {
+                    let mut selected_points = selected.points.iter().peekable();
+                    for (is_point_selected, pp) in path.curve.points.iter()
+                        .enumerate()
+                        .map(|(i, pp)| (selected_points.next_if_eq(&&i).is_some(), pp))
+                    {
+                        let is_selected = is_point_selected || selection_rec.check_collision_point_rec(pp.p);
+                        d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
+                    }
+                } else {
+                    for pp in &path.curve.points {
+                        let is_selected = selection_rec.check_collision_point_rec(pp.p);
+                        d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
                     }
                 }
             }
@@ -85,86 +93,5 @@ impl MultiSelect {
                 }
             }
         }
-    }
-}
-
-pub trait EnumerateSelectedLayers {
-    fn enumerate_selected_layers(self, selection: &MultiSelect) -> LayerSelection<'_, Self> where Self: Sized;
-}
-
-impl<I> EnumerateSelectedLayers for I {
-    #[inline]
-    fn enumerate_selected_layers(self, selection: &MultiSelect) -> LayerSelection<'_, Self> where Self: Sized {
-        LayerSelection::new(self, selection)
-    }
-}
-
-pub struct LayerSelection<'a, I> {
-    iter: I,
-    selected_iter: std::slice::Iter<'a, SelectionPiece>,
-    awaiting_match: Option<&'a SelectionPiece>,
-}
-
-impl<'a, I> LayerSelection<'a, I> {
-    fn new(iter: I, selection: &'a MultiSelect) -> Self {
-        let mut selected_iter = selection.pieces.iter();
-        let awaiting_match = selected_iter.next();
-        Self {
-            iter,
-            selected_iter,
-            awaiting_match,
-        }
-    }
-}
-
-impl<'a, I: Iterator<Item = &'a Layer>> Iterator for LayerSelection<'a, I> {
-    type Item = (Option<&'a SelectionPiece>, I::Item);
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().and_then(|item| {
-            if let Layer::Path(path) = item {
-                let selected_points = self.awaiting_match.and_then(|selected_layer| (path == &selected_layer.target).then_some(selected_layer));
-                if selected_points.is_some() {
-                    self.awaiting_match = self.selected_iter.next();
-                }
-                Some((selected_points, item))
-            } else {
-                None
-            }
-        })
-    }
-}
-
-pub trait EnumerateSelectedPoints<'a> {
-    fn enumerate_selected_points(self, selection: &SelectionPiece) -> PointSelection<'_, std::collections::vec_deque::Iter<'a, PathPoint>> where Self: Sized;
-}
-
-impl<'a> EnumerateSelectedPoints<'a> for &'a VectorPath {
-    fn enumerate_selected_points(self, selection: &SelectionPiece) -> PointSelection<'_, std::collections::vec_deque::Iter<'a, PathPoint>> where Self: Sized {
-        let mut selected_iter = selection.points.iter().copied();
-        let awaiting_match = selected_iter.next();
-        PointSelection {
-            iter: self.curve.points.iter().enumerate(),
-            selected_iter,
-            awaiting_match,
-        }
-    }
-}
-
-pub struct PointSelection<'a, I> {
-    iter: std::iter::Enumerate<I>,
-    selected_iter: std::iter::Copied<std::slice::Iter<'a, usize>>,
-    awaiting_match: Option<usize>,
-}
-
-impl<I: Iterator> Iterator for PointSelection<'_, I> {
-    type Item = (bool, I::Item);
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|item| {
-            let is_selected = self.awaiting_match.is_some_and(|selected_idx| item.0 == selected_idx);
-            if is_selected {
-                self.awaiting_match = self.selected_iter.next();
-            }
-            (is_selected, item.1)
-        })
     }
 }

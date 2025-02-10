@@ -220,9 +220,6 @@ impl ToolType for PointSelection {
             d.draw_rectangle_rec(selection_rec, Color::BLUE.alpha(0.125));
         }
 
-        // goal: draw each control point ONLY ONCE without O(n^2) complexity selection test
-        // IMPORTANT: relies on previously stated sorting requirements
-
         match self.state.as_ref() {
             Some(SelectionState { selection: Selection::Singular(selected), .. }) => {
                 selected.draw(d, document, px_world_size, selection_rec, shader_table);
