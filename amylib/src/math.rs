@@ -405,3 +405,120 @@ impl_remap!{
         (0..=255).map(|x| (x as f32 / 255.0, x))
     }
 }
+
+// pub struct NoOrdError<T> {
+//     would_be: T,
+// }
+
+// impl<T> std::fmt::Debug for NoOrdError<T> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         f.debug_struct("NoOrdError").finish()
+//     }
+// }
+
+// impl<T> std::error::Error for NoOrdError<T> {
+//     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+//         None
+//     }
+// }
+
+// impl<T> std::fmt::Display for NoOrdError<T> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "partial_cmp returned None for one or more element(s) of the iterator")
+//     }
+// }
+
+// pub trait PartialMinMax: Iterator {
+//     fn partial_min(self) -> Option<Result<Self::Item, NoOrdError<Self::Item>>>
+//     where
+//         Self: Sized,
+//         Self::Item: PartialOrd;
+
+//     fn partial_max(self) -> Option<Result<Self::Item, NoOrdError<Self::Item>>>
+//     where
+//         Self: Sized,
+//         Self::Item: PartialOrd;
+
+//     fn partial_min_by<F>(self, compare: F) -> Option<Result<Self::Item, NoOrdError<Self::Item>>>
+//     where
+//         Self: Sized,
+//         F: FnMut(&Self::Item, &Self::Item) -> Option<std::cmp::Ordering>;
+
+//     fn partial_max_by<F>(self, compare: F) -> Option<Result<Self::Item, NoOrdError<Self::Item>>>
+//     where
+//         Self: Sized,
+//         F: FnMut(&Self::Item, &Self::Item) -> Option<std::cmp::Ordering>;
+
+//     fn partial_min_by_key<B, F>(self, key: F) -> Option<Result<Self::Item, NoOrdError<Self::Item>>>
+//     where
+//         B: PartialOrd,
+//         Self: Sized,
+//         F: FnMut(&Self::Item) -> B;
+
+//     fn partial_max_by_key<B, F>(self, key: F) -> Option<Result<Self::Item, NoOrdError<Self::Item>>>
+//     where
+//         B: PartialOrd,
+//         Self: Sized,
+//         F: FnMut(&Self::Item) -> B;
+// }
+
+// impl<I: Iterator> PartialMinMax for I {
+//     fn partial_min(self) -> Option<Result<Self::Item, NoOrdError<Self::Item>>>
+//     where
+//         Self: Sized,
+//         Self::Item: PartialOrd
+//     {
+//         self.partial_min_by(PartialOrd::partial_cmp)
+//     }
+
+//     fn partial_max(self) -> Option<Result<Self::Item, NoOrdError<Self::Item>>>
+//     where
+//         Self: Sized,
+//         Self::Item: PartialOrd
+//     {
+//         self.partial_max_by(PartialOrd::partial_cmp)
+//     }
+
+//     fn partial_min_by<F>(self, compare: F) -> Option<Result<Self::Item, NoOrdError<Self::Item>>>
+//     where
+//         Self: Sized,
+//         F: FnMut(&Self::Item, &Self::Item) -> Option<std::cmp::Ordering>
+//     {
+//         #[inline]
+//         fn fold<T>(mut compare: impl FnMut(&T, &T) -> Option<std::cmp::Ordering>) -> impl FnMut(T, T) -> T {
+//             move |v1, v2| match compare(&v1, &v2) {
+//                 Some(std::cmp::Ordering::Less) | Some(std::cmp::Ordering::Equal) => Ok(v1),
+//                 Some(std::cmp::Ordering::Greater) => Ok(v2),
+//                 None => Err(v1, v2),
+//             }
+//         }
+
+//         self.reduce(fold(compare))
+//     }
+
+//     fn partial_max_by<F>(self, compare: F) -> Option<Result<Self::Item, NoOrdError<Self::Item>>>
+//     where
+//         Self: Sized,
+//         F: FnMut(&Self::Item, &Self::Item) -> Option<std::cmp::Ordering>
+//     {
+//         todo!()
+//     }
+
+//     fn partial_min_by_key<B, F>(self, key: F) -> Option<Result<Self::Item, NoOrdError<Self::Item>>>
+//     where
+//         B: PartialOrd,
+//         Self: Sized,
+//         F: FnMut(&Self::Item) -> B
+//     {
+//         todo!()
+//     }
+
+//     fn partial_max_by_key<B, F>(self, key: F) -> Option<Result<Self::Item, NoOrdError<Self::Item>>>
+//     where
+//         B: PartialOrd,
+//         Self: Sized,
+//         F: FnMut(&Self::Item) -> B
+//     {
+//         todo!()
+//     }
+// }

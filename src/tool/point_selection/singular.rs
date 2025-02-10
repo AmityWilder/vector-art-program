@@ -33,6 +33,7 @@ impl Change for EditSinglePointAction {
     }
 }
 
+/// Allows manipulating velocity controls on one point
 pub struct SingleSelect {
     pub target: StrongMut<VectorPath>,
     pub pt_idx: Option<usize>,
@@ -71,24 +72,26 @@ impl SingleSelect {
 
     pub fn get_selected(&mut self, mouse_world_pos: Vector2) -> Option<PPPart> {
         let path = self.target.read();
+        let mut items = [None, None, None];
         if let Some(idx) = self.pt_idx {
             let pp = &path.curve.points[idx];
+            let p_dist = pp.p.rec_distance_to(mouse_world_pos);
+            items[0] = (p_dist <= HOVER_RADIUS).then_some((PPPart::Anchor, p_dist));
             if let Some(Ctrl1 { c1: (c1_side, c1), c2 }) = pp.c {
-                if c1.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR {
-                    return Some(PPPart::Ctrl(c1_side));
-                } else if let Some(c2) = c2 {
+                let c1_dist = c1.distance_sqr_to(mouse_world_pos);
+                items[1] = (c1_dist <= HOVER_RADIUS_SQR).then_some((PPPart::Ctrl(c1_side), c1_dist));
+                if let Some(c2) = c2 {
                     let c2 = c2.calculate(pp.p, c1);
-                    if c2.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR {
-                        let c2_side = c1_side.opposite();
-                        return Some(PPPart::Ctrl(c2_side));
-                    }
+                    let c2_dist = c2.distance_sqr_to(mouse_world_pos);
+                    let c2_side = c1_side.opposite();
+                    items[2] = (c2_dist <= HOVER_RADIUS_SQR).then_some((PPPart::Ctrl(c2_side), c2_dist));
                 }
             }
-            (pp.p.rec_distance_to(mouse_world_pos) <= HOVER_RADIUS)
-                .then_some(PPPart::Anchor)
-        } else {
-            None
         }
+        items.into_iter()
+            .flatten()
+            .min_by(|(_, a), (_, b)| a.partial_cmp(b).expect("distance should not be NaN"))
+            .map(|(part, _)| part)
     }
 
     pub fn draw(&self, d: &mut impl RaylibDraw, document: &Document, px_world_size: f32, selection_rec: Option<Rectangle>, _shader_table: &ShaderTable) {

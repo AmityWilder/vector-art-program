@@ -31,6 +31,7 @@ pub struct SelectionPiece {
     pub points: Vec<usize>,
 }
 
+/// Allows manipulating many points at once, even from separate paths, but not velocity controls
 pub struct MultiSelect {
     pub pieces: Vec<SelectionPiece>,
 }

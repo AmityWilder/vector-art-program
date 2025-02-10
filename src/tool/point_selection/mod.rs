@@ -71,23 +71,6 @@ impl PointSelection {
             }
         }
 
-        // // test
-        // let mouse_world_pos = Vector2::from(unsafe { ffi::GetScreenToWorld2D(ffi::GetMousePosition(), document.camera.into()) });
-        // d.draw_circle_v(mouse_world_pos, 5.0, Color::RED);
-        // for layer in document.layers.shallow_iter().cdir::<BackToFore>() {
-        //     if let Layer::Path(path) = layer {
-        //         let path = path.read();
-        //         for bez in path.curve.slices() {
-        //             if bez.bounds().grow(HOVER_RADIUS_SQR).is_overlapping_point(mouse_world_pos) &&
-        //                 let Some((_t, p)) = bez.estimate_time_at(mouse_world_pos) &&
-        //                 p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR
-        //             {
-        //                 d.draw_circle_v(p, 4.0, Color::GREEN);
-        //             }
-        //         }
-        //     }
-        // }
-
         let hovered_point = document.layers
             .shallow_iter_mut()
             .cdir::<ForeToBack>()
@@ -96,7 +79,11 @@ impl PointSelection {
                     let path_borrow = path.read();
                     let curve = &path_borrow.curve;
                     let idx = curve.points.iter()
-                        .position(|pp| pp.p.rec_distance_to(mouse_world_pos) <= HOVER_RADIUS);
+                        .enumerate()
+                        .map(|(i, pp)| (i, pp.p.rec_distance_to(mouse_world_pos)))
+                        .filter(|(_, dist)| *dist <= HOVER_RADIUS)
+                        .min_by(|(_, a), (_, b)| a.partial_cmp(b).expect("distance should not be NaN"))
+                        .map(|(i, _)| i);
                     if idx.is_some() || curve.slices()
                         .any(|bez|
                             bez.bounds().grow(HOVER_RADIUS).is_overlapping_point(mouse_world_pos) &&
