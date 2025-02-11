@@ -284,7 +284,7 @@ impl ToolType for VectorBrush {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32, _viewport: &Rect2) {
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32, _viewport: &Rect2, #[cfg(dev)] _mouse_world_pos: Vector2) {
         const DRAW_DEBUG: bool = false;
         if let VectorBrush::Active(brush) = self {
             brush.draw(d, document, shader_table);

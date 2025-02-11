@@ -91,6 +91,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1be3f42a67d6d345ecd59f675f3f012d6974981560836e938c22b424b85ce1be"
 
 [[package]]
+name = "build_rs_macros"
+version = "0.1.0"
+
+[[package]]
 name = "cc"
 version = "1.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -650,6 +654,7 @@ dependencies = [
  "amylib",
  "amymath",
  "amyvec",
+ "build_rs_macros",
  "raylib",
  "rltest",
 ]

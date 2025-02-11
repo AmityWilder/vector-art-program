@@ -140,10 +140,14 @@ fn main() {
             };
         }
 
-        engine.tick(&mut rl, &thread, is_window_resized, &window_rect);
+        let mouse_screen_pos = rl.get_mouse_position();
+        let mouse_screen_delta = rl.get_mouse_delta();
+
+        engine.tick(&mut rl, &thread, is_window_resized, &window_rect, mouse_screen_pos, mouse_screen_delta);
         {
+            #[cfg(debug_assertions)]
             let mut d = rl.begin_drawing(&thread);
-            engine.draw(&mut d, &thread, &mut trim_rtex, &window_rect);
+            engine.draw(&mut d, &thread, &mut trim_rtex, &window_rect, #[cfg(dev)] mouse_screen_pos);
 
             // debug
             {

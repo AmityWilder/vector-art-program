@@ -105,10 +105,7 @@ impl Engine {
         } else { None }
     }
 
-    pub fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, is_window_resized: bool, window_rect: &IRect2) {
-        let mouse_screen_pos = rl.get_mouse_position();
-        let mouse_screen_delta = rl.get_mouse_delta();
-
+    pub fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, is_window_resized: bool, window_rect: &IRect2, mouse_screen_pos: Vector2, mouse_screen_delta: Vector2) {
         if is_window_resized {
             self.layers_panel.panel.update_rec(window_rect);
         }
@@ -130,7 +127,7 @@ impl Engine {
         }
     }
 
-    pub fn draw(&self, d: &mut RaylibDrawHandle<'_>, thread: &RaylibThread, trim_rtex: &mut RenderTexture2D, window_rect: &IRect2) {
+    pub fn draw(&self, d: &mut RaylibDrawHandle<'_>, thread: &RaylibThread, trim_rtex: &mut RenderTexture2D, window_rect: &IRect2, #[cfg(dev)] mouse_screen_pos: Vector2) {
         let editors = &self.editors;
         let shader_table = &self.shader_table;
 
@@ -152,7 +149,7 @@ impl Engine {
                 draw_artwork(d, trim_rtex);
             }
 
-            editor.draw_foreground(d, shader_table, &viewport);
+            editor.draw_foreground(d, shader_table, &viewport, #[cfg(dev)] d.get_screen_to_world2D(mouse_screen_pos, editor.document.camera));
         }
 
         if let Some(active_editor) = self.get_active_editor() {

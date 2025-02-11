@@ -291,7 +291,7 @@ impl Editor {
         }
     }
 
-    pub fn draw_foreground(&self, d: &mut RaylibDrawHandle<'_>, shader_table: &ShaderTable, viewport: &Rect2) {
+    pub fn draw_foreground(&self, d: &mut RaylibDrawHandle<'_>, shader_table: &ShaderTable, viewport: &Rect2, #[cfg(dev)] mouse_world_pos: Vector2) {
         const FONT_SIZE: i32 = 10;
         // Artboards foreground
         for board in &self.document.artboards {
@@ -301,6 +301,6 @@ impl Editor {
         }
         let mut d = d.begin_mode2D(self.document.camera);
         let px_world_size = self.document.camera.zoom.recip();
-        self.current_tool.draw(&mut d, &self.document, &shader_table, px_world_size, viewport);
+        self.current_tool.draw(&mut d, &self.document, &shader_table, px_world_size, viewport, #[cfg(dev)] mouse_world_pos);
     }
 }

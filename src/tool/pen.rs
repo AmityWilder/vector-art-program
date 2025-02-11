@@ -198,7 +198,7 @@ impl ToolType for Pen {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, _shader_table: &ShaderTable, px_world_size: f32, viewport: &Rect2) {
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, _shader_table: &ShaderTable, px_world_size: f32, viewport: &Rect2, #[cfg(dev)] _mouse_world_pos: Vector2) {
         let info = match self {
             Self::Active(ActivePen { target, direction, .. }) => Some((target, Some(direction))),
             Self::Inactive(InactivePen(Some(target))) => Some((target, None)),

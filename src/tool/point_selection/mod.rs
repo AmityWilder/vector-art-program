@@ -207,7 +207,7 @@ impl ToolType for PointSelection {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32, viewport: &Rect2) {
+    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32, viewport: &Rect2, #[cfg(dev)] _mouse_world_pos: Vector2) {
         let selection_rec = self.selection_points.as_ref().copied().map(|(start, end)|
             start.minmax_rec(end)
         );

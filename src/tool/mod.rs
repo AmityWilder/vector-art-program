@@ -3,25 +3,39 @@ use amymath::prelude::Rect2;
 use raylib::prelude::*;
 use crate::{raster::{raster_brush::{self, RasterBrush}, Raster}, shaders::ShaderTable, Document};
 
-pub mod basic_selection;
 pub mod point_selection;
 pub mod pen;
 pub mod vector_brush;
 
 use self::{
-    basic_selection::BasicSelection,
     vector_brush::VectorBrush,
     point_selection::PointSelection,
     pen::Pen,
 };
 
 pub trait ToolType {
-    fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, document: &mut Document, mouse_world_pos: Vector2);
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32, viewport: &Rect2);
+    fn tick(
+        &mut self,
+        rl: &mut RaylibHandle,
+        thread: &RaylibThread,
+        document: &mut Document,
+        mouse_world_pos: Vector2,
+    );
+    /// Reason for `draw` not having a `mouse_world_pos` parameter:
+    /// The program's visuals ought to accurately represent the ACTUAL state of the program,
+    /// rather than (possibly incorrectly) try to replicate it.
+    fn draw(
+        &self,
+        d: &mut impl RaylibDraw,
+        document: &Document,
+        shader_table: &ShaderTable,
+        px_world_size: f32,
+        viewport: &Rect2,
+        #[cfg(dev)] mouse_world_pos: Vector2,
+    );
 }
 
 pub enum Tool {
-    BasicSelection(BasicSelection),
     PointSelection(PointSelection),
     Pen(Pen),
     VectorBrush(VectorBrush),
@@ -36,11 +50,6 @@ impl Default for Tool {
 
 // todo: have direct selection set pen/brush target
 impl Tool {
-    pub fn switch_to_basic_selection(&mut self) {
-        println!("switched to basic selection");
-        *self = Self::BasicSelection(BasicSelection::new());
-    }
-
     pub fn switch_to_point_selection(&mut self) {
         println!("switched to point selection");
         *self = Self::PointSelection(PointSelection::new());
@@ -73,7 +82,6 @@ impl Tool {
 impl ToolType for Tool {
     fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, document: &mut Document, mouse_world_pos: Vector2) {
         match self {
-            Tool::BasicSelection(tool) => tool.tick(rl, thread, document, mouse_world_pos),
             Tool::PointSelection(tool) => tool.tick(rl, thread, document, mouse_world_pos),
             Tool::Pen           (tool) => tool.tick(rl, thread, document, mouse_world_pos),
             Tool::VectorBrush   (tool) => tool.tick(rl, thread, document, mouse_world_pos),
@@ -81,13 +89,20 @@ impl ToolType for Tool {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32, viewport: &Rect2) {
+    fn draw(
+        &self,
+        d: &mut impl RaylibDraw,
+        document: &Document,
+        shader_table: &ShaderTable,
+        px_world_size: f32,
+        viewport: &Rect2,
+        #[cfg(dev)] mouse_world_pos: Vector2,
+    ) {
         match self {
-            Tool::BasicSelection(tool) => tool.draw(d, document, shader_table, px_world_size, viewport),
-            Tool::PointSelection(tool) => tool.draw(d, document, shader_table, px_world_size, viewport),
-            Tool::Pen           (tool) => tool.draw(d, document, shader_table, px_world_size, viewport),
-            Tool::VectorBrush   (tool) => tool.draw(d, document, shader_table, px_world_size, viewport),
-            Tool::RasterBrush   (tool) => tool.draw(d, document, shader_table, px_world_size, viewport),
+            Tool::PointSelection(tool) => tool.draw(d, document, shader_table, px_world_size, viewport, #[cfg(dev)] mouse_world_pos),
+            Tool::Pen           (tool) => tool.draw(d, document, shader_table, px_world_size, viewport, #[cfg(dev)] mouse_world_pos),
+            Tool::VectorBrush   (tool) => tool.draw(d, document, shader_table, px_world_size, viewport, #[cfg(dev)] mouse_world_pos),
+            Tool::RasterBrush   (tool) => tool.draw(d, document, shader_table, px_world_size, viewport, #[cfg(dev)] mouse_world_pos),
         }
     }
 }

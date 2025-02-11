@@ -135,7 +135,7 @@ impl ToolType for RasterBrush {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, _document: &Document, _shader_table: &ShaderTable, px_world_size: f32, _viewport: &Rect2) {
+    fn draw(&self, d: &mut impl RaylibDraw, _document: &Document, _shader_table: &ShaderTable, px_world_size: f32, _viewport: &Rect2, #[cfg(dev)] _mouse_world_pos: Vector2) {
         let raster = self.target.read();
         let (src_rec, dest_rec) = (raster.texture.src_rec.flipped(), raster.texture.dest_rec);
         Self::draw_buffer(d, &self.buffer, self.shader.as_ref(), src_rec, dest_rec, &self.stroke);
