@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use amymath::prelude::{Rect2, Rotate90};
+use amymath::{prelude::{Rect2, Rotate90}, rlgl::*};
 use raylib::prelude::*;
 use crate::{
     cubic_bezier::CubicBezier,
@@ -122,8 +122,20 @@ impl Curve {
 
     pub fn draw_stroke(&self, d: &mut impl RaylibDraw, strips_per_bez: usize, thick: &WidthProfile, color: Color) {
         if self.points.is_empty() { return; }
-        let mut points = Vec::with_capacity(strips_per_bez * 2 * self.points.len());
+        let num_points = strips_per_bez * 2 * self.points.len();
+        if num_points < 3 { return; }
         let total_strips = self.points.len() * strips_per_bez;
+
+        let extents = thick.extents_at(0.0);
+        d.draw_circle_v(self.points[0].p, (extents.x + extents.y) * 0.5, color);
+        let extents = thick.extents_at(1.0);
+        d.draw_circle_v(self.points[self.points.len() - 1].p, (extents.x + extents.y) * 0.5, color);
+
+        let mut d = d.begin_rlgl();
+        let mut d = d.rl_begin_triangles();
+        d.rl_color4ub(color.r, color.g, color.b, color.a);
+
+        let mut past_points: Option<[Vector2; 2]> = None;
         for (n, bez) in self.slices().enumerate() {
             let row = n * strips_per_bez;
             for i in 0..strips_per_bez {
@@ -134,28 +146,32 @@ impl Curve {
                 let v = bez.velocity_at(t);
                 let tangent = v.normalized();
                 let (normal_cw, normal_cc) = (tangent.rotate90_cw(), tangent.rotate90_cc());
-                points.push_within_capacity(p + normal_cc * extents.x).expect("should not realloc");
-                points.push_within_capacity(p + normal_cw * extents.y).expect("should not realloc");
+                let p1 = p + normal_cc * extents.x;
+                let p2 = p + normal_cw * extents.y;
+                if let Some(past_points) = &mut past_points {
+                    let [p3, p4] = *past_points;
+                    d.rl_vertex2f(p1.x, p1.y);
+                    d.rl_vertex2f(p3.x, p3.y);
+                    d.rl_vertex2f(p4.x, p4.y);
+
+                    d.rl_vertex2f(p2.x, p2.y);
+                    d.rl_vertex2f(p1.x, p1.y);
+                    d.rl_vertex2f(p4.x, p4.y);
+
+                    past_points[0] = p1;
+                    past_points[1] = p2;
+                } else {
+                    past_points = Some([p1, p2]);
+                }
             }
         }
-        {
-            let extents = thick.extents_at(0.0);
-            let radius = (extents.x + extents.y) * 0.5;
-            // let offset = ; // todo
-            d.draw_circle_v(self.points[0].p, radius, color);
-        }
-        {
-            let extents = thick.extents_at(1.0);
-            let radius = (extents.x + extents.y) * 0.5;
-            d.draw_circle_v(self.points[self.points.len() - 1].p, radius, color);
-        }
-        d.draw_triangle_strip(&points[..], color);
     }
 
     pub fn draw_fill(&self, d: &mut impl RaylibDraw, color: Color) {
         const DENSITY: usize = 10;
         if self.points.is_empty() { return; }
-        let mut points = Vec::with_capacity(DENSITY * self.points.len());
+        let num_points = DENSITY * self.points.len();
+        let mut points = Vec::with_capacity(num_points);
         for bez in self.slices() {
             for i in 0..DENSITY {
                 let t = i as f32 / (DENSITY - 1) as f32;
@@ -166,6 +182,27 @@ impl Curve {
         d.draw_triangle_fan(&points[..], color);
         points.reverse();
         d.draw_triangle_fan(&points[..], color);
+
+        // if num_points >= 3 {
+        //     let mut d = d.begin_rlgl();
+        //     let mut d = d.rl_set_texture(tex_shapes());
+        //     let mut d = d.rl_begin_quads();
+        //     d.rl_color4ub(color.r, color.g, color.b, color.a);
+
+        //     for (int i = 1; i < num_points - 1; i++) {
+        //         rlTexCoord2f(texShapesRec.x/texShapes.width, texShapesRec.y/texShapes.height);
+        //         rlVertex2f(points[0].x, points[0].y);
+
+        //         rlTexCoord2f(texShapesRec.x/texShapes.width, (texShapesRec.y + texShapesRec.height)/texShapes.height);
+        //         rlVertex2f(points[i].x, points[i].y);
+
+        //         rlTexCoord2f((texShapesRec.x + texShapesRec.width)/texShapes.width, (texShapesRec.y + texShapesRec.height)/texShapes.height);
+        //         rlVertex2f(points[i + 1].x, points[i + 1].y);
+
+        //         rlTexCoord2f((texShapesRec.x + texShapesRec.width)/texShapes.width, texShapesRec.y/texShapes.height);
+        //         rlVertex2f(points[i + 1].x, points[i + 1].y);
+        //     }
+        // }
     }
 }
 
