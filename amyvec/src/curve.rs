@@ -107,6 +107,19 @@ impl Curve {
         Slices::new(self.calculate())
     }
 
+    pub fn draw_lines(&self, d: &mut impl RaylibDraw, strips_per_bez: usize, color: Color) {
+        if self.points.is_empty() { return; }
+        let mut points = Vec::with_capacity(strips_per_bez * self.points.len());
+        for bez in self.slices() {
+            for i in 0..strips_per_bez {
+                let t = i as f32 / (strips_per_bez - 1) as f32;
+                let p = bez.position_at(t);
+                points.push_within_capacity(p).expect("should not realloc");
+            }
+        }
+        d.draw_line_strip(&points[..], color);
+    }
+
     pub fn draw_stroke(&self, d: &mut impl RaylibDraw, strips_per_bez: usize, thick: &WidthProfile, color: Color) {
         if self.points.is_empty() { return; }
         let mut points = Vec::with_capacity(strips_per_bez * 2 * self.points.len());

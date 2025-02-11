@@ -45,7 +45,7 @@ impl LayerType for VectorPath {
                             stroke::Align::Middle,
                             stroke::Pattern::Solid(color),
                         ) => {
-                            const EXPERIMENTAL_IMPL: bool = false;
+                            const EXPERIMENTAL_IMPL: bool = true;
                             if EXPERIMENTAL_IMPL {
                                 self.curve.draw_stroke(d, 20, &stroke.thick, *color);
                             } else {
@@ -79,11 +79,9 @@ impl LayerType for VectorPath {
         }
     }
 
-    fn draw_selected(&self, d: &mut impl RaylibDraw, px_world_size: f32) {
+    fn draw_selected(&self, d: &mut impl RaylibDraw, _px_world_size: f32) {
         let color = self.settings.color;
-        for bez in self.curve.slices() {
-            d.draw_spline_segment_bezier_cubic(bez.p1, bez.c1_out, bez.c2_in, bez.p2, px_world_size, color);
-        }
+        self.curve.draw_lines(d, 32, color);
     }
 }
 
