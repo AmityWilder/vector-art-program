@@ -40,19 +40,25 @@ impl LayerType for VectorPath {
         for item in &self.appearance.items {
             match item {
                 StyleItem::Stroke(stroke) => {
-                    match (&stroke.thick, &stroke.align, &stroke.pattern) {
+                    match (&stroke.align, &stroke.pattern) {
                         (
-                            stroke::WidthProfile::Constant(thickness),
                             stroke::Align::Middle,
                             stroke::Pattern::Solid(color),
                         ) => {
-                            for bez in self.curve.slices() {
-                                d.draw_spline_segment_bezier_cubic(bez.p1, bez.c1_out, bez.c2_in, bez.p2, *thickness, color);
-                            }
-                            // cover up cuts between bezier curves
-                            let radius = thickness * 0.5;
-                            for pp in &self.curve.points {
-                                d.draw_circle_v(pp.p, radius, color);
+                            const EXPERIMENTAL_IMPL: bool = false;
+                            if EXPERIMENTAL_IMPL {
+                                self.curve.draw_stroke(d, 20, &stroke.thick, *color);
+                            } else {
+                                let thickness = stroke.thick.extents_at(0.0);
+                                let thick = (thickness.x + thickness.y) * 0.5;
+                                for bez in self.curve.slices() {
+                                    d.draw_spline_segment_bezier_cubic(bez.p1, bez.c1_out, bez.c2_in, bez.p2, thick, color);
+                                }
+                                // cover up cuts between bezier curves
+                                let radius = thick * 0.5;
+                                for pp in &self.curve.points {
+                                    d.draw_circle_v(pp.p, radius, color);
+                                }
                             }
                         }
 
@@ -60,7 +66,15 @@ impl LayerType for VectorPath {
                     }
                 }
 
-                StyleItem::Fill(_fill) => todo!(),
+                StyleItem::Fill(fill) => {
+                    match &fill.pattern {
+                        fill::Pattern::Solid(color) => {
+                            self.curve.draw_fill(d, *color);
+                        }
+
+                        _ => todo!(),
+                    }
+                }
             }
         }
     }

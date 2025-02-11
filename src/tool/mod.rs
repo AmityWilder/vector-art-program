@@ -52,17 +52,37 @@ impl Default for Tool {
 impl Tool {
     pub fn switch_to_point_selection(&mut self) {
         println!("switched to point selection");
-        *self = Self::PointSelection(PointSelection::new());
+        match self {
+            Tool::PointSelection(_) => (),
+
+            //   | Tool::Pen(
+            //     | Pen::Active(pen::ActivePen { ref target, .. })
+            //     | Pen::Inactive(pen::InactivePen(Some(ref target)))
+            // ) | Tool::VectorBrush(
+            //     | VectorBrush::Active(vector_brush::ActiveVectorBrush { ref target, .. })
+            //     | VectorBrush::Inactive(vector_brush::InactiveVectorBrush(Some(ref target)))
+            // )=> *self = Self::PointSelection(PointSelection::with_target(target)),
+
+            _ => *self = Self::PointSelection(PointSelection::new()),
+        }
     }
 
     pub fn switch_to_pen(&mut self) {
         println!("switched to pen");
-        *self = Self::Pen(Pen::new());
+        match self {
+            Tool::Pen(_) => (),
+
+            _ => *self = Self::Pen(Pen::new()),
+        }
     }
 
     pub fn switch_to_vector_brush(&mut self) {
         println!("switched to vector brush");
-        *self = Self::VectorBrush(VectorBrush::new());
+        match self {
+            Tool::VectorBrush(_) => (),
+
+            _ => *self = Self::VectorBrush(VectorBrush::new()),
+        }
     }
 
     pub fn switch_to_raster_brush(

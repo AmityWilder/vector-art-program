@@ -1,11 +1,26 @@
 use std::collections::VecDeque;
-use amymath::prelude::Rect2;
+use amymath::prelude::{Rect2, Rotate90};
 use raylib::prelude::*;
 use crate::{
     cubic_bezier::CubicBezier,
     path_point::PathPoint,
 };
 
+pub enum WidthProfile {
+    Constant(Vector2),
+    Variable(Curve),
+}
+
+impl WidthProfile {
+    pub fn extents_at(&self, t: f32) -> Vector2 {
+        match self {
+            WidthProfile::Constant(v) => *v,
+            WidthProfile::Variable(curve) => curve.position_at(t).expect("width profile should not be empty"),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct Curve {
     pub points: VecDeque<PathPoint>,
     pub is_closed: bool,
@@ -60,6 +75,22 @@ impl Curve {
     }
 
     #[inline]
+    pub fn position_at(&self, t: f32) -> Option<Vector2> {
+        if self.points.len() == 0 { return None; }
+        assert!(0.0 <= t && t <= 1.0, "t out of bounds");
+        if self.points.len() == 1 {
+            return Some(self.points[0].p);
+        }
+        let t_major = t * (self.points.len() - 2) as f32;
+        let (slice_idx, t) = if t_major == 1.0 {
+            (self.points.len() - 2, 1.0)
+        } else {
+            (t_major.floor() as usize, t_major.fract())
+        };
+        Some(self.slice(slice_idx).unwrap().position_at(t))
+    }
+
+    #[inline]
     pub fn max_bounds(&self) -> Option<Rect2> {
         self.slices()
             .map(|bez| bez.max_bounds())
@@ -74,6 +105,54 @@ impl Curve {
     #[inline]
     pub fn slices(&self) -> Slices<impl Iterator<Item = &'_ PathPoint>> {
         Slices::new(self.calculate())
+    }
+
+    pub fn draw_stroke(&self, d: &mut impl RaylibDraw, strips_per_bez: usize, thick: &WidthProfile, color: Color) {
+        if self.points.is_empty() { return; }
+        let mut points = Vec::with_capacity(strips_per_bez * 2 * self.points.len());
+        let total_strips = self.points.len() * strips_per_bez;
+        for (n, bez) in self.slices().enumerate() {
+            let row = n * strips_per_bez;
+            for i in 0..strips_per_bez {
+                let t = i as f32 / (strips_per_bez - 1) as f32;
+                let t_full = (row + i) as f32 / total_strips as f32;
+                let extents = thick.extents_at(t_full);
+                let p = bez.position_at(t);
+                let v = bez.velocity_at(t);
+                let tangent = v.normalized();
+                let (normal_cw, normal_cc) = (tangent.rotate90_cw(), tangent.rotate90_cc());
+                points.push_within_capacity(p + normal_cc * extents.x).expect("should not realloc");
+                points.push_within_capacity(p + normal_cw * extents.y).expect("should not realloc");
+            }
+        }
+        {
+            let extents = thick.extents_at(0.0);
+            let radius = (extents.x + extents.y) * 0.5;
+            // let offset = ; // todo
+            d.draw_circle_v(self.points[0].p, radius, color);
+        }
+        {
+            let extents = thick.extents_at(1.0);
+            let radius = (extents.x + extents.y) * 0.5;
+            d.draw_circle_v(self.points[self.points.len() - 1].p, radius, color);
+        }
+        d.draw_triangle_strip(&points[..], color);
+    }
+
+    pub fn draw_fill(&self, d: &mut impl RaylibDraw, color: Color) {
+        const DENSITY: usize = 10;
+        if self.points.is_empty() { return; }
+        let mut points = Vec::with_capacity(DENSITY * self.points.len());
+        for bez in self.slices() {
+            for i in 0..DENSITY {
+                let t = i as f32 / (DENSITY - 1) as f32;
+                let p = bez.position_at(t);
+                points.push_within_capacity(p).expect("should not realloc");
+            }
+        }
+        d.draw_triangle_fan(&points[..], color);
+        points.reverse();
+        d.draw_triangle_fan(&points[..], color);
     }
 }
 

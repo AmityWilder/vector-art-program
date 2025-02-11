@@ -49,6 +49,20 @@ impl PointSelection {
         }
     }
 
+    pub fn with_target(target: &StrongMut<VectorPath>) -> Self {
+        Self {
+            state: Some(SelectionState {
+                selection: Selection::Singular(SingleSelect {
+                    target: target.clone_mut(),
+                    pt_idx: None,
+                    part: PPPart::Anchor
+                }),
+                drag: None,
+            }),
+            selection_points: None,
+        }
+    }
+
     fn find_hovered_anchor(document: &mut Document, mouse_world_pos: Vector2) -> Option<(&StrongMut<VectorPath>, Option<usize>)> {
         document.layers
             .shallow_iter_mut()

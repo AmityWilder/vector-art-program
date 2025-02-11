@@ -37,14 +37,14 @@ impl Change for AddPointAction {
     }
 }
 
-pub struct InactivePen(Option<StrongMut<VectorPath>>);
+pub struct InactivePen(pub(super) Option<StrongMut<VectorPath>>);
 
 pub struct ActivePen {
     /// If [`Some`], continue seleted.
     /// If [`None`], find a hovered path or create a new path upon clicking.
     /// Must be a `VectorPath` layer.
     /// If there is a layer, it must not die before the pen dies.
-    target: StrongMut<VectorPath>,
+    pub(super) target: StrongMut<VectorPath>,
 
     /// Whether we are modifying an existing point or creating a new one
     is_dragging: bool,

@@ -30,7 +30,7 @@ impl Change for BrushAction {
     }
 }
 
-pub struct InactiveVectorBrush;
+pub struct InactiveVectorBrush(pub(super) Option<StrongMut<VectorPath>>);
 
 impl InactiveVectorBrush {
     fn tick(
@@ -54,7 +54,7 @@ pub struct ActiveVectorBrush {
     /// If [`None`], find a hovered path or create a new path upon clicking.
     /// Must be a `VectorPath` layer.
     /// If there is a layer, it must not die before the pen dies.
-    target: StrongMut<VectorPath>,
+    pub(super) target: StrongMut<VectorPath>,
 
     signal: PathSignal,
 
@@ -223,7 +223,7 @@ impl ActiveVectorBrush {
         //         stroke,
         //     })
         // );
-        InactiveVectorBrush
+        InactiveVectorBrush(Some(self.target.clone_mut()))
     }
 
     /// Returns true if still active, false if finished
@@ -265,7 +265,7 @@ pub enum VectorBrush {
 
 impl VectorBrush {
     pub fn new() -> Self {
-        Self::Inactive(InactiveVectorBrush)
+        Self::Inactive(InactiveVectorBrush(None))
     }
 }
 

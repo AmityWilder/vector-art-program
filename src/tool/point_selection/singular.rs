@@ -39,7 +39,7 @@ impl Change for EditSinglePointAction {
 pub struct SingleSelect {
     pub target: StrongMut<VectorPath>,
     pub pt_idx: Option<usize>,
-    pub part: PPPart,
+    pub part: PPPart, // todo: move this into the option next to usize
 }
 
 impl SingleSelect {

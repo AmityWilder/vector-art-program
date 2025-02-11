@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, fs::File, io::{self, BufRead, BufReader, BufWriter, Read, Write}, path::Path};
 use amymath::prelude::{IRect2, Matrix2x2};
-use amyvec::curve::Curve;
+use amyvec::curve::{Curve, WidthProfile};
 use raylib::prelude::*;
 use amylib::{collections::Tree, io::{ReadArr, ReadBytes, WriteArr, WriteBytes}, rc::prelude::*};
 use crate::{
@@ -300,19 +300,19 @@ fn read_stroke_pattern(reader: &mut impl Read, is_gradient: bool) -> io::Result<
     })
 }
 
-fn save_stroke_thickness(writer: &mut impl Write, thick: &mut stroke::WidthProfile) -> io::Result<()> {
+fn save_stroke_thickness(writer: &mut impl Write, thick: &mut WidthProfile) -> io::Result<()> {
     match thick {
-        stroke::WidthProfile::Constant(thick) => writer.write_le(*thick)?,
-        stroke::WidthProfile::Variable(_) => unimplemented!("not doing until supported"),
+        WidthProfile::Constant(thick) => write_vector2(writer, *thick)?,
+        WidthProfile::Variable(_) => unimplemented!("not doing until supported"),
     }
     Ok(())
 }
 
-fn read_stroke_thickness(reader: &mut impl Read, is_variable_thickness: bool) -> io::Result<stroke::WidthProfile> {
+fn read_stroke_thickness(reader: &mut impl Read, is_variable_thickness: bool) -> io::Result<WidthProfile> {
     Ok(if is_variable_thickness {
         unimplemented!("not doing until supported")
     } else {
-        stroke::WidthProfile::Constant(reader.read_le()?)
+        WidthProfile::Constant(read_vector2(reader)?)
     })
 }
 
@@ -333,7 +333,7 @@ fn save_stroke_style(
     let opacity_byte = opacity_byte(opacity);
     writer.write_all(&[
         (u8::from(matches!(pattern, stroke::Pattern::Gradient { .. })) << 6)
-        | (u8::from(matches!(thick, stroke::WidthProfile::Variable(_))) << 5)
+        | (u8::from(matches!(thick, WidthProfile::Variable(_))) << 5)
         | (match align {
             stroke::Align::Inside  => 0,
             stroke::Align::Middle  => 1,

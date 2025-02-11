@@ -24,7 +24,7 @@ impl Default for Fill {
     fn default() -> Self {
         Self {
             blend: Blending::default(),
-            pattern: Pattern::Solid(Color::WHITE),
+            pattern: Pattern::Solid(Color::SLATEBLUE),
         }
     }
 }

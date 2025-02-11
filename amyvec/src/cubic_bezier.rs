@@ -2,6 +2,7 @@ use amymath::prelude::{DistanceSqr, Rect2};
 use raylib::prelude::*;
 use crate::polynomial::*;
 
+#[derive(Debug)]
 pub struct CubicBezier {
     pub p1:     Vector2,
     pub c1_out: Vector2,
