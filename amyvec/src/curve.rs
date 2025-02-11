@@ -171,38 +171,28 @@ impl Curve {
         const DENSITY: usize = 10;
         if self.points.is_empty() { return; }
         let num_points = DENSITY * self.points.len();
-        let mut points = Vec::with_capacity(num_points);
+        if num_points < 3 { return; }
+
+        let mut d = d.begin_rlgl();
+        let mut d = d.rl_begin_triangles();
+        d.rl_color4ub(color.r, color.g, color.b, color.a);
+
+        let mut first_point: Option<Vector2> = None;
+        let mut prev_point: Option<Vector2> = None;
         for bez in self.slices() {
             for i in 0..DENSITY {
                 let t = i as f32 / (DENSITY - 1) as f32;
                 let p = bez.position_at(t);
-                points.push_within_capacity(p).expect("should not realloc");
+                if let Some((first_point, prev_point)) = first_point.as_ref().zip(prev_point.as_mut()) {
+                    d.rl_vertex2f(first_point.x, first_point.y);
+                    d.rl_vertex2f(prev_point.x, prev_point.y);
+                    d.rl_vertex2f(p.x, p.y);
+                } else if prev_point.is_none() {
+                    first_point = Some(p);
+                }
+                prev_point = Some(p);
             }
         }
-        d.draw_triangle_fan(&points[..], color);
-        points.reverse();
-        d.draw_triangle_fan(&points[..], color);
-
-        // if num_points >= 3 {
-        //     let mut d = d.begin_rlgl();
-        //     let mut d = d.rl_set_texture(tex_shapes());
-        //     let mut d = d.rl_begin_quads();
-        //     d.rl_color4ub(color.r, color.g, color.b, color.a);
-
-        //     for (int i = 1; i < num_points - 1; i++) {
-        //         rlTexCoord2f(texShapesRec.x/texShapes.width, texShapesRec.y/texShapes.height);
-        //         rlVertex2f(points[0].x, points[0].y);
-
-        //         rlTexCoord2f(texShapesRec.x/texShapes.width, (texShapesRec.y + texShapesRec.height)/texShapes.height);
-        //         rlVertex2f(points[i].x, points[i].y);
-
-        //         rlTexCoord2f((texShapesRec.x + texShapesRec.width)/texShapes.width, (texShapesRec.y + texShapesRec.height)/texShapes.height);
-        //         rlVertex2f(points[i + 1].x, points[i + 1].y);
-
-        //         rlTexCoord2f((texShapesRec.x + texShapesRec.width)/texShapes.width, texShapesRec.y/texShapes.height);
-        //         rlVertex2f(points[i + 1].x, points[i + 1].y);
-        //     }
-        // }
     }
 }
 

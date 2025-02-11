@@ -2,11 +2,11 @@ use raylib::prelude::*;
 
 #[link(name = "raylib")]
 unsafe extern "C" {
-    static texShapes: Texture2D;
+    static texShapes: ffi::Texture2D;
 }
 
-pub fn tex_shapes() -> impl AsRef<ffi::Texture2D> {
-    unsafe { &texShapes }
+pub unsafe fn tex_shapes() -> &'static ffi::Texture2D {
+    &texShapes
 }
 
 pub trait RaylibRlglExt {
