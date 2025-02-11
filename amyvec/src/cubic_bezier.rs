@@ -20,6 +20,47 @@ fn if_bounded(x: f32) -> Option<f32> {
 }
 
 impl CubicBezier {
+    /// Returns a broader bounding box of the curve using only the anchors and velocities.
+    ///
+    /// Cheaper than [`Self::bounds`], but significantly less accurate.
+    ///
+    /// [`Self::bounds`] will always produce a bounding box smaller or equal to this.
+    ///
+    /// **\* Describes the bounding box of *all* elements of the curve, not just the curve itself**
+    #[inline]
+    pub fn max_bounds(&self) -> Rect2 {
+        let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
+        Rect2 {
+            xmin: p0.x.min(p1.x).min(p2.x).min(p3.x),
+            ymin: p0.y.min(p1.y).min(p2.y).min(p3.y),
+            xmax: p0.x.max(p1.x).max(p2.x).max(p3.x),
+            ymax: p0.y.max(p1.y).max(p2.y).max(p3.y),
+        }
+    }
+
+    /// Returns a narrower bounding box of the curve using only the anchors.
+    ///
+    /// Cheaper than [`Self::bounds`] (significantly) and [`Self::max_bounds`] (barely), but
+    /// inaccurate to the point of near meaninglessness.
+    ///
+    /// [`Self::bounds`] will always produce a bounding box larger or equal to this.
+    ///
+    /// **\* Only describes the bounding box of the start and end of the curve, not the curve itself**
+    #[inline]
+    pub fn min_bounds(&self) -> Rect2 {
+        let (p0, _p1, _p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
+        Rect2 {
+            xmin: p0.x.min(p3.x),
+            ymin: p0.y.min(p3.y),
+            xmax: p0.x.max(p3.x),
+            ymax: p0.y.max(p3.y),
+        }
+    }
+
+    /// Returns the bounding box of the curve.
+    ///
+    /// ## Performance
+    /// Solves the quadratic equation on both `x` and `y` axes
     #[inline]
     pub fn bounds(&self) -> Rect2 {
         let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
@@ -45,7 +86,7 @@ impl CubicBezier {
                 }.into_iter().flatten()
             })
             .map(|t| self.position_at(t))
-            .fold(Rect2::minmax_rec(p0, p3), |rec, p| rec.max_pt(p))
+            .fold(self.min_bounds(), |rec, p| rec.max_pt(p))
     }
 
     /// Calculate the arclength up to the time along the curve
@@ -140,9 +181,13 @@ impl CubicBezier {
 
     /// Time along curve closest to the position
     ///
-    /// ## Notes about current implementation
-    /// Loses accuracy the further the point is from the curve.
-    /// Excessively sensitive to this at start and end of the curve.
+    /// ## Performance
+    /// Solves the cubic equation, including complex roots.
+    ///
+    /// ## Note regarding current implementation
+    /// - Loses accuracy the further the point is from the curve.
+    /// - Excessively sensitive to this at start and end of the curve.
+    /// - **Does not consistently produce a valid output.**
     pub fn estimate_time_at(&self, pt: Vector2) -> Option<(f32, Vector2)> {
         let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
         let (p0, p1, p2, p3, p) = (p0.x - p0.y, p1.x - p1.y, p2.x - p2.y, p3.x - p3.y, pt.x - pt.y);

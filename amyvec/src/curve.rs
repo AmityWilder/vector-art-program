@@ -28,11 +28,10 @@ impl Curve {
 
     #[inline]
     pub fn slice(&self, start_index: usize) -> Option<CubicBezier> {
-        if let (Some(pp1), Some(pp2)) = (
-            self.points.get(start_index),
-            start_index.checked_add(1)
-                .and_then(|end_index| self.points.get(end_index)),
-        ) {
+        if let Some((pp2, pp1)) = start_index.checked_add(1)
+            .and_then(|end_index| self.points.get(end_index))
+            .map(|pp2| (pp2, self.points.get(start_index).expect("existence of [i+1] should guarantee existence of [i]")))
+        {
             let ((_, p1, c1_out), (c2_in, p2, _)) = (pp1.calculate(), pp2.calculate());
             return Some(CubicBezier::new(p1, c1_out, c2_in, p2))
         }
@@ -42,14 +41,29 @@ impl Curve {
     /// Calculate the bounding box of the entire curve
     ///
     /// Returns [`None`] if the curve is empty
+    ///
+    /// ## Note regarding current implementation
+    /// Calls [`Curve::slices`] (which calculates every path point)
+    /// and [`CubicBezier::bounds`] (which solves the quadratic equation) on each.
+    #[inline]
     pub fn bounds(&self) -> Option<Rect2> {
-        self.slices()
-            .map(|bez| bez.bounds())
-            .reduce(|acc, e| acc.max(e))
+        let mut bez_iter = self.slices();
+        if let Some(bez) = bez_iter.next() {
+            let mut rec = bez.bounds();
+            for bez in bez_iter {
+                if !rec.entirely_contains(&bez.max_bounds()) {
+                    rec = rec.max(bez.bounds());
+                }
+            }
+            Some(rec)
+        } else { None }
     }
 
-    pub fn edge_distance_to(&self, _pt: Vector2) -> f32 {
-        todo!()
+    #[inline]
+    pub fn max_bounds(&self) -> Option<Rect2> {
+        self.slices()
+            .map(|bez| bez.max_bounds())
+            .reduce(|rec, b| rec.max(b))
     }
 
     #[inline]
@@ -72,7 +86,7 @@ impl<I> Calculate<I> {
     const fn new(iter: I, is_closed: bool) -> Self {
         Self {
             iter,
-            wrapped: if is_closed { Some(None) } else { None },
+            wrapped: if is_closed { Some(None) } else { None }, // fun fact: `then_some()` isn't const :/
         }
     }
 }

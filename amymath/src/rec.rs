@@ -111,6 +111,24 @@ impl From<IRect2> for Rect2 {
 }
 
 impl Rect2 {
+    pub fn from_center_and_extent(center: Vector2, extent: Vector2) -> Self {
+        Self {
+            xmin: center.x - extent.x,
+            ymin: center.y - extent.y,
+            xmax: center.x + extent.x,
+            ymax: center.y + extent.y,
+        }
+    }
+
+    pub fn from_center_and_radius(center: Vector2, radius: f32) -> Self {
+        Self {
+            xmin: center.x - radius,
+            ymin: center.y - radius,
+            xmax: center.x + radius,
+            ymax: center.y + radius,
+        }
+    }
+
     #[inline]
     pub fn is_overlapping_point(&self, point: Vector2) -> bool {
         self.xmin <= point.x && point.x < self.xmax &&
@@ -121,6 +139,12 @@ impl Rect2 {
     pub fn is_overlapping(&self, rec: &Self) -> bool {
         self.xmin < rec.xmax && rec.xmin < self.xmax &&
         self.ymin < rec.ymax && rec.ymin < self.ymax
+    }
+
+    #[inline]
+    pub fn entirely_contains(&self, rec: &Self) -> bool {
+        self.xmin <= rec.xmin && rec.xmax <= self.xmax &&
+        self.ymin <= rec.ymin && rec.ymax <= self.ymax
     }
 
     #[inline]
@@ -141,6 +165,31 @@ impl Rect2 {
             xmax: self.xmax + amnt,
             ymax: self.ymax + amnt,
         }
+    }
+
+    #[inline]
+    pub fn scale(self, origin: Vector2, amount: f32) -> Self {
+        self.scale_ex(origin, Vector2::new(amount, amount))
+    }
+
+    #[inline]
+    pub fn scale_ex(self, origin: Vector2, amount: Vector2) -> Self {
+        Self {
+            xmin: origin.x + (self.xmin - origin.x) * amount.x,
+            ymin: origin.y + (self.ymin - origin.y) * amount.y,
+            xmax: origin.x + (self.xmax - origin.x) * amount.x,
+            ymax: origin.y + (self.ymax - origin.y) * amount.y,
+        }
+    }
+
+    #[inline]
+    pub fn scale_from_center(self, amount: f32) -> Self {
+        self.scale_from_center_ex(Vector2::new(amount, amount))
+    }
+
+    #[inline]
+    pub fn scale_from_center_ex(self, amount: Vector2) -> Self {
+        self.scale_ex(self.center(), amount)
     }
 
     /// Returns a rectangle that can entirely contain both input rects
