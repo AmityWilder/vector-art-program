@@ -194,30 +194,31 @@ impl Editor {
         }
 
         if !is_mouse_event_handled {
-            self.current_tool.tick(rl, thread, &mut self.document, mouse_world_pos);
+            let px_world_size = self.document.camera.zoom.recip();
+            self.current_tool.tick(rl, thread, &mut self.document, mouse_world_pos, px_world_size);
         }
 
-        if (is_ctrl_down) && rl.is_key_pressed(KEY_Z) {
-            if is_shift_down {
-                let result = self.redo();
-                if let Some(result) = result {
-                    if let Err(e) = result {
-                        println!("error: {e:?}");
-                    }
-                } else {
-                    println!("nothing to redo");
-                }
-            } else {
-                let result = self.undo();
-                if let Some(result) = result {
-                    if let Err(e) = result {
-                        println!("error: {e:?}");
-                    }
-                } else {
-                    println!("nothing to undo");
-                }
-            }
-        }
+        // if (is_ctrl_down) && rl.is_key_pressed(KEY_Z) {
+        //     if is_shift_down {
+        //         let result = self.redo();
+        //         if let Some(result) = result {
+        //             if let Err(e) = result {
+        //                 println!("error: {e:?}");
+        //             }
+        //         } else {
+        //             println!("nothing to redo");
+        //         }
+        //     } else {
+        //         let result = self.undo();
+        //         if let Some(result) = result {
+        //             if let Err(e) = result {
+        //                 println!("error: {e:?}");
+        //             }
+        //         } else {
+        //             println!("nothing to undo");
+        //         }
+        //     }
+        // }
     }
 
     pub fn draw_background(&self, engine: &Engine, d: &mut RaylibDrawHandle<'_>) {

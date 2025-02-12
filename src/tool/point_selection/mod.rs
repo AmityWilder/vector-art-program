@@ -1,11 +1,14 @@
 use amymath::prelude::*;
+use amyvec::curve::PathPointIdx;
 use raylib::prelude::*;
 use amylib::{iter::directed::DirectibleDoubleEndedIterator, prelude::StrongMut};
-use crate::{document::layer::Layer, layer::{BackToFore, ForeToBack, LayerType}, shaders::ShaderTable, vector_path::{path_point::PPPart, DrawPathPoint, VectorPath}, Document};
+use crate::{document::layer::Layer, layer::{BackToFore, ForeToBack, LayerType}, shaders::ShaderTable, vector_path::{path_point::PPPart, DrawPathPoint, VectorPath, ANCHOR_EXTENT_OUTER}, Document};
 use super::ToolType;
 
-pub const HOVER_RADIUS: f32 = 3.0;
+pub const HOVER_RADIUS: f32 = 6.0;
 pub const HOVER_RADIUS_SQR: f32 = HOVER_RADIUS * HOVER_RADIUS;
+
+const _: () = assert!(HOVER_RADIUS >= ANCHOR_EXTENT_OUTER);
 
 pub const SNAP_VERT_RADIUS: f32 = 4.0;
 pub const SNAP_VERT_RADIUS_SQR: f32 = SNAP_VERT_RADIUS * SNAP_VERT_RADIUS;
@@ -54,8 +57,7 @@ impl PointSelection {
             state: Some(SelectionState {
                 selection: Selection::Singular(SingleSelect {
                     target: target.clone_mut(),
-                    pt_idx: None,
-                    part: PPPart::Anchor
+                    point: None,
                 }),
                 drag: None,
             }),
@@ -63,53 +65,25 @@ impl PointSelection {
         }
     }
 
-    fn find_hovered_anchor(document: &mut Document, mouse_world_pos: Vector2) -> Option<(&StrongMut<VectorPath>, Option<usize>)> {
-        document.layers
-            .shallow_iter_mut()
-            .cdir::<ForeToBack>()
-            .filter_map(|layer| if let Layer::Path(ref path) = layer { Some(path) } else { None })
-            .filter(|path| path.read().curve.bounds().is_some_and(|bounds| bounds.is_overlapping_point(mouse_world_pos)))
-            .find_map(|path| {
-                let path_borrow = path.read();
-                let curve = &path_borrow.curve;
-
-                let idx = curve.points.iter()
-                    .enumerate()
-                    .map(|(i, pp)| (i, pp.p.rec_distance_to(mouse_world_pos)))
-                    .filter(|(_, dist)| *dist <= HOVER_RADIUS)
-                    .min_by(|(_, a), (_, b)| a.partial_cmp(b).expect("distance should not be NaN"))
-                    .map(|(i, _)| i);
-
-                if idx.is_some() || curve.slices().any(|bez|
-                    bez.bounds()
-                        .grow(HOVER_RADIUS)
-                        .is_overlapping_point(mouse_world_pos) &&
-                    bez
-                        .estimate_time_at(mouse_world_pos)
-                        .is_some_and(|(_, p)| p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR)
-                ) {
-                    drop(path_borrow);
-                    return Some((path, idx));
-                }
-                None
-            })
-    }
-
-    fn begin_dragging(&mut self, document: &mut Document, mouse_world_pos: Vector2) {
+    fn begin_dragging(&mut self, document: &mut Document, mouse_world_pos: Vector2, px_world_size: f32) {
+        let hover_radius = HOVER_RADIUS * px_world_size;
+        let hover_radius_sqr = hover_radius * hover_radius;
         let drag = Some((mouse_world_pos, mouse_world_pos));
 
+        // check if clicking a point already in selection.
+        // this means we want to start dragging that selection.
         if let Some(state) = self.state.as_mut() {
             match &mut state.selection {
                 Selection::Singular(x) => {
-                    if let Some(part) = x.get_selected(mouse_world_pos) {
-                        x.part = part;
+                    if let Some(part) = x.get_selected(mouse_world_pos, px_world_size) {
+                        x.point = Some(part);
                         state.drag = drag;
                         return;
                     }
                 },
 
                 Selection::Multiple(x) => {
-                    if x.is_selected(mouse_world_pos) {
+                    if x.is_selected(mouse_world_pos, px_world_size) {
                         state.drag = drag;
                         return;
                     }
@@ -117,14 +91,48 @@ impl PointSelection {
             }
         }
 
-        let hovered_point = Self::find_hovered_anchor(document, mouse_world_pos);
+        // check if clicking a point at all (presumably unselected).
+        // this means we want to clear the current selection and replace it with that point.
+        let hovered_point = document.layers
+            .shallow_iter_mut()
+            .cdir::<ForeToBack>()
+            .filter_map(|layer| if let Layer::Path(ref path) = layer { Some(path) } else { None })
+            .find_map(|path| {
+                let path_borrow = path.read();
+                let curve = &path_borrow.curve;
+
+                if !curve.max_bounds().is_some_and(|bounds| dbg!(bounds.grow(hover_radius)).is_overlapping_point(mouse_world_pos)) {
+                    return None;
+                }
+
+                let idx = curve.points.iter()
+                    .enumerate()
+                    .filter_map(|(i, pp)| {
+                        let dist = pp.p.rec_distance_to(mouse_world_pos);
+                        (dist <= hover_radius).then_some((i, dist))
+                    })
+                    .min_by(|(_, a), (_, b)| a.partial_cmp(b).expect("distance should not be NaN"))
+                    .map(|(i, _)| i);
+
+                if let Some(idx) = idx {
+                    drop(path_borrow);
+                    Some((path, Some(PathPointIdx::new_anchor(idx))))
+                } else if curve.slices().any(|bez| bez
+                    .estimate_time_at(mouse_world_pos)
+                    .is_some_and(|(_, p)| p.distance_sqr_to(mouse_world_pos) <= hover_radius_sqr)
+                ) {
+                    drop(path_borrow);
+                    Some((path, None))
+                } else {
+                    None
+                }
+            });
 
         if let Some((hovered_target, hovered_idx)) = hovered_point {
             self.state = Some(SelectionState {
                 selection: Selection::Singular(SingleSelect {
                     target: hovered_target.clone_mut(),
-                    pt_idx: hovered_idx,
-                    part: PPPart::Anchor,
+                    point: hovered_idx,
                 }),
                 drag,
             });
@@ -171,7 +179,10 @@ impl PointSelection {
                     SelectionState {
                         selection: match &selected[..] {
                             [SelectionPiece { target, points }] if points.len() == 1
-                                => Selection::Singular(SingleSelect { target: target.clone_mut(), pt_idx: Some(points[0]), part: PPPart::Anchor }),
+                                => Selection::Singular(SingleSelect {
+                                    target: target.clone_mut(),
+                                    point: Some(PathPointIdx::new(points[0], PPPart::Anchor)),
+                                }),
                             [..]
                                 => Selection::Multiple(MultiSelect { pieces: selected }),
                         },
@@ -183,9 +194,9 @@ impl PointSelection {
 }
 
 impl ToolType for PointSelection {
-    fn tick(&mut self, rl: &mut RaylibHandle, _thread: &RaylibThread, document: &mut Document, mouse_world_pos: Vector2) {
+    fn tick(&mut self, rl: &mut RaylibHandle, _thread: &RaylibThread, document: &mut Document, mouse_world_pos: Vector2, px_world_size: f32) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-            self.begin_dragging(document, mouse_world_pos);
+            self.begin_dragging(document, mouse_world_pos, px_world_size);
         }
 
         if let Some((_, curr)) = self.selection_points.as_mut() {
@@ -206,8 +217,10 @@ impl ToolType for PointSelection {
             match &mut selection_state.selection {
                 Selection::Singular(single_select) => {
                     let mut path = single_select.target.write();
-                    if let Some(idx) = single_select.pt_idx {
-                        path.curve.points.remove(idx).expect("should not select a point that is not within the curve");
+                    if let Some(idx) = single_select.point {
+                        assert_eq!(idx.part, PPPart::Anchor, "cannot remove ctrl");
+                        path.curve.points.remove(idx.point)
+                            .expect("should not select a point that is not within the curve");
                     } else {
                         path.curve.points.clear();
                     }

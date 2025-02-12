@@ -9,3 +9,7 @@ amylib = { path = "../amylib" }
 amymath = { path = "../amymath" }
 rltest = { path = "../rltest" }
 num = "0.4.3"
+
+[features]
+debug_stroke = []
+debug_fill = []

@@ -1,4 +1,4 @@
-use std::{fmt, path::PathBuf};
+use std::path::PathBuf;
 use amygui::panel::Panel;
 use amymath::prelude::*;
 use layer::{Layer, LayerTree};

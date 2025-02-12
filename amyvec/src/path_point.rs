@@ -1,7 +1,7 @@
 use raylib::prelude::*;
 use amymath::prelude::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Ctrl {
     In,
     Out,
@@ -17,10 +17,29 @@ impl Ctrl {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PPPart {
     Ctrl(Ctrl),
     Anchor,
+}
+
+impl Ord for PPPart {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (PPPart::Anchor, PPPart::Anchor) => std::cmp::Ordering::Equal,
+
+            (PPPart::Ctrl(side1), PPPart::Ctrl(side2)) => side1.cmp(side2),
+
+            (PPPart::Ctrl(Ctrl::In ), PPPart::Anchor) | (PPPart::Anchor, PPPart::Ctrl(Ctrl::Out)) => std::cmp::Ordering::Less,
+            (PPPart::Ctrl(Ctrl::Out), PPPart::Anchor) | (PPPart::Anchor, PPPart::Ctrl(Ctrl::In )) => std::cmp::Ordering::Greater,
+        }
+    }
+}
+
+impl PartialOrd for PPPart {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -1,25 +1,22 @@
-use amyvec::path_point::PathPoint;
+use amyvec::{curve::PathPointIdx, path_point::PathPoint};
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::rc::prelude::*;
 use crate::{layer::LayerType, shaders::ShaderTable, vector_path::{path_point::{Ctrl1, Ctrl2, PPPart}, VectorPath, DrawPathPoint}, Document};
-use super::{HOVER_RADIUS, HOVER_RADIUS_SQR, SNAP_VERT_RADIUS, SNAP_VERT_RADIUS_SQR};
+use super::{HOVER_RADIUS, SNAP_VERT_RADIUS, SNAP_VERT_RADIUS_SQR};
 
 /// Allows manipulating velocity controls on one point
 pub struct SingleSelect {
     pub target: StrongMut<VectorPath>,
-    pub pt_idx: Option<usize>,
-    pub part: PPPart, // todo: move this into the option next to usize
+    pub point: Option<PathPointIdx>,
 }
-
-// todo: add actual snapping
 
 impl SingleSelect {
     pub fn drag(&mut self, delta: Vector2) {
         let mut path = self.target.write();
-        if let Some(idx) = self.pt_idx {
-            let pp = &mut path.curve.points[idx];
-            match &self.part {
+        if let Some(idx) = self.point {
+            let pp = &mut path.curve.points[idx.point];
+            match &idx.part {
                 PPPart::Anchor => {
                     pp.move_point(delta);
                 }
@@ -46,9 +43,9 @@ impl SingleSelect {
 
     pub fn end_dragging(&mut self, px_world_size: f32) {
         let mut path = self.target.write();
-        if let Some(idx) = self.pt_idx {
-            let pp = &mut path.curve.points[idx];
-            if let (PPPart::Ctrl(side), &mut Some(Ctrl1 { c1: (ref mut c1_side, ref mut c1), c2: ref mut c2 @ Some(Ctrl2::Exact(c2_pos)) })) = (self.part, &mut pp.c) {
+        if let Some(idx) = self.point {
+            let pp = &mut path.curve.points[idx.point];
+            if let (PPPart::Ctrl(side), &mut Some(Ctrl1 { c1: (ref mut c1_side, ref mut c1), c2: ref mut c2 @ Some(Ctrl2::Exact(c2_pos)) })) = (idx.part, &mut pp.c) {
                 let snap_vert_radius_sqr = SNAP_VERT_RADIUS_SQR * px_world_size * px_world_size;
 
                 let p = pp.p;
@@ -81,28 +78,33 @@ impl SingleSelect {
         }
     }
 
-    pub fn get_selected(&mut self, mouse_world_pos: Vector2) -> Option<PPPart> {
+    pub fn get_selected(&mut self, mouse_world_pos: Vector2, px_world_size: f32) -> Option<PathPointIdx> {
+        let hover_radius = HOVER_RADIUS * px_world_size;
+        let hover_radius_sqr = hover_radius * hover_radius;
+
         let path = self.target.read();
         let mut items = [None, None, None];
-        if let Some(idx) = self.pt_idx {
-            let pp = &path.curve.points[idx];
+        if let Some(idx) = self.point {
+            let pp = &path.curve.points[idx.point];
             let p_dist = pp.p.rec_distance_to(mouse_world_pos);
-            items[0] = (p_dist <= HOVER_RADIUS).then_some((PPPart::Anchor, p_dist));
+            items[0] = (p_dist <= hover_radius).then_some((PPPart::Anchor, p_dist));
             if let Some(Ctrl1 { c1: (c1_side, c1), c2 }) = pp.c {
                 let c1_dist = c1.distance_sqr_to(mouse_world_pos);
-                items[1] = (c1_dist <= HOVER_RADIUS_SQR).then_some((PPPart::Ctrl(c1_side), c1_dist));
+                items[1] = (c1_dist <= hover_radius_sqr).then_some((PPPart::Ctrl(c1_side), c1_dist));
                 if let Some(c2) = c2 {
                     let c2 = c2.calculate(pp.p, c1);
                     let c2_dist = c2.distance_sqr_to(mouse_world_pos);
                     let c2_side = c1_side.opposite();
-                    items[2] = (c2_dist <= HOVER_RADIUS_SQR).then_some((PPPart::Ctrl(c2_side), c2_dist));
+                    items[2] = (c2_dist <= hover_radius_sqr).then_some((PPPart::Ctrl(c2_side), c2_dist));
                 }
             }
+            items.into_iter()
+                .flatten()
+                .min_by(|(_, a), (_, b)| a.partial_cmp(b).expect("distance should not be NaN"))
+                .map(|(part, _)| PathPointIdx { point: idx.point, part })
+        } else {
+            None
         }
-        items.into_iter()
-            .flatten()
-            .min_by(|(_, a), (_, b)| a.partial_cmp(b).expect("distance should not be NaN"))
-            .map(|(part, _)| part)
     }
 
     pub fn draw(&self, d: &mut impl RaylibDraw, _document: &Document, px_world_size: f32, selection_rec: Option<Rectangle>, _shader_table: &ShaderTable) {
@@ -126,11 +128,11 @@ impl SingleSelect {
             // }
         } else {
             let path = self.target.read();
-            if let Some(idx) = self.pt_idx {
+            if let Some(idx) = self.point {
                 path.draw_selected(d, px_world_size);
-                let pp = &path.curve.points[idx];
+                let pp = &path.curve.points[idx.point];
                 d.draw_path_point(pp, px_world_size, path.settings.color, true, true, true);
-                if let (PPPart::Ctrl(side), &PathPoint { p, c: Some(Ctrl1 { c1: (c1_side, c1), c2: Some(Ctrl2::Exact(c2)) }) }) = (self.part, pp) {
+                if let (PPPart::Ctrl(side), &PathPoint { p, c: Some(Ctrl1 { c1: (c1_side, c1), c2: Some(Ctrl2::Exact(c2)) }) }) = (idx.part, pp) {
                     let (c_self, c_opp) = if c1_side == side { (c1, c2) } else { (c2, c1) };
                     let refl = c_opp.reflected_over(p);
                     let mirror = c_opp.reflected_to(p, (refl - p).normalized().dot(c_self - p));

@@ -122,7 +122,7 @@ impl RasterBrush {
 }
 
 impl ToolType for RasterBrush {
-    fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, _document: &mut Document, mouse_world_pos: Vector2) {
+    fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, _document: &mut Document, mouse_world_pos: Vector2, _px_world_size: f32) {
         self.mouse_curr = mouse_world_pos;
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             self.begin_stroke(rl, thread, mouse_world_pos);

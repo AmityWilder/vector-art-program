@@ -12,7 +12,7 @@ raylib = "5.0.2"
 amylib = { path = "amylib" }
 amymath = { path = "amymath" }
 amygui = { path = "amygui" }
-amyvec = { path = "amyvec" }
+amyvec = { path = "amyvec", features = ["debug_stroke", "debug_fill"] }
 rltest = { path = "rltest" }
 
 [build-dependencies]

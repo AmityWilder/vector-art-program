@@ -234,7 +234,7 @@ impl VectorBrush {
 }
 
 impl ToolType for VectorBrush {
-    fn tick(&mut self, rl: &mut RaylibHandle, _thread: &RaylibThread, document: &mut Document, mouse_world_pos: Vector2) {
+    fn tick(&mut self, rl: &mut RaylibHandle, _thread: &RaylibThread, document: &mut Document, mouse_world_pos: Vector2, _px_world_size: f32) {
         if let VectorBrush::Inactive(_) = self {
             if let Some(active_brush) = InactiveVectorBrush::tick(rl, document) {
                 *self = Self::Active(active_brush);

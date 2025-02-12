@@ -3,7 +3,7 @@ use amymath::{prelude::{Rect2, Rotate90}, rlgl::*};
 use raylib::prelude::*;
 use crate::{
     cubic_bezier::CubicBezier,
-    path_point::PathPoint,
+    path_point::{Ctrl, PPPart, PathPoint},
 };
 
 pub enum WidthProfile {
@@ -17,6 +17,43 @@ impl WidthProfile {
             WidthProfile::Constant(v) => *v,
             WidthProfile::Variable(curve) => curve.position_at(t).expect("width profile should not be empty"),
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PathPointIdx {
+    pub point: usize,
+    pub part: PPPart,
+}
+
+impl PathPointIdx {
+    pub const fn new(point: usize, part: PPPart) -> Self {
+        Self { point, part }
+    }
+
+    pub const fn new_anchor(point: usize) -> Self {
+        Self { point, part: PPPart::Anchor }
+    }
+
+    pub const fn new_ctrl(point: usize, side: Ctrl) -> Self {
+        Self { point, part: PPPart::Ctrl(side) }
+    }
+}
+
+impl Ord for PathPointIdx {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let broad = self.point.cmp(&other.point);
+        if broad.is_eq() {
+            self.part.cmp(&other.part)
+        } else {
+            broad
+        }
+    }
+}
+
+impl PartialOrd for PathPointIdx {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -120,43 +157,51 @@ impl Curve {
         d.draw_line_strip(&points[..], color);
     }
 
-    pub fn draw_stroke(&self, d: &mut impl RaylibDraw, strips_per_bez: usize, thick: &WidthProfile, color: Color) {
+    pub fn draw_stroke(&self, d: &mut impl RaylibDraw, strips_per_slice: usize, thick: &WidthProfile, color: Color) {
         if self.points.is_empty() { return; }
-        let num_points = strips_per_bez * 2 * self.points.len();
+        let num_points = strips_per_slice * 2 * self.points.len();
         if num_points < 3 { return; }
-        let total_strips = self.points.len() * strips_per_bez;
+        let total_strips = self.points.len() * strips_per_slice;
 
         let extents = thick.extents_at(0.0);
         d.draw_circle_v(self.points[0].p, (extents.x + extents.y) * 0.5, color);
         let extents = thick.extents_at(1.0);
         d.draw_circle_v(self.points[self.points.len() - 1].p, (extents.x + extents.y) * 0.5, color);
 
-        let mut d = d.begin_rlgl();
-        let mut d = d.rl_begin_triangles();
-        d.rl_color4ub(color.r, color.g, color.b, color.a);
+
+        #[cfg(not(feature = "debug_stroke"))] let mut d = d.begin_rlgl();
+        #[cfg(not(feature = "debug_stroke"))] let mut d = d.rl_begin_triangles();
+        #[cfg(not(feature = "debug_stroke"))] d.rl_color4ub(color.r, color.g, color.b, color.a);
 
         let mut past_points: Option<[Vector2; 2]> = None;
         for (n, bez) in self.slices().enumerate() {
-            let row = n * strips_per_bez;
-            for i in 0..strips_per_bez {
-                let t = i as f32 / (strips_per_bez - 1) as f32;
-                let t_full = (row + i) as f32 / total_strips as f32;
-                let extents = thick.extents_at(t_full);
-                let p = bez.position_at(t);
+            let row = n * strips_per_slice;
+            for i in 0..strips_per_slice {
+                let t = i as f32 / (strips_per_slice - 1) as f32;
                 let v = bez.velocity_at(t);
+                if v.length_sqr() < f32::EPSILON { continue; }
                 let tangent = v.normalized();
                 let (normal_cw, normal_cc) = (tangent.rotate90_cw(), tangent.rotate90_cc());
+                let p = bez.position_at(t);
+                let t_full = (row + i) as f32 / total_strips as f32;
+                let extents = thick.extents_at(t_full);
                 let p1 = p + normal_cc * extents.x;
                 let p2 = p + normal_cw * extents.y;
                 if let Some(past_points) = &mut past_points {
                     let [p3, p4] = *past_points;
-                    d.rl_vertex2f(p1.x, p1.y);
-                    d.rl_vertex2f(p3.x, p3.y);
-                    d.rl_vertex2f(p4.x, p4.y);
+                    // cannot be `cfg!()` because `d` is a different type
+                    #[cfg(not(feature = "debug_stroke"))] {
+                        d.rl_vertex2f(p1.x, p1.y);
+                        d.rl_vertex2f(p3.x, p3.y);
+                        d.rl_vertex2f(p4.x, p4.y);
 
-                    d.rl_vertex2f(p2.x, p2.y);
-                    d.rl_vertex2f(p1.x, p1.y);
-                    d.rl_vertex2f(p4.x, p4.y);
+                        d.rl_vertex2f(p2.x, p2.y);
+                        d.rl_vertex2f(p1.x, p1.y);
+                        d.rl_vertex2f(p4.x, p4.y);
+                    } #[cfg(feature = "debug_stroke")] {
+                        d.draw_line_strip(&[p1, p3, p4], Color::RED);
+                        d.draw_line_strip(&[p2, p1, p4], Color::BLUE);
+                    }
 
                     past_points[0] = p1;
                     past_points[1] = p2;
@@ -167,26 +212,29 @@ impl Curve {
         }
     }
 
-    pub fn draw_fill(&self, d: &mut impl RaylibDraw, color: Color) {
-        const DENSITY: usize = 10;
+    pub fn draw_fill(&self, d: &mut impl RaylibDraw, segments_per_slice: usize, color: Color) {
         if self.points.is_empty() { return; }
-        let num_points = DENSITY * self.points.len();
+        let num_points = segments_per_slice * self.points.len();
         if num_points < 3 { return; }
 
-        let mut d = d.begin_rlgl();
-        let mut d = d.rl_begin_triangles();
-        d.rl_color4ub(color.r, color.g, color.b, color.a);
+        #[cfg(not(feature = "debug_fill"))] let mut d = d.begin_rlgl();
+        #[cfg(not(feature = "debug_fill"))] let mut d = d.rl_begin_triangles();
+        #[cfg(not(feature = "debug_fill"))] d.rl_color4ub(color.r, color.g, color.b, color.a);
 
         let mut first_point: Option<Vector2> = None;
         let mut prev_point: Option<Vector2> = None;
         for bez in self.slices() {
-            for i in 0..DENSITY {
-                let t = i as f32 / (DENSITY - 1) as f32;
+            for i in 0..segments_per_slice {
+                let t = i as f32 / (segments_per_slice - 1) as f32;
                 let p = bez.position_at(t);
                 if let Some((first_point, prev_point)) = first_point.as_ref().zip(prev_point.as_mut()) {
-                    d.rl_vertex2f(first_point.x, first_point.y);
-                    d.rl_vertex2f(prev_point.x, prev_point.y);
-                    d.rl_vertex2f(p.x, p.y);
+                    #[cfg(not(feature = "debug_fill"))] {
+                        d.rl_vertex2f(first_point.x, first_point.y);
+                        d.rl_vertex2f(prev_point.x, prev_point.y);
+                        d.rl_vertex2f(p.x, p.y);
+                    } #[cfg(feature = "debug_fill")] {
+                        d.draw_line_strip(&[*first_point, *prev_point, p], color);
+                    }
                 } else if prev_point.is_none() {
                     first_point = Some(p);
                 }

@@ -20,6 +20,7 @@ pub trait ToolType {
         thread: &RaylibThread,
         document: &mut Document,
         mouse_world_pos: Vector2,
+        px_world_size: f32,
     );
     /// Reason for `draw` not having a `mouse_world_pos` parameter:
     /// The program's visuals ought to accurately represent the ACTUAL state of the program,
@@ -100,12 +101,12 @@ impl Tool {
 }
 
 impl ToolType for Tool {
-    fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, document: &mut Document, mouse_world_pos: Vector2) {
+    fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, document: &mut Document, mouse_world_pos: Vector2, px_world_size: f32) {
         match self {
-            Tool::PointSelection(tool) => tool.tick(rl, thread, document, mouse_world_pos),
-            Tool::Pen           (tool) => tool.tick(rl, thread, document, mouse_world_pos),
-            Tool::VectorBrush   (tool) => tool.tick(rl, thread, document, mouse_world_pos),
-            Tool::RasterBrush   (tool) => tool.tick(rl, thread, document, mouse_world_pos),
+            Tool::PointSelection(tool) => tool.tick(rl, thread, document, mouse_world_pos, px_world_size),
+            Tool::Pen           (tool) => tool.tick(rl, thread, document, mouse_world_pos, px_world_size),
+            Tool::VectorBrush   (tool) => tool.tick(rl, thread, document, mouse_world_pos, px_world_size),
+            Tool::RasterBrush   (tool) => tool.tick(rl, thread, document, mouse_world_pos, px_world_size),
         }
     }
 

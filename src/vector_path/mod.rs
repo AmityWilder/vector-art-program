@@ -69,7 +69,7 @@ impl LayerType for VectorPath {
                 StyleItem::Fill(fill) => {
                     match &fill.pattern {
                         fill::Pattern::Solid(color) => {
-                            self.curve.draw_fill(d, *color);
+                            self.curve.draw_fill(d, 20, *color);
                         }
 
                         _ => todo!(),
@@ -85,11 +85,11 @@ impl LayerType for VectorPath {
     }
 }
 
-const ANCHOR_EXTENT_INNER: f32 = 2.0;
-const ANCHOR_OUTLINE_THICK: f32 = 1.0;
-const ANCHOR_EXTENT_OUTER: f32 = ANCHOR_EXTENT_INNER + ANCHOR_OUTLINE_THICK;
-const ANCHOR_SIZE_INNER: f32 = ANCHOR_EXTENT_INNER * 2.0;
-const ANCHOR_SIZE_OUTER: f32 = ANCHOR_EXTENT_OUTER * 2.0;
+pub const ANCHOR_EXTENT_INNER: f32 = 2.0;
+pub const ANCHOR_OUTLINE_THICK: f32 = 1.0;
+pub const ANCHOR_EXTENT_OUTER: f32 = ANCHOR_EXTENT_INNER + ANCHOR_OUTLINE_THICK;
+pub const ANCHOR_SIZE_INNER: f32 = ANCHOR_EXTENT_INNER * 2.0;
+pub const ANCHOR_SIZE_OUTER: f32 = ANCHOR_EXTENT_OUTER * 2.0;
 
 pub trait DrawPathPoint: RaylibDraw {
     fn draw_path_point(

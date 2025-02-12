@@ -28,11 +28,12 @@ impl MultiSelect {
         todo!()
     }
 
-    pub fn is_selected(&self, mouse_world_pos: Vector2) -> bool {
+    pub fn is_selected(&self, mouse_world_pos: Vector2, px_world_size: f32) -> bool {
+        let hover_radius = HOVER_RADIUS * px_world_size;
         self.pieces.iter()
             .any(|SelectionPiece { target, points }| {
                 let path = target.read();
-                points.iter().any(|&idx| path.curve.points[idx].p.rec_distance_to(mouse_world_pos) <= HOVER_RADIUS)
+                points.iter().any(|&idx| path.curve.points[idx].p.rec_distance_to(mouse_world_pos) <= hover_radius)
             })
     }
 
