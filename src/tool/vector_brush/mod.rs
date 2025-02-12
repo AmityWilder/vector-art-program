@@ -1,34 +1,10 @@
-use std::{collections::VecDeque, fmt};
 use raylib::prelude::*;
 use amylib::rc::prelude::*;
 use amymath::prelude::*;
-use crate::{layer::LayerType, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath, DrawPathPoint}, Change, Document};
-use super::ToolType;
+use crate::{layer::LayerType, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath, DrawPathPoint}, Document};
+use super::{point_selection::SNAP_VERT_RADIUS_SQR, ToolType};
 
 use MouseButton::MOUSE_BUTTON_LEFT;
-
-struct BrushAction {
-    target: StrongMut<VectorPath>,
-    stroke: VecDeque<PathPoint>,
-}
-
-impl fmt::Debug for BrushAction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("BrushAction").finish()
-    }
-}
-
-impl Change for BrushAction {
-    fn redo(&mut self, _document: &mut Document) -> Result<(), String> {
-        self.target.write().curve.points.clone_from(&self.stroke);
-        Ok(())
-    }
-
-    fn undo(&mut self, _document: &mut Document) -> Result<(), String> {
-        self.target.write().curve.points.clear();
-        Ok(())
-    }
-}
 
 pub struct InactiveVectorBrush(pub(super) Option<StrongMut<VectorPath>>);
 
@@ -42,7 +18,6 @@ impl InactiveVectorBrush {
             return Some(ActiveVectorBrush {
                 target: document.create_path(None, None).clone_mut(),
                 signal: PathSignal::default(),
-                last_failing: None,
             })
         }
         None
@@ -50,16 +25,9 @@ impl InactiveVectorBrush {
 }
 
 pub struct ActiveVectorBrush {
-    /// If [`Some`], continue seleted.
-    /// If [`None`], find a hovered path or create a new path upon clicking.
-    /// Must be a `VectorPath` layer.
-    /// If there is a layer, it must not die before the pen dies.
     pub(super) target: StrongMut<VectorPath>,
 
     signal: PathSignal,
-
-    /// The position the last time its dot product was 1
-    last_failing: Option<Vector2>,
 }
 
 const MIN_DISTANCE: f32 = 2.0;
@@ -156,7 +124,7 @@ impl ActiveVectorBrush {
     // This function fixes that.
     fn merge_confirmed_verts(path: &mut VectorPath) {
         // join points confirmed to be no longer editing
-        if let Some(idx) = path.curve.points.len().checked_sub(3) && path.curve.points[idx].p.distance_sqr_to(path.curve.points[idx + 1].p) < 0.001 {
+        if let Some(idx) = path.curve.points.len().checked_sub(3) && path.curve.points[idx].p.distance_sqr_to(path.curve.points[idx + 1].p) < SNAP_VERT_RADIUS_SQR {
             let b = path.curve.points.remove(idx + 1).expect("checked sub should ensure element existence");
             let a = &mut path.curve.points[idx];
             println!("merging points\n  {a:?}\n  {b:?}");
@@ -208,21 +176,17 @@ impl ActiveVectorBrush {
         _document: &mut Document,
         mouse_world_pos: Vector2,
     ) -> InactiveVectorBrush {
-        let _stroke = {
+        {
             let mut path = self.target.write();
-
             path.curve.points.push_back(PathPoint { p: mouse_world_pos, c: None });
-
-            path.curve.points.clone()
-        };
-        // todo: rework undo/redo
-
-        // document.push_change(
-        //     Box::new(BrushAction {
-        //         target: self.target.clone_mut(),
-        //         stroke,
-        //     })
-        // );
+            if path.curve.points.len() >= 2 {
+                let first = path.curve.points.front().expect("len >= 2 should guarantee 2 points").p;
+                let last  = path.curve.points.back ().expect("len >= 2 should guarantee 2 points").p;
+                if first.distance_sqr_to(last) <= SNAP_VERT_RADIUS_SQR {
+                    path.curve.is_closed = true;
+                }
+            }
+        }
         InactiveVectorBrush(Some(self.target.clone_mut()))
     }
 

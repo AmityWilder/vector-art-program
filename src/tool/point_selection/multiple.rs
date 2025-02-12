@@ -1,30 +1,8 @@
-use std::fmt;
-
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::rc::prelude::*;
-use crate::{document::layer::Layer, layer::LayerType, shaders::ShaderTable, vector_path::{VectorPath, DrawPathPoint}, Change, Document};
+use crate::{document::layer::Layer, layer::LayerType, shaders::ShaderTable, vector_path::{VectorPath, DrawPathPoint}, Document};
 use super::HOVER_RADIUS;
-
-struct EditMultiPointAction {
-
-}
-
-impl fmt::Debug for EditMultiPointAction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("EditMultiPointAction").finish()
-    }
-}
-
-impl Change for EditMultiPointAction {
-    fn redo(&mut self, _document: &mut Document) -> Result<(), String> {
-        todo!()
-    }
-
-    fn undo(&mut self, _document: &mut Document) -> Result<(), String> {
-        todo!()
-    }
-}
 
 pub struct SelectionPiece {
     pub target: StrongMut<VectorPath>,
@@ -44,6 +22,10 @@ impl MultiSelect {
                 path.curve.points[*idx].move_point(delta);
             }
         }
+    }
+
+    pub fn end_dragging(&mut self) {
+        todo!()
     }
 
     pub fn is_selected(&self, mouse_world_pos: Vector2) -> bool {

@@ -1,12 +1,15 @@
-use std::{collections::VecDeque, path::Path, time::Instant};
+use std::{path::Path, time::Instant};
 
 use amylib::prelude::DirectibleDoubleEndedIterator;
 use amymath::prelude::{DrawRect2Lines, IRect2, RaylibRlglDraw, RaylibRlglExt, Rect2};
 use raylib::prelude::*;
-use crate::{appearance::Blending, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Change, Document}, engine::{Config, Engine}, raster::{raster_brush, RasterTex}, shaders::ShaderTable, tool::{Tool, ToolType}};
+use undo_redo::{Action, EditHistory, RedoError, UndoError};
+use crate::{appearance::Blending, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, raster::{raster_brush, RasterTex}, shaders::ShaderTable, tool::{Tool, ToolType}};
 
 #[allow(clippy::enum_glob_use, reason = "every frickin one of these is prefixed with its type name >:T")]
 use {KeyboardKey::*, MouseButton::*};
+
+pub mod undo_redo;
 
 #[repr(u8)]
 enum SerializationKind {
@@ -74,46 +77,6 @@ const fn serialization_key(key: Option<KeyboardKey>) -> Option<SerializationKind
     }
 }
 
-struct EditHistory {
-    changes: VecDeque<Box<dyn Change>>,
-    present: usize,
-}
-
-impl EditHistory {
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self {
-            changes: VecDeque::with_capacity(capacity),
-            present: 0,
-        }
-    }
-
-    /// Apply a change that can be undone/redone and add it to the history
-    pub fn push_change(&mut self, change: Box<dyn Change>) {
-        for _ in 0..self.present {
-            self.changes.pop_front();
-        }
-        self.present = 0;
-        if self.changes.len() == self.changes.capacity() {
-            self.changes.pop_back();
-        }
-        self.changes.push_front(change);
-    }
-
-    pub fn prev(&mut self) -> Option<&mut Box<dyn Change>> {
-        let change = self.changes.get_mut(self.present);
-        if change.is_some() { self.present += 1; }
-        change
-    }
-
-    pub fn next(&mut self) -> Option<&mut Box<dyn Change>> {
-        if let Some(present) = self.present.checked_sub(1) {
-            self.present = present;
-            return Some(&mut self.changes[present])
-        }
-        None
-    }
-}
-
 pub struct Editor {
     pub document: Document,
     history: EditHistory,
@@ -140,27 +103,35 @@ impl Editor {
         }
     }
 
-    pub fn push_change(&mut self, change: Box<dyn Change>) {
+    pub fn push_change(&mut self, change: Action) {
         self.history.push_change(change);
     }
 
-    pub fn undo(&mut self) -> Option<Result<(), String>> {
+    pub fn undo(&mut self) -> Option<Result<(), UndoError>> {
         if let Some(change) = self.history.prev() {
-            println!("undo: {change:?}");
+            println!("undo: {change}");
             return Some(change.undo(&mut self.document));
         }
         None
     }
 
-    pub fn redo(&mut self) -> Option<Result<(), String>> {
+    pub fn redo(&mut self) -> Option<Result<(), RedoError>> {
         if let Some(change) = self.history.next() {
-            println!("redo: {change:?}");
+            println!("redo: {change}");
             return Some(change.redo(&mut self.document));
         }
         None
     }
 
-    pub fn tick(&mut self, engine_config: &Config, rl: &mut RaylibHandle, thread: &RaylibThread, is_mouse_event_handled: bool, mouse_screen_pos: Vector2, mouse_screen_delta: Vector2) {
+    pub fn tick(
+        &mut self,
+        engine_config: &Config,
+        rl: &mut RaylibHandle,
+        thread: &RaylibThread,
+        is_mouse_event_handled: bool,
+        mouse_screen_pos: Vector2,
+        mouse_screen_delta: Vector2,
+    ) {
         let is_ctrl_down = rl.is_key_down(KEY_LEFT_CONTROL) || rl.is_key_down(KEY_RIGHT_CONTROL);
         let is_shift_down = rl.is_key_down(KEY_LEFT_SHIFT) || rl.is_key_down(KEY_RIGHT_SHIFT);
 
@@ -206,7 +177,7 @@ impl Editor {
         } else if rl.is_key_pressed(KEY_B) {
             if is_shift_down {
                 let raster = RasterTex::new(rl, thread, 480, 480, Rectangle::new(0.0, 0.0, 480.0, 480.0)).unwrap();
-                let shader = rl.load_shader_from_memory(thread, None, Some(include_str!("shaders/blur.frag")));
+                let shader = rl.load_shader_from_memory(thread, None, Some(include_str!("../shaders/blur.frag")));
                 self.current_tool.switch_to_raster_brush(
                     rl,
                     thread,
@@ -227,14 +198,24 @@ impl Editor {
         }
 
         if (is_ctrl_down) && rl.is_key_pressed(KEY_Z) {
-            match if is_shift_down { self.redo() } else { self.undo() } {
-                Some(Ok(())) => (),
-                Some(Err(e)) => println!("error: {e:?}"),
-                None => if is_shift_down {
-                    println!("nothing to redo")
+            if is_shift_down {
+                let result = self.redo();
+                if let Some(result) = result {
+                    if let Err(e) = result {
+                        println!("error: {e:?}");
+                    }
                 } else {
-                    println!("nothing to undo")
-                },
+                    println!("nothing to redo");
+                }
+            } else {
+                let result = self.undo();
+                if let Some(result) = result {
+                    if let Err(e) = result {
+                        println!("error: {e:?}");
+                    }
+                } else {
+                    println!("nothing to undo");
+                }
             }
         }
     }

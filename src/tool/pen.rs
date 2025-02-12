@@ -1,41 +1,8 @@
-use std::fmt;
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{iter::directed::DirectibleDoubleEndedIterator, rc::prelude::*};
-use crate::{layer::{BackToFore, ForeToBack, Layer, LayerType}, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath, DrawPathPoint}, Change, Document};
+use crate::{layer::{BackToFore, ForeToBack, Layer, LayerType}, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath, DrawPathPoint}, Document};
 use super::{point_selection::HOVER_RADIUS_SQR, ToolType};
-
-struct AddPointAction {
-    target: StrongMut<VectorPath>,
-    side: Ctrl,
-    pp: PathPoint,
-}
-
-impl fmt::Debug for AddPointAction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("AddPointAction").finish()
-    }
-}
-
-impl Change for AddPointAction {
-    fn redo(&mut self, _document: &mut Document) -> Result<(), String> {
-        let mut path = self.target.write();
-        match self.side {
-            Ctrl::In  => path.curve.points.push_front(self.pp),
-            Ctrl::Out => path.curve.points.push_back (self.pp),
-        }
-        Ok(())
-    }
-
-    fn undo(&mut self, _document: &mut Document) -> Result<(), String> {
-        let mut path = self.target.write();
-        match self.side {
-            Ctrl::In  => _ = path.curve.points.pop_front(),
-            Ctrl::Out => _ = path.curve.points.pop_back (),
-        }
-        Ok(())
-    }
-}
 
 pub struct InactivePen(pub(super) Option<StrongMut<VectorPath>>);
 

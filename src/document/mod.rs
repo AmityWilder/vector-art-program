@@ -18,11 +18,6 @@ use self::{
     }
 };
 
-pub trait Change: fmt::Debug {
-    fn redo(&mut self, document: &mut Document) -> Result<(), String>;
-    fn undo(&mut self, document: &mut Document) -> Result<(), String>;
-}
-
 const DEFAULT_LAYER_COLORS: [Color; 10] = [
     Color::BLUEVIOLET,
     Color::ORANGERED,

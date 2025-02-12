@@ -7,8 +7,8 @@ use super::ToolType;
 pub const HOVER_RADIUS: f32 = 3.0;
 pub const HOVER_RADIUS_SQR: f32 = HOVER_RADIUS * HOVER_RADIUS;
 
-// pub const SNAP_VERT_RADIUS: f32 = 3.0;
-// pub const SNAP_VERT_RADIUS_SQR: f32 = SNAP_VERT_RADIUS * SNAP_VERT_RADIUS;
+pub const SNAP_VERT_RADIUS: f32 = 4.0;
+pub const SNAP_VERT_RADIUS_SQR: f32 = SNAP_VERT_RADIUS * SNAP_VERT_RADIUS;
 
 mod singular;
 mod multiple;
@@ -136,6 +136,10 @@ impl PointSelection {
 
     fn end_dragging(&mut self, document: &mut Document, mouse_world_pos: Vector2) {
         if let Some(state) = self.state.as_mut() {
+            match &mut state.selection {
+                Selection::Singular(single_select) => single_select.end_dragging(document.camera.zoom.recip()),
+                Selection::Multiple(multi_select) => multi_select.end_dragging(),
+            }
             state.drag = None;
         }
 
