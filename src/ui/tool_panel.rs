@@ -26,8 +26,8 @@ impl ToolIconTextures {
                     Vector2::new(WIDTH, WIDTH),
                     Color::WHITE);
                 img.draw_line_v(
-                    Vector2::new(0.0, WIDTH),
-                    Vector2::new(WIDTH, WIDTH),
+                    Vector2::new(0.0, WIDTH - 1.0),
+                    Vector2::new(WIDTH, WIDTH - 1.0),
                     Color::WHITE);
                 rl.load_texture_from_image(thread, &img).unwrap()
             },
@@ -117,8 +117,37 @@ impl ToolPanel {
         }
     }
 
-    pub fn tick(&mut self, _rl: &mut RaylibHandle, _editor: &mut Editor, _mouse_screen_pos: Vector2) {
-
+    pub fn tick(&mut self, rl: &mut RaylibHandle, editor: &mut Editor, mouse_screen_pos: Vector2) {
+        if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
+            let panel_rec = self.panel.rect();
+            let (start_x, start_y) = (
+                panel_rec.xmin + Self::ICON_INSET,
+                panel_rec.ymin + Self::ICON_INSET,
+            );
+            // todo: this could be O(1)
+            for (i, &icon) in self.items.iter().enumerate() {
+                let (y, x) = (i / self.num_cols, i % self.num_cols);
+                let (button_x, button_y) = (
+                    start_x + x as i32 * (Self::BUTTON_WIDTH + Self::ICON_GAP),
+                    start_y + y as i32 * (Self::BUTTON_WIDTH + Self::ICON_GAP),
+                );
+                let button_rec = Rectangle::new(
+                    button_x as f32,
+                    button_y as f32,
+                    Self::BUTTON_WIDTH as f32,
+                    Self::BUTTON_WIDTH as f32,
+                );
+                if button_rec.check_collision_point_rec(mouse_screen_pos) {
+                    match icon {
+                        ToolIcon::PointSelection => editor.current_tool.switch_to_point_selection(),
+                        ToolIcon::Pen => editor.current_tool.switch_to_pen(),
+                        ToolIcon::VectorBrush => editor.current_tool.switch_to_vector_brush(),
+                        ToolIcon::RasterBrush => todo!("raster brush requires additional arguments"), // editor.current_tool.switch_to_raster_brush(rl, thread, shader, target, stroke)
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     pub fn draw(&self, d: &mut impl RaylibDraw, editor: &Editor) {
@@ -135,13 +164,14 @@ impl ToolPanel {
                 start_x + x as i32 * (Self::BUTTON_WIDTH + Self::ICON_GAP),
                 start_y + y as i32 * (Self::BUTTON_WIDTH + Self::ICON_GAP),
             );
+            let button_rec = Rectangle::new(
+                button_x as f32,
+                button_y as f32,
+                Self::BUTTON_WIDTH as f32,
+                Self::BUTTON_WIDTH as f32,
+            );
             d.draw_rectangle_rounded(
-                Rectangle::new(
-                    button_x as f32,
-                    button_y as f32,
-                    Self::BUTTON_WIDTH as f32,
-                    Self::BUTTON_WIDTH as f32,
-                ),
+                button_rec,
                 0.125,
                 3,
                 if icon.eq(&editor.current_tool) { Color::DODGERBLUE } else { Color::GRAY },
