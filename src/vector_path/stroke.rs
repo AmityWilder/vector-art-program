@@ -45,8 +45,8 @@ impl Default for Stroke {
             pattern: Pattern::Solid(Color::BLACK),
             // thick: WidthProfile::Constant(Vector2::new(10.0, 10.0)),
             thick: WidthProfile::init()
-                .with_point2(0.0, 15.0, 5.0)
-                .with_point2(1.0, 1.0, 1.0)
+                .with_point(1.0, 1.0, 1.0)
+                .with_point(0.0, 15.0, 5.0)
                 .build(),
             align: Align::Middle,
         }

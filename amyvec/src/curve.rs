@@ -2,61 +2,43 @@ use std::collections::VecDeque;
 use amymath::{prelude::{Matrix2x2, MinMaxRectangle, Rotate90}, rlgl::*};
 use raylib::prelude::*;
 use crate::{
-    bezier::cubic::Cubic, generics::*, path_point::{Ctrl, PPPart, PathPoint}
+    bezier::cubic::Cubic, generics::*, path_point::{Ctrl, Ctrl1, Ctrl2, PPPart, PathPoint}
 };
 
 #[derive(Debug)]
 pub enum WidthProfile {
-    Constant1Sided(f32),
-    Constant2Sided(f32, f32),
-    Variable1Sided(Curve<Vector2, Matrix2x2>),
-    Variable2Sided(Curve<Vector3, Matrix>),
+    Constant(f32, f32),
+    Variable(Curve<Vector2, Matrix2x2>),
 }
 
 pub struct WidthProfileBuilder {
-    points: Vec<(f32, (f32, Option<f32>))>,
+    points: Vec<(f32, (f32, f32))>,
 }
 
 impl WidthProfileBuilder {
-    pub fn with_point1(mut self, t: f32, thick1: f32) -> Self {
-        self.points.push((t, (thick1, None)));
-        self
-    }
-    pub fn with_point2(mut self, t: f32, thick1: f32, thick2: f32) -> Self {
-        self.points.push((t, (thick1, Some(thick2))));
+    pub fn with_point(mut self, t: f32, thick1: f32, thick2: f32) -> Self {
+        self.points.push((t, (thick1, thick2)));
         self
     }
 
     pub fn build(mut self) -> WidthProfile {
         assert!(!self.points.is_empty(), "width profile cannot be empty");
         self.points.sort_by(|(a, _), (b, _)| a.partial_cmp(&b).expect("time should be normal"));
-        if self.points.iter().any(|(_, (_, x))| x.is_some()) {
-            WidthProfile::Variable2Sided(Curve {
-                is_closed: false,
-                points: self.points.into_iter()
-                    .map(|(t, (thick1, thick2))| PathPoint {
-                        p: Vector3::new(t, thick1, thick2.unwrap_or_default()),
-                        c: None,
-                    })
-                    .collect(),
-            })
-        } else {
-            WidthProfile::Variable1Sided(Curve {
-                is_closed: false,
-                points: self.points.into_iter()
-                    .map(|(t, (thick1, _))| PathPoint {
-                        p: Vector2::new(t, thick1),
-                        c: None
-                    })
-                    .collect(),
-            })
-        }
+        WidthProfile::Variable(Curve {
+            is_closed: false,
+            points: self.points.into_iter()
+                .map(|(t, (thick1, thick2))| PathPoint {
+                    p: Vector2::new(thick1, thick2),
+                    c: Some(Ctrl1 { c1: (Ctrl::Out, Vector2::new(thick1, thick2)), c2: Some(Ctrl2::Reflect) })
+                })
+                .collect(),
+        })
     }
 }
 
 impl WidthProfile {
     pub const fn new_constant2(thick1: f32, thick2: f32) -> Self {
-        Self::Constant2Sided(thick1, thick2)
+        Self::Constant(thick1, thick2)
     }
 
     pub fn init() -> WidthProfileBuilder {
@@ -67,50 +49,31 @@ impl WidthProfile {
 
     pub fn extents_at(&self, t: f32) -> (f32, f32) {
         match self {
-            &WidthProfile::Constant1Sided(x) => (x, x),
-            &WidthProfile::Constant2Sided(a, b) => (a, b),
-
-            WidthProfile::Variable1Sided(curve) => {
-                let Vector2 { x: _, y } = curve.position_at(t).expect("width profile should not be empty");
-                (y, y)
-            },
-            WidthProfile::Variable2Sided(curve) => {
-                let Vector3 { x: _, y, z } = curve.position_at(t).expect("width profile should not be empty");
-                (y, z)
+            &WidthProfile::Constant(a, b) => (a, b),
+            WidthProfile::Variable(curve) => {
+                let Vector2 { x, y } = curve.position_at(t).expect("width profile should not be empty");
+                (x, y)
             },
         }
     }
 
     pub fn extents_min(&self) -> (f32, f32) {
         match self {
-            &WidthProfile::Constant1Sided(x) => (x, x),
-            &WidthProfile::Constant2Sided(a, b) => (a, b),
-
-            WidthProfile::Variable1Sided(curve) => {
+            &WidthProfile::Constant(a, b) => (a, b),
+            WidthProfile::Variable(curve) => {
                 let bounds = curve.bounds().expect("width profile should not be empty");
-                (bounds.min.y, bounds.min.y)
-            },
-
-            WidthProfile::Variable2Sided(curve) => {
-                let bounds = curve.bounds().expect("width profile should not be empty");
-                (bounds.min.y, bounds.min.z)
+                (bounds.min.x, bounds.min.y)
             },
         }
     }
 
     pub fn extents_max(&self) -> (f32, f32) {
         match self {
-            &WidthProfile::Constant1Sided(x) => (x, x),
-            &WidthProfile::Constant2Sided(a, b) => (a, b),
+            &WidthProfile::Constant(a, b) => (a, b),
 
-            WidthProfile::Variable1Sided(curve) => {
+            WidthProfile::Variable(curve) => {
                 let bounds = curve.bounds().expect("width profile should not be empty");
-                (bounds.max.y, bounds.max.y)
-            },
-
-            WidthProfile::Variable2Sided(curve) => {
-                let bounds = curve.bounds().expect("width profile should not be empty");
-                (bounds.max.y, bounds.max.z)
+                (bounds.max.x, bounds.max.y)
             },
         }
     }
@@ -270,12 +233,12 @@ impl<M: Maternal<Vector2>> Curve<Vector2, M> {
             if num_points < 3 { return; }
             let total_strips = self.points.len() * strips_per_slice;
 
-            for (t, t_full, bez) in [
-                (0.0, 0.0, self.slice(0).expect("should have at least 2 points in this branch")),
-                (1.0, 1.0, self.slice(self.num_slices() - 1).expect("should have at least 2 points in this branch"))
+            for (t_vel, t, t_full, bez) in [
+                (0.001, 0.0, 0.0, self.slice(0).expect("should have at least 2 points in this branch")),
+                (0.999, 1.0, 1.0, self.slice(self.num_slices() - 1).expect("should have at least 2 points in this branch"))
             ] {
                 let extents = thick.extents_at(t_full);
-                let v = bez.velocity_at(t);
+                let v = bez.velocity_at(t_vel);
                 let p = bez.position_at(t);
                 if v.length_sqr() >= f32::EPSILON {
                     let tangent = v.normalized();

@@ -303,11 +303,10 @@ fn read_stroke_pattern(reader: &mut impl Read, is_gradient: bool) -> io::Result<
 fn save_stroke_thickness(writer: &mut impl Write, thick: &mut WidthProfile) -> io::Result<()> {
     // todo: distinguish variants
     match thick {
-        &mut WidthProfile::Constant1Sided(thick) => writer.write_le(thick)?,
-        // &mut WidthProfile::Constant2Sided(thick1, thick2) => {
-        //     writer.write_le(thick1)?;
-        //     writer.write_le(thick2)?;
-        // }
+        &mut WidthProfile::Constant(thick1, thick2) => {
+            writer.write_le(thick1)?;
+            writer.write_le(thick2)?;
+        }
         _ => unimplemented!("not doing until supported"),
     }
     Ok(())
@@ -317,7 +316,7 @@ fn read_stroke_thickness(reader: &mut impl Read, is_variable_thickness: bool) ->
     Ok(if is_variable_thickness {
         unimplemented!("not doing until supported")
     } else {
-        WidthProfile::Constant1Sided(reader.read_le()?)
+        WidthProfile::Constant(reader.read_le()?, reader.read_le()?)
     })
 }
 
@@ -338,7 +337,7 @@ fn save_stroke_style(
     let opacity_byte = opacity_byte(opacity);
     writer.write_all(&[
         (u8::from(matches!(pattern, stroke::Pattern::Gradient { .. })) << 6)
-        | (u8::from(!matches!(thick, WidthProfile::Constant1Sided(_))) << 5)
+        | (u8::from(matches!(thick, WidthProfile::Variable(_))) << 5)
         | (match align {
             stroke::Align::Inside  => 0,
             stroke::Align::Middle  => 1,
