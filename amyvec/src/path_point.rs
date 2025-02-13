@@ -1,56 +1,6 @@
 use raylib::prelude::*;
 use amymath::prelude::*;
 
-pub trait Vectoral where
-    Self:
-        Copy +
-        ReflectVector +
-        std::ops::Neg<Output = Self> +
-        std::ops::Add<Self, Output = Self> +
-        std::ops::Sub<Self, Output = Self> +
-        std::ops::Mul<Self, Output = Self> +
-        std::ops::Div<Self, Output = Self> +
-        std::ops::Mul<f32, Output = Self> +
-        std::ops::Div<f32, Output = Self> +
-        std::ops::AddAssign<Self> +
-        std::ops::SubAssign<Self> +
-        std::ops::MulAssign<Self> +
-        std::ops::DivAssign<Self> +
-        std::ops::MulAssign<f32> +
-        std::ops::DivAssign<f32>,
-{
-    type Rect;
-    const ZERO: Self;
-    const ONE: Self;
-}
-
-impl Vectoral for Vector2 {
-    type Rect = Rect2;
-    const ZERO: Self = Vector2 { x: 0.0, y: 0.0 };
-    const ONE:  Self = Vector2 { x: 1.0, y: 1.0 };
-}
-
-impl Vectoral for Vector3 {
-    type Rect = BoundingBox;
-    const ZERO: Self = Vector3 { x: 0.0, y: 0.0, z: 0.0 };
-    const ONE:  Self = Vector3 { x: 1.0, y: 1.0, z: 1.0 };
-}
-
-pub trait Maternal<V: Vectoral>: Copy {
-    fn transform(&self, v: V) -> V;
-}
-
-impl Maternal<Vector2> for Matrix2x2 {
-    fn transform(&self, v: Vector2) -> Vector2 {
-        self * v
-    }
-}
-impl Maternal<Vector3> for Matrix {
-    fn transform(&self, v: Vector3) -> Vector3 {
-        v.transform_with(*self)
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Ctrl {
     In,
@@ -93,7 +43,7 @@ impl PartialOrd for PPPart {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum Ctrl2<V: Vectoral = Vector2, M: Maternal<V> = Matrix2x2> {
+pub enum Ctrl2<V: Vector = Vector2, M: Maternal<V> = Matrix2x2> {
     // corner: G0 continuity
 
     // todo: add G2 continuity option
@@ -116,7 +66,9 @@ pub enum Ctrl2<V: Vectoral = Vector2, M: Maternal<V> = Matrix2x2> {
 }
 use Ctrl2::*;
 
-impl<V: Vectoral, M: Maternal<V>> Ctrl2<V, M> {
+use crate::generics::{Maternal, Vector};
+
+impl<V: Vector, M: Maternal<V>> Ctrl2<V, M> {
     #[inline]
     pub const fn is_reflect(&self) -> bool {
         matches!(self, Reflect)
@@ -144,18 +96,18 @@ impl<V: Vectoral, M: Maternal<V>> Ctrl2<V, M> {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Ctrl1<V: Vectoral = Vector2, M: Maternal<V> = Matrix2x2> {
+pub struct Ctrl1<V: Vector = Vector2, M: Maternal<V> = Matrix2x2> {
     pub c1: (Ctrl, V),
     pub c2: Option<Ctrl2<V, M>>,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct PathPoint<V: Vectoral = Vector2, M: Maternal<V> = Matrix2x2> {
+pub struct PathPoint<V: Vector = Vector2, M: Maternal<V> = Matrix2x2> {
     pub p: V,
     pub c: Option<Ctrl1<V, M>>,
 }
 
-impl<V: Vectoral, M: Maternal<V>> PathPoint<V, M> {
+impl<V: Vector, M: Maternal<V>> PathPoint<V, M> {
     #[inline]
     pub const fn is_c1_corner(&self) -> bool {
         self.c.is_none()

@@ -1,9 +1,8 @@
 use std::collections::VecDeque;
-use amymath::{prelude::{Matrix2x2, MinMaxRectangle, Rect2, Rotate90}, rlgl::*};
+use amymath::{prelude::{Matrix2x2, MinMaxRectangle, Rotate90}, rlgl::*};
 use raylib::prelude::*;
 use crate::{
-    bezier::cubic::Cubic as CubicBezier,
-    path_point::{Ctrl, Maternal, PPPart, PathPoint, Vectoral},
+    bezier::cubic::Cubic, generics::{Maternal, Vector}, path_point::{Ctrl, PPPart, PathPoint}
 };
 
 #[derive(Debug)]
@@ -31,14 +30,20 @@ impl WidthProfileBuilder {
             WidthProfile::Variable2Sided(Curve {
                 is_closed: false,
                 points: self.points.into_iter()
-                    .map(|(t, (thick1, thick2))| Vector3::new(t, thick1, thick2.unwrap_or_default()))
+                    .map(|(t, (thick1, thick2))| PathPoint {
+                        p: Vector3::new(t, thick1, thick2.unwrap_or_default()),
+                        c: None,
+                    })
                     .collect(),
             })
         } else {
             WidthProfile::Variable1Sided(Curve {
                 is_closed: false,
                 points: self.points.into_iter()
-                    .map(|(t, (thick1, _))| Vector2::new(t, thick1))
+                    .map(|(t, (thick1, _))| PathPoint {
+                        p: Vector2::new(t, thick1),
+                        c: None
+                    })
                     .collect(),
             })
         }
@@ -65,7 +70,7 @@ impl WidthProfile {
                 let Vector2 { x: _, y } = curve.position_at(t).expect("width profile should not be empty");
                 (y, y)
             },
-            WidthProfile::Variable1Sided(curve) => {
+            WidthProfile::Variable2Sided(curve) => {
                 let Vector3 { x: _, y, z } = curve.position_at(t).expect("width profile should not be empty");
                 (y, z)
             },
@@ -77,9 +82,14 @@ impl WidthProfile {
             &WidthProfile::Constant1Sided(x) => (x, x),
             &WidthProfile::Constant2Sided(a, b) => (a, b),
 
-            WidthProfile::Variable(curve) => {
+            WidthProfile::Variable1Sided(curve) => {
                 let bounds = curve.bounds().expect("width profile should not be empty");
-                Vector2::new(bounds.xmin, bounds.ymin)
+                (bounds.min.y, bounds.min.y)
+            },
+
+            WidthProfile::Variable2Sided(curve) => {
+                let bounds = curve.bounds().expect("width profile should not be empty");
+                (bounds.min.y, bounds.min.z)
             },
         }
     }
@@ -89,9 +99,14 @@ impl WidthProfile {
             &WidthProfile::Constant1Sided(x) => (x, x),
             &WidthProfile::Constant2Sided(a, b) => (a, b),
 
-            WidthProfile::Variable(curve) => {
+            WidthProfile::Variable1Sided(curve) => {
                 let bounds = curve.bounds().expect("width profile should not be empty");
-                Vector2::new(bounds.xmax, bounds.ymax)
+                (bounds.max.y, bounds.max.y)
+            },
+
+            WidthProfile::Variable2Sided(curve) => {
+                let bounds = curve.bounds().expect("width profile should not be empty");
+                (bounds.max.y, bounds.max.z)
             },
         }
     }
@@ -135,19 +150,19 @@ impl PartialOrd for PathPointIdx {
 }
 
 #[derive(Debug)]
-pub struct Curve<V: Vectoral, M: Maternal<V>> {
+pub struct Curve<V: Vector, M: Maternal<V>> {
     pub points: VecDeque<PathPoint<V, M>>,
     pub is_closed: bool,
 }
 
-impl<V: Vectoral, M: Maternal<V>> Default for Curve<V, M> {
+impl<V: Vector, M: Maternal<V>> Default for Curve<V, M> {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<V: Vectoral, M: Maternal<V>> Curve<V, M> {
+impl<V: Vector, M: Maternal<V>> Curve<V, M> {
     pub fn new() -> Self {
         Self {
             points: VecDeque::new(),
@@ -161,13 +176,13 @@ impl<V: Vectoral, M: Maternal<V>> Curve<V, M> {
     }
 
     #[inline]
-    pub fn slice(&self, start_index: usize) -> Option<CubicBezier<V>> {
+    pub fn slice(&self, start_index: usize) -> Option<Cubic<V>> {
         if let Some((pp2, pp1)) = start_index.checked_add(1)
             .and_then(|end_index| self.points.get(end_index))
             .map(|pp2| (pp2, self.points.get(start_index).expect("existence of [i+1] should guarantee existence of [i]")))
         {
             let ((_, p1, c1_out), (c2_in, p2, _)) = (pp1.calculate(), pp2.calculate());
-            return Some(CubicBezier::new(p1, c1_out, c2_in, p2))
+            return Some(Cubic::new(p1, c1_out, c2_in, p2))
         }
         None
     }
@@ -178,7 +193,7 @@ impl<V: Vectoral, M: Maternal<V>> Curve<V, M> {
     ///
     /// ## Note regarding current implementation
     /// Calls [`Curve::slices`] (which calculates every path point)
-    /// and [`CubicBezier::bounds`] (which solves the quadratic equation) on each.
+    /// and [`Cubic::bounds`] (which solves the quadratic equation) on each.
     #[inline]
     pub fn bounds(&self) -> Option<V::Rect> {
         let mut bez_iter = self.slices();
@@ -356,7 +371,7 @@ impl<V, I> Calculate<V, I> {
     }
 }
 
-impl<'a, V: Vectoral + 'a, M: Maternal<V> + 'a, I: Iterator<Item = &'a PathPoint<V, M>>> Iterator for Calculate<V, I> {
+impl<'a, V: Vector + 'a, M: Maternal<V> + 'a, I: Iterator<Item = &'a PathPoint<V, M>>> Iterator for Calculate<V, I> {
     type Item = (V, V, V);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -385,8 +400,8 @@ impl<V, I> Slices<V, I> {
     }
 }
 
-impl<'a, V: Vectoral + 'a, M: Maternal<V> + 'a, I: Iterator<Item = &'a PathPoint<V, M>>> Iterator for Slices<V, I> {
-    type Item = CubicBezier<V>;
+impl<'a, V: Vector + 'a, M: Maternal<V> + 'a, I: Iterator<Item = &'a PathPoint<V, M>>> Iterator for Slices<V, I> {
+    type Item = Cubic<V>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut next = self.iter.next();
@@ -397,7 +412,7 @@ impl<'a, V: Vectoral + 'a, M: Maternal<V> + 'a, I: Iterator<Item = &'a PathPoint
         if let (Some(pp1), Some(pp2)) = (self.prev, next) {
             let ((_, p1, c1_out), (c2_in, p2, _)) = (pp1, pp2);
             self.prev = Some(pp2);
-            Some(CubicBezier::new(p1, c1_out, c2_in, p2))
+            Some(Cubic::new(p1, c1_out, c2_in, p2))
         } else {
             None
         }

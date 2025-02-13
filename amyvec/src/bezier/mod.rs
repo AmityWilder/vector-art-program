@@ -1,6 +1,4 @@
-use amymath::prelude::Rect2;
-use raylib::prelude::Vector2;
-use crate::path_point::Vectoral;
+use crate::generics::Vector;
 
 /// Order 1 Bezier curve
 pub mod linear;
@@ -9,7 +7,7 @@ pub mod quadratic;
 /// Order 3 Bezier curve
 pub mod cubic;
 
-pub trait Bezier<V: Vectoral> {
+pub trait Bezier<V: Vector> {
     /// Returns a broader bounding box of the curve using only the anchors and velocities.
     ///
     /// [`Bezier::bounds`] will always produce a bounding box smaller or equal to this.

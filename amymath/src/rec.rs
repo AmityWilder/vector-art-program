@@ -88,8 +88,8 @@ impl MinMaxRectangle for Vector2 {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Rect2 {
-    min: Vector2,
-    max: Vector2,
+    pub min: Vector2,
+    pub max: Vector2,
 }
 
 impl From<IRect2> for Rect2 {

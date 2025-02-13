@@ -1,24 +1,24 @@
-use amymath::prelude::{CrossProduct, DistanceSqr, Rect2};
+use amymath::prelude::{CrossProduct, DistanceSqr};
 use raylib::prelude::*;
-use crate::{path_point::Vectoral, polynomial::*};
+use crate::{generics::*, polynomial::*};
 
 use super::{if_bounded, linear::Linear, quadratic::Quadratic, Bezier};
 
 #[derive(Debug)]
-pub struct Cubic<V: Vectoral> {
+pub struct Cubic<V: Vector> {
     pub p1:     V,
     pub c1_out: V,
     pub c2_in:  V,
     pub p2:     V,
 }
 
-impl<V: Vectoral> Cubic<V> {
+impl<V: Vector> Cubic<V> {
     pub fn new(p1: V, c1_out: V, c2_in: V, p2: V) -> Self {
         Self { p1, c1_out, c2_in, p2 }
     }
 }
 
-impl<V: Vectoral> Cubic<V> {
+impl<V: Vector> Cubic<V> {
     /// Returns a broader bounding box of the curve using only the anchors and velocities.
     ///
     /// Cheaper than [`Self::bounds`], but significantly less accurate.
@@ -29,7 +29,7 @@ impl<V: Vectoral> Cubic<V> {
     #[inline]
     pub fn max_bounds(&self) -> V::Rect {
         let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
-        V::Rect::minmax_rec(p0, p1).max(V::Rect::minmax_rec(p2, p3))
+        V::Rect::minmax_rec(p0, p1).max(&V::Rect::minmax_rec(p2, p3))
     }
 
     /// Returns a narrower bounding box of the curve using only the anchors.
@@ -41,28 +41,23 @@ impl<V: Vectoral> Cubic<V> {
     ///
     /// **\* Only describes the bounding box of the start and end of the curve, not the curve itself**
     #[inline]
-    pub fn min_bounds(&self) -> Rect2 {
-        Rect2::minmax_rec(self.p1, self.p2)
+    pub fn min_bounds(&self) -> V::Rect {
+        V::Rect::minmax_rec(self.p1, self.p2)
     }
 
     /// Returns the bounding box of the curve.
     ///
     /// ## Performance
     /// Solves the quadratic equation on both `x` and `y` axes
-    pub fn bounds(&self) -> Rect2 {
+    pub fn bounds(&self) -> V::Rect {
         let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
-        let a_x = -3.0*p0 + 9.0*p1 - 9.0*p2 + 3.0*p3;
-        let (b_x, b_y) = (
-            6.0*p0.x - 12.0*p1.x + 6.0*p2.x,
-            6.0*p0.y - 12.0*p1.y + 6.0*p2.y,
-        );
-        let (c_x, c_y) = (
-            -3.0*p0.x + 3.0*p1.x,
-            -3.0*p0.y + 3.0*p1.y,
-        );
-        [(a_x, b_x, c_x), (a_y, b_y, c_y)]
-            .into_iter()
-            .flat_map(|(a, b, c)| {
+        let a = p0*-3.0 + p1*9.0 - p2*9.0 + p3*3.0;
+        let b = p0*6.0 - p1*12.0 + p2*6.0;
+        let c = p0*-3.0 + p1*3.0;
+        a.into_arr().into_iter()
+            .zip(b.into_arr().into_iter())
+            .zip(c.into_arr().into_iter())
+            .flat_map(|((a, b), c)| {
                 match quadratic_zero(a, b, c) {
                     QuadraticZeros::NoSolution | QuadraticZeros::InfiniteSolutions => [None, None],
                     QuadraticZeros::OneSolution(x0) => [if_bounded(x0), None],
@@ -210,17 +205,17 @@ impl<V: Vectoral> Cubic<V> {
 
 impl Bezier<Vector2> for Cubic<Vector2> {
     #[inline]
-    fn max_bounds(&self) -> Rect2 {
+    fn max_bounds(&self) -> V::Rect {
         self.max_bounds()
     }
 
     #[inline]
-    fn min_bounds(&self) -> Rect2 {
+    fn min_bounds(&self) -> V::Rect {
         self.min_bounds()
     }
 
     #[inline]
-    fn bounds(&self) -> Rect2 {
+    fn bounds(&self) -> V::Rect {
         self.bounds()
     }
 
