@@ -1,10 +1,18 @@
 use amygui::{panel::Panel, rec::UIRect};
 use amymath::prelude::*;
 use raylib::prelude::*;
-use crate::{editor::Editor, shaders::ShaderTable, ui::layers_panel::LayersPanel};
+use crate::{editor::Editor, shaders::ShaderTable, ui::{layers_panel::LayersPanel, tool_panel::{ToolIcon, ToolPanel}}};
 
 #[allow(clippy::enum_glob_use, reason = "every frickin one of these is prefixed with its type name >:T")]
 use KeyboardKey::*;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum HoverRegion {
+    #[default]
+    Editor,
+    LayersPanel,
+    ToolPanel,
+}
 
 #[derive(Clone, Copy)]
 pub struct Config {
@@ -25,15 +33,12 @@ impl Config {
     }
 }
 
-pub struct Panels {
-
-}
-
 pub struct Engine {
     pub config: Config,
     pub is_trim_view: bool,
     shader_table: ShaderTable,
     layers_panel: LayersPanel,
+    tool_panel: ToolPanel,
     editors: Vec<Editor>,
     active_editor: Option<usize>,
 }
@@ -59,11 +64,29 @@ impl Engine {
                 LAYER_PANEL_BACKGROUND,
             ),
         );
+        let tool_panel = ToolPanel::new(
+            rl, thread,
+            Panel::new(
+                &window_rect,
+                UIRect::init()
+                    .from_left(0)
+                    .with_width(ToolPanel::width(2))
+                    .build(),
+                LAYER_PANEL_BACKGROUND,
+            ),
+            [
+                ToolIcon::PointSelection,
+                ToolIcon::Pen,
+                ToolIcon::VectorBrush,
+                ToolIcon::RasterBrush,
+            ]
+        );
         Self {
             config: Config::new(),
             shader_table: ShaderTable::new(rl, thread).unwrap(),
             is_trim_view: false,
             layers_panel,
+            tool_panel,
             editors: Vec::new(),
             active_editor: None,
         }
@@ -115,14 +138,26 @@ impl Engine {
             println!("toggled trim view");
         }
 
-        let is_hovering_layers_panel = self.layers_panel.panel.rect().is_overlapping_v(mouse_screen_pos);
+        let hover_region = if self.tool_panel.panel.rect().is_overlapping_v(mouse_screen_pos) {
+            HoverRegion::ToolPanel
+        } else if self.layers_panel.panel.rect().is_overlapping_v(mouse_screen_pos) {
+            HoverRegion::LayersPanel
+        } else {
+            HoverRegion::Editor
+        };
 
         if let Some(active_editor_idx) = self.active_editor {
             assert!(active_editor_idx < self.editors.len(), "`engine.active_editor` should be a valid editor index in `engine.editors`");
-            self.editors[active_editor_idx].tick(&self.config, rl, thread, is_hovering_layers_panel, mouse_screen_pos, mouse_screen_delta);
-            if is_hovering_layers_panel {
-                let document = &mut self.editors[active_editor_idx].document;
-                self.layers_panel.tick(rl, document, mouse_screen_pos);
+            let editor = &mut self.editors[active_editor_idx];
+            editor.tick(&self.config, rl, thread, hover_region != HoverRegion::Editor, mouse_screen_pos, mouse_screen_delta);
+            match hover_region {
+                HoverRegion::ToolPanel => {
+                    self.tool_panel.tick(rl, editor, mouse_screen_pos);
+                }
+                HoverRegion::LayersPanel => {
+                    self.layers_panel.tick(rl, &mut editor.document, mouse_screen_pos);
+                }
+                HoverRegion::Editor => (), // Already handled
             }
         }
     }
@@ -153,6 +188,7 @@ impl Engine {
 
         if let Some(active_editor) = self.get_active_editor() {
             self.layers_panel.draw(d, &active_editor.document);
+            self.tool_panel.draw(d, &active_editor);
         }
     }
 }

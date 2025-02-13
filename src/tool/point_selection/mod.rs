@@ -225,7 +225,9 @@ impl ToolType for PointSelection {
             self.end_dragging(document, mouse_world_pos);
         }
 
-        if rl.is_key_pressed(KeyboardKey::KEY_DELETE) && let Some(selection_state) = self.state.as_mut() {
+        if (rl.is_key_pressed(KeyboardKey::KEY_DELETE) || rl.is_key_pressed(KeyboardKey::KEY_BACKSPACE)) &&
+            let Some(selection_state) = self.state.as_mut()
+        {
             match &mut selection_state.selection {
                 Selection::Singular(single_select) => {
                     let mut path = single_select.target.write();
