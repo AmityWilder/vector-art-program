@@ -35,7 +35,8 @@ impl ActivePen {
                 // close path
                 if opp_end.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR {
                     path.curve.is_closed = true;
-                    self.is_dragging = true;
+                    drop(path);
+                    return Some(InactivePen(Some(self.target.clone_mut())))
                 }
             }
         }
