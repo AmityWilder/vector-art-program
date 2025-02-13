@@ -1,5 +1,5 @@
 use amymath::prelude::*;
-use amyvec::curve::PathPointIdx;
+use amyvec::{curve::PathPointIdx, path_point::{Ctrl, Ctrl1, Ctrl2}};
 use raylib::prelude::*;
 use amylib::{iter::directed::DirectibleDoubleEndedIterator, prelude::StrongMut};
 use crate::{document::layer::Layer, layer::{BackToFore, ForeToBack, LayerType}, shaders::ShaderTable, vector_path::{path_point::PPPart, DrawPathPoint, VectorPath, ANCHOR_EXTENT_OUTER}, Document};
@@ -65,7 +65,7 @@ impl PointSelection {
         }
     }
 
-    fn begin_dragging(&mut self, document: &mut Document, mouse_world_pos: Vector2, px_world_size: f32) {
+    fn begin_dragging(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2, px_world_size: f32) {
         let hover_radius = HOVER_RADIUS * px_world_size;
         let hover_radius_sqr = hover_radius * hover_radius;
         let drag = Some((mouse_world_pos, mouse_world_pos));
@@ -75,8 +75,20 @@ impl PointSelection {
         if let Some(state) = self.state.as_mut() {
             match &mut state.selection {
                 Selection::Singular(x) => {
-                    if let Some(part) = x.get_selected(mouse_world_pos, px_world_size) {
-                        x.point = Some(part);
+                    if let Some(mut idx) = x.get_selected(mouse_world_pos, px_world_size) {
+                        if matches!(idx.part, PPPart::Anchor) && rl.is_key_down(KeyboardKey::KEY_LEFT_ALT) {
+                            let mut path = x.target.write();
+                            let c = &mut path.curve.points[idx.point].c;
+                            if let Some(Ctrl1 { c1: (c1_side, _), c2: c2 @ None }) = c {
+                                *c2 = Some(Ctrl2::Exact(mouse_world_pos));
+                                idx.part = PPPart::Ctrl(c1_side.opposite());
+                            } else if c.is_none() {
+                                let side = Ctrl::Out;
+                                *c = Some(Ctrl1 { c1: (Ctrl::Out, mouse_world_pos), c2: Some(Ctrl2::Reflect) });
+                                idx.part = PPPart::Ctrl(side);
+                            }
+                        }
+                        x.point = Some(idx);
                         state.drag = drag;
                         return;
                     }
@@ -196,7 +208,7 @@ impl PointSelection {
 impl ToolType for PointSelection {
     fn tick(&mut self, rl: &mut RaylibHandle, _thread: &RaylibThread, document: &mut Document, mouse_world_pos: Vector2, px_world_size: f32) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-            self.begin_dragging(document, mouse_world_pos, px_world_size);
+            self.begin_dragging(rl, document, mouse_world_pos, px_world_size);
         }
 
         if let Some((_, curr)) = self.selection_points.as_mut() {

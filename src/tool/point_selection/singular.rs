@@ -45,10 +45,10 @@ impl SingleSelect {
         let mut path = self.target.write();
         if let Some(idx) = self.point {
             let pp = &mut path.curve.points[idx.point];
+            let snap_vert_radius_sqr = SNAP_VERT_RADIUS_SQR * px_world_size * px_world_size;
+            let p = pp.p;
             if let (PPPart::Ctrl(side), &mut Some(Ctrl1 { c1: (ref mut c1_side, ref mut c1), c2: ref mut c2 @ Some(Ctrl2::Exact(c2_pos)) })) = (idx.part, &mut pp.c) {
-                let snap_vert_radius_sqr = SNAP_VERT_RADIUS_SQR * px_world_size * px_world_size;
 
-                let p = pp.p;
                 let is_c_self_c1 = *c1_side == side;
                 let (c_self, c_opp) = if is_c_self_c1 { (*c1, c2_pos) } else { (c2_pos, *c1) };
 
@@ -68,11 +68,19 @@ impl SingleSelect {
                 };
 
                 if let Some(snapped) = snapped {
-                    if is_c_self_c1 {
-                        *c1_side = c1_side.opposite();
-                        *c1 = c2_pos;
+                    if is_c_self_c1 && snapped.is_none() {
+                        pp.c = None;
+                    } else {
+                        if is_c_self_c1 {
+                            *c1_side = c1_side.opposite();
+                            *c1 = c2_pos;
+                        }
+                        *c2 = snapped;
                     }
-                    *c2 = snapped;
+                }
+            } else if let (PPPart::Ctrl(side), &mut Some(Ctrl1 { c1: (ref mut c1_side, ref mut c1), c2: None })) = (idx.part, &mut pp.c) {
+                if *c1_side == side && c1.distance_sqr_to(p) <= snap_vert_radius_sqr {
+                    pp.c = None;
                 }
             }
         }

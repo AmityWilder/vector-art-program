@@ -43,12 +43,12 @@ impl Default for Stroke {
         Self {
             blend: Blending::default(),
             pattern: Pattern::Solid(Color::new(10, 10, 10, 255)),
-            // thick: WidthProfile::Constant(Vector2::new(10.0, 10.0)),
-            thick: dbg!(WidthProfile::init()
-                .with_point(0.0, 15.0, 5.0)
-                .with_point(0.5, 1.0, 1.0)
-                .with_point(1.0, 1.0, 8.0)
-                .build()),
+            thick: WidthProfile::Constant(10.0, 10.0),
+            // thick: WidthProfile::init()
+            //     .with_point(0.0, 15.0, 5.0)
+            //     .with_point(0.5, 1.0, 1.0)
+            //     .with_point(1.0, 1.0, 8.0)
+            //     .build(),
             align: Align::Middle,
         }
     }
