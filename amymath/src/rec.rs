@@ -2,7 +2,6 @@ use raylib::prelude::*;
 
 pub trait RectangleCenter {
     fn center(&self) -> Vector2;
-
     fn extent(&self) -> Vector2;
 
     #[inline]
@@ -32,10 +31,7 @@ impl RectangleCenter for Rectangle {
 impl RectangleCenter for Rect2 {
     #[inline]
     fn center(&self) -> Vector2 {
-        Vector2 {
-            x: self.xmin.midpoint(self.xmax),
-            y: self.ymin.midpoint(self.ymax),
-        }
+        self.min.midpoint(self.max)
     }
 
     #[inline]
@@ -92,20 +88,22 @@ impl MinMaxRectangle for Vector2 {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Rect2 {
-    pub xmin: f32,
-    pub ymin: f32,
-    pub xmax: f32,
-    pub ymax: f32,
+    min: Vector2,
+    max: Vector2,
 }
 
 impl From<IRect2> for Rect2 {
     #[inline]
     fn from(IRect2 { xmin, ymin, xmax, ymax }: IRect2) -> Self {
         Self {
-            xmin: xmin as f32,
-            ymin: ymin as f32,
-            xmax: xmax as f32,
-            ymax: ymax as f32,
+            min: Vector2 {
+                x: xmin as f32,
+                y: ymin as f32,
+            },
+            max: Vector2 {
+                x: xmax as f32,
+                y: ymax as f32,
+            },
         }
     }
 }
@@ -113,57 +111,51 @@ impl From<IRect2> for Rect2 {
 impl Rect2 {
     pub fn from_center_and_extent(center: Vector2, extent: Vector2) -> Self {
         Self {
-            xmin: center.x - extent.x,
-            ymin: center.y - extent.y,
-            xmax: center.x + extent.x,
-            ymax: center.y + extent.y,
+            min: center - extent,
+            max: center + extent,
         }
     }
 
     pub fn from_center_and_radius(center: Vector2, radius: f32) -> Self {
         Self {
-            xmin: center.x - radius,
-            ymin: center.y - radius,
-            xmax: center.x + radius,
-            ymax: center.y + radius,
+            min: center - radius,
+            max: center + radius,
         }
     }
 
     #[inline]
     pub fn is_overlapping_point(&self, point: Vector2) -> bool {
-        self.xmin <= point.x && point.x < self.xmax &&
-        self.ymin <= point.y && point.y < self.ymax
+        self.min.x <= point.x && point.x < self.max.x &&
+        self.min.y <= point.y && point.y < self.max.y
     }
 
     #[inline]
     pub fn is_overlapping(&self, rec: &Self) -> bool {
-        self.xmin < rec.xmax && rec.xmin < self.xmax &&
-        self.ymin < rec.ymax && rec.ymin < self.ymax
+        self.min.x < rec.max.x && rec.min.x < self.max.x &&
+        self.min.y < rec.max.y && rec.min.y < self.max.y
     }
 
     #[inline]
     pub fn entirely_contains(&self, rec: &Self) -> bool {
-        self.xmin <= rec.xmin && rec.xmax <= self.xmax &&
-        self.ymin <= rec.ymin && rec.ymax <= self.ymax
+        self.min.x <= rec.min.x && rec.max.x <= self.max.x &&
+        self.min.y <= rec.min.y && rec.max.y <= self.max.y
     }
 
     #[inline]
     pub fn width(&self) -> f32 {
-        self.xmax - self.xmin
+        self.max.x - self.min.x
     }
 
     #[inline]
     pub fn height(&self) -> f32 {
-        self.ymax - self.ymin
+        self.max.y - self.min.y
     }
 
     #[inline]
     pub fn grow(self, amnt: f32) -> Self {
         Self {
-            xmin: self.xmin - amnt,
-            ymin: self.ymin - amnt,
-            xmax: self.xmax + amnt,
-            ymax: self.ymax + amnt,
+            min: self.min - amnt,
+            max: self.max + amnt,
         }
     }
 
@@ -175,10 +167,8 @@ impl Rect2 {
     #[inline]
     pub fn scale_ex(self, origin: Vector2, amount: Vector2) -> Self {
         Self {
-            xmin: origin.x + (self.xmin - origin.x) * amount.x,
-            ymin: origin.y + (self.ymin - origin.y) * amount.y,
-            xmax: origin.x + (self.xmax - origin.x) * amount.x,
-            ymax: origin.y + (self.ymax - origin.y) * amount.y,
+            min: origin + (self.min - origin) * amount,
+            max: origin + (self.max - origin) * amount,
         }
     }
 
@@ -196,10 +186,14 @@ impl Rect2 {
     #[inline]
     pub fn max(self, other: Self) -> Self {
         Self {
-            xmin: self.xmin.min(other.xmin),
-            ymin: self.ymin.min(other.ymin),
-            xmax: self.xmax.max(other.xmax),
-            ymax: self.ymax.max(other.ymax),
+            min: Vector2 {
+                x: self.min.x.min(other.min.x),
+                y: self.min.y.min(other.min.y),
+            },
+            max: Vector2 {
+                x: self.max.x.max(other.max.x),
+                y: self.max.y.max(other.max.y),
+            },
         }
     }
 
@@ -207,20 +201,28 @@ impl Rect2 {
     #[inline]
     pub fn max_pt(self, p: Vector2) -> Self {
         Self {
-            xmin: self.xmin.min(p.x),
-            ymin: self.ymin.min(p.y),
-            xmax: self.xmax.max(p.x),
-            ymax: self.ymax.max(p.y),
+            min: Vector2 {
+                x: self.min.x.min(p.x),
+                y: self.min.y.min(p.y),
+            },
+            max: Vector2 {
+                x: self.max.x.max(p.x),
+                y: self.max.y.max(p.y),
+            },
         }
     }
 
     #[inline]
     pub fn minmax_rec(p1: Vector2, p2: Vector2) -> Self {
         Self {
-            xmin: p1.x.min(p2.x),
-            ymin: p1.y.min(p2.y),
-            xmax: p1.x.max(p2.x),
-            ymax: p1.y.max(p2.y),
+            min: Vector2 {
+                x: p1.x.min(p2.x),
+                y: p1.y.min(p2.y),
+            },
+            max: Vector2 {
+                x: p1.x.max(p2.x),
+                y: p1.y.max(p2.y),
+            },
         }
     }
 }
@@ -229,11 +231,11 @@ pub trait DrawRect2Lines: RaylibDraw {
     #[inline]
     fn draw_rectangle_lines_rect2(&mut self, rec: Rect2, color: Color) {
         self.draw_line_strip(&[
-            Vector2::new(rec.xmin, rec.ymin),
-            Vector2::new(rec.xmax, rec.ymin),
-            Vector2::new(rec.xmax, rec.ymax),
-            Vector2::new(rec.xmin, rec.ymax),
-            Vector2::new(rec.xmin, rec.ymin),
+            rec.min,
+            Vector2::new(rec.max.x, rec.min.y),
+            rec.max,
+            Vector2::new(rec.min.x, rec.max.y),
+            rec.min,
         ], color);
     }
 }
@@ -244,34 +246,32 @@ impl From<Rectangle> for Rect2 {
     #[inline]
     fn from(Rectangle { x, y, width, height }: Rectangle) -> Self {
         Self {
-            xmin: x,
-            ymin: y,
-            xmax: x + width,
-            ymax: y + height,
+            min: Vector2 { x, y },
+            max: Vector2 { x: x + width, y: y + height },
         }
     }
 }
 
 impl From<Rect2> for Rectangle {
     #[inline]
-    fn from(Rect2 { xmin, ymin, xmax, ymax }: Rect2) -> Self {
+    fn from(Rect2 { min, max }: Rect2) -> Self {
         Self {
-            x: xmin,
-            y: ymin,
-            width:  xmax - xmin,
-            height: ymax - ymin,
+            x: min.x,
+            y: min.y,
+            width:  max.x - min.x,
+            height: max.y - min.y,
         }
     }
 }
 
 impl From<Rect2> for ffi::Rectangle {
     #[inline]
-    fn from(Rect2 { xmin, ymin, xmax, ymax }: Rect2) -> Self {
+    fn from(Rect2 { min, max }: Rect2) -> Self {
         Self {
-            x: xmin,
-            y: ymin,
-            width:  xmax - xmin,
-            height: ymax - ymin,
+            x: min.x,
+            y: min.y,
+            width:  max.x - min.x,
+            height: max.y - min.y,
         }
     }
 }

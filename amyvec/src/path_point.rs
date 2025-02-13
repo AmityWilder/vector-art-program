@@ -1,6 +1,56 @@
 use raylib::prelude::*;
 use amymath::prelude::*;
 
+pub trait Vectoral where
+    Self:
+        Copy +
+        ReflectVector +
+        std::ops::Neg<Output = Self> +
+        std::ops::Add<Self, Output = Self> +
+        std::ops::Sub<Self, Output = Self> +
+        std::ops::Mul<Self, Output = Self> +
+        std::ops::Div<Self, Output = Self> +
+        std::ops::Mul<f32, Output = Self> +
+        std::ops::Div<f32, Output = Self> +
+        std::ops::AddAssign<Self> +
+        std::ops::SubAssign<Self> +
+        std::ops::MulAssign<Self> +
+        std::ops::DivAssign<Self> +
+        std::ops::MulAssign<f32> +
+        std::ops::DivAssign<f32>,
+{
+    type Rect;
+    const ZERO: Self;
+    const ONE: Self;
+}
+
+impl Vectoral for Vector2 {
+    type Rect = Rect2;
+    const ZERO: Self = Vector2 { x: 0.0, y: 0.0 };
+    const ONE:  Self = Vector2 { x: 1.0, y: 1.0 };
+}
+
+impl Vectoral for Vector3 {
+    type Rect = BoundingBox;
+    const ZERO: Self = Vector3 { x: 0.0, y: 0.0, z: 0.0 };
+    const ONE:  Self = Vector3 { x: 1.0, y: 1.0, z: 1.0 };
+}
+
+pub trait Maternal<V: Vectoral>: Copy {
+    fn transform(&self, v: V) -> V;
+}
+
+impl Maternal<Vector2> for Matrix2x2 {
+    fn transform(&self, v: Vector2) -> Vector2 {
+        self * v
+    }
+}
+impl Maternal<Vector3> for Matrix {
+    fn transform(&self, v: Vector3) -> Vector3 {
+        v.transform_with(*self)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Ctrl {
     In,
@@ -43,7 +93,7 @@ impl PartialOrd for PPPart {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum Ctrl2 {
+pub enum Ctrl2<V: Vectoral = Vector2, M: Maternal<V> = Matrix2x2> {
     // corner: G0 continuity
 
     // todo: add G2 continuity option
@@ -58,15 +108,15 @@ pub enum Ctrl2 {
 
     /// A transformation of the relative vector from `p` to `c1` \
     /// G0 continuity
-    Transformed(Matrix2x2),
+    Transformed(M),
 
     /// A directly given position \
     /// G0 continuity
-    Exact(Vector2),
+    Exact(V),
 }
 use Ctrl2::*;
 
-impl Ctrl2 {
+impl<V: Vectoral, M: Maternal<V>> Ctrl2<V, M> {
     #[inline]
     pub const fn is_reflect(&self) -> bool {
         matches!(self, Reflect)
@@ -83,29 +133,29 @@ impl Ctrl2 {
     }
 
     #[inline]
-    pub fn calculate(&self, p: Vector2, c1: Vector2) -> Vector2 {
+    pub fn calculate(&self, p: V, c1: V) -> V {
         match self {
             &Exact(c2) => c2,
             &Reflect => c1.reflected_over(p),
             &Mirror(s2) => c1.reflected_to(p, s2),
-            Transformed(m2) => p + m2 * (c1 - p),
+            Transformed(m2) => p + m2.transform(c1 - p),
         }
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Ctrl1 {
-    pub c1: (Ctrl, Vector2),
-    pub c2: Option<Ctrl2>,
+pub struct Ctrl1<V: Vectoral = Vector2, M: Maternal<V> = Matrix2x2> {
+    pub c1: (Ctrl, V),
+    pub c2: Option<Ctrl2<V, M>>,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct PathPoint {
-    pub p: Vector2,
-    pub c: Option<Ctrl1>,
+pub struct PathPoint<V: Vectoral = Vector2, M: Maternal<V> = Matrix2x2> {
+    pub p: V,
+    pub c: Option<Ctrl1<V, M>>,
 }
 
-impl PathPoint {
+impl<V: Vectoral, M: Maternal<V>> PathPoint<V, M> {
     #[inline]
     pub const fn is_c1_corner(&self) -> bool {
         self.c.is_none()
@@ -117,7 +167,7 @@ impl PathPoint {
     }
 
     #[inline]
-    pub const fn c2(&self) -> Option<&Ctrl2> {
+    pub const fn c2(&self) -> Option<&Ctrl2<V, M>> {
         match &self.c {
             Some(Ctrl1 { c2, .. }) => c2.as_ref(),
             _ => None,
@@ -125,7 +175,7 @@ impl PathPoint {
     }
 
     #[inline]
-    pub const fn c2_mut(&mut self) -> Option<&mut Ctrl2> {
+    pub const fn c2_mut(&mut self) -> Option<&mut Ctrl2<V, M>> {
         match &mut self.c {
             Some(Ctrl1 { c2, .. }) => c2.as_mut(),
             _ => None,
@@ -133,7 +183,7 @@ impl PathPoint {
     }
 
     #[inline]
-    pub fn calculate(&self) -> (Vector2, Vector2, Vector2) {
+    pub fn calculate(&self) -> (V, V, V) {
         let (c_in, c_out) = match &self.c {
             Some(Ctrl1 { c1: (c1_side, c1), c2 }) => {
                 // debug_assert_ne!(&self.p, c1);
@@ -150,14 +200,14 @@ impl PathPoint {
     }
 
     #[inline]
-    pub fn ctrl(&self, side: Ctrl) -> Option<Ctrl2> {
+    pub fn ctrl(&self, side: Ctrl) -> Option<Ctrl2<V, M>> {
         self.c.as_ref().and_then(|Ctrl1 { c1: (c1_side, c1), c2 }|
             if c1_side == &side { Some(Exact(*c1)) } else { *c2 }
         )
     }
 
     #[inline]
-    pub fn ctrl_pov(&self, side: Ctrl) -> (Option<Ctrl2>, Option<Ctrl2>) {
+    pub fn ctrl_pov(&self, side: Ctrl) -> (Option<Ctrl2<V, M>>, Option<Ctrl2<V, M>>) {
         if let Some(Ctrl1 { c1: (c1_side, c1), c2 }) = self.c.as_ref() {
             let (c1, c2) = (Some(Exact(*c1)), *c2);
             if c1_side == &side { (c1, c2) } else { (c2, c1) }
@@ -168,7 +218,7 @@ impl PathPoint {
 
     /// Translate the point and controls while keeping the controls' relative positions
     #[inline]
-    pub fn move_point(&mut self, delta: Vector2) {
+    pub fn move_point(&mut self, delta: V) {
         self.p += delta;
         if let Some(Ctrl1 { c1: (_, c1), c2 }) = self.c.as_mut() {
             *c1 += delta;
@@ -180,11 +230,11 @@ impl PathPoint {
 
     /// Move the point and controls while keeping the controls' relative positions
     #[inline]
-    pub fn set_point(&mut self, p: Vector2) {
+    pub fn set_point(&mut self, p: V) {
         self.move_point(p - self.p);
     }
 
-    pub fn _transform(&mut self, _mat: Matrix2x2) {
+    pub fn _transform(&mut self, _mat: M) {
         todo!("im not updating this anymore until it gets used")
     }
 }

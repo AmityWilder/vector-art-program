@@ -1,21 +1,98 @@
 use std::collections::VecDeque;
-use amymath::{prelude::{Rect2, Rotate90}, rlgl::*};
+use amymath::{prelude::{Matrix2x2, MinMaxRectangle, Rect2, Rotate90}, rlgl::*};
 use raylib::prelude::*;
 use crate::{
-    cubic_bezier::CubicBezier,
-    path_point::{Ctrl, PPPart, PathPoint},
+    bezier::cubic::Cubic as CubicBezier,
+    path_point::{Ctrl, Maternal, PPPart, PathPoint, Vectoral},
 };
 
+#[derive(Debug)]
 pub enum WidthProfile {
-    Constant(Vector2),
-    Variable(Curve),
+    Constant1Sided(f32),
+    Constant2Sided(f32, f32),
+    Variable1Sided(Curve<Vector2, Matrix2x2>),
+    Variable2Sided(Curve<Vector3, Matrix>),
+}
+
+pub struct WidthProfileBuilder {
+    points: Vec<(f32, (f32, Option<f32>))>,
+}
+
+impl WidthProfileBuilder {
+    pub fn with_point(mut self, t: f32, thick1: f32, thick2: f32) -> Self {
+        self.points.push((t, (thick1, Some(thick2))));
+        self
+    }
+
+    pub fn build(mut self) -> WidthProfile {
+        assert!(!self.points.is_empty(), "width profile cannot be empty");
+        self.points.sort_by(|(a, _), (b, _)| a.partial_cmp(&b).expect("time should be normal"));
+        if self.points.iter().any(|(_, (_, x))| x.is_some()) {
+            WidthProfile::Variable2Sided(Curve {
+                is_closed: false,
+                points: self.points.into_iter()
+                    .map(|(t, (thick1, thick2))| Vector3::new(t, thick1, thick2.unwrap_or_default()))
+                    .collect(),
+            })
+        } else {
+            WidthProfile::Variable1Sided(Curve {
+                is_closed: false,
+                points: self.points.into_iter()
+                    .map(|(t, (thick1, _))| Vector2::new(t, thick1))
+                    .collect(),
+            })
+        }
+    }
 }
 
 impl WidthProfile {
-    pub fn extents_at(&self, t: f32) -> Vector2 {
+    pub const fn new_constant2(thick1: f32, thick2: f32) -> Self {
+        Self::Constant2Sided(thick1, thick2)
+    }
+
+    pub fn init() -> WidthProfileBuilder {
+        WidthProfileBuilder {
+            points: Vec::with_capacity(1),
+        }
+    }
+
+    pub fn extents_at(&self, t: f32) -> (f32, f32) {
         match self {
-            WidthProfile::Constant(v) => *v,
-            WidthProfile::Variable(curve) => curve.position_at(t).expect("width profile should not be empty"),
+            &WidthProfile::Constant1Sided(x) => (x, x),
+            &WidthProfile::Constant2Sided(a, b) => (a, b),
+
+            WidthProfile::Variable1Sided(curve) => {
+                let Vector2 { x: _, y } = curve.position_at(t).expect("width profile should not be empty");
+                (y, y)
+            },
+            WidthProfile::Variable1Sided(curve) => {
+                let Vector3 { x: _, y, z } = curve.position_at(t).expect("width profile should not be empty");
+                (y, z)
+            },
+        }
+    }
+
+    pub fn extents_min(&self) -> (f32, f32) {
+        match self {
+            &WidthProfile::Constant1Sided(x) => (x, x),
+            &WidthProfile::Constant2Sided(a, b) => (a, b),
+
+            WidthProfile::Variable(curve) => {
+                let bounds = curve.bounds().expect("width profile should not be empty");
+                Vector2::new(bounds.xmin, bounds.ymin)
+            },
+        }
+    }
+
+    pub fn extents_max(&self) -> (f32, f32) {
+        match self {
+            &WidthProfile::Constant1Sided(x) => (x, x),
+            &WidthProfile::Constant2Sided(a, b) => (a, b),
+
+            WidthProfile::Variable(curve) => {
+                let bounds = curve.bounds().expect("width profile should not be empty");
+                Vector2::new(bounds.xmax, bounds.ymax)
+            },
         }
     }
 }
@@ -58,19 +135,19 @@ impl PartialOrd for PathPointIdx {
 }
 
 #[derive(Debug)]
-pub struct Curve {
-    pub points: VecDeque<PathPoint>,
+pub struct Curve<V: Vectoral, M: Maternal<V>> {
+    pub points: VecDeque<PathPoint<V, M>>,
     pub is_closed: bool,
 }
 
-impl Default for Curve {
+impl<V: Vectoral, M: Maternal<V>> Default for Curve<V, M> {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Curve {
+impl<V: Vectoral, M: Maternal<V>> Curve<V, M> {
     pub fn new() -> Self {
         Self {
             points: VecDeque::new(),
@@ -79,7 +156,12 @@ impl Curve {
     }
 
     #[inline]
-    pub fn slice(&self, start_index: usize) -> Option<CubicBezier> {
+    pub fn num_slices(&self) -> usize {
+        self.points.len().saturating_sub(1)
+    }
+
+    #[inline]
+    pub fn slice(&self, start_index: usize) -> Option<CubicBezier<V>> {
         if let Some((pp2, pp1)) = start_index.checked_add(1)
             .and_then(|end_index| self.points.get(end_index))
             .map(|pp2| (pp2, self.points.get(start_index).expect("existence of [i+1] should guarantee existence of [i]")))
@@ -98,7 +180,7 @@ impl Curve {
     /// Calls [`Curve::slices`] (which calculates every path point)
     /// and [`CubicBezier::bounds`] (which solves the quadratic equation) on each.
     #[inline]
-    pub fn bounds(&self) -> Option<Rect2> {
+    pub fn bounds(&self) -> Option<V::Rect> {
         let mut bez_iter = self.slices();
         if let Some(bez) = bez_iter.next() {
             let mut rec = bez.bounds();
@@ -112,7 +194,7 @@ impl Curve {
     }
 
     #[inline]
-    pub fn position_at(&self, t: f32) -> Option<Vector2> {
+    pub fn position_at(&self, t: f32) -> Option<V> {
         if self.points.len() == 0 { return None; }
         assert!(0.0 <= t && t <= 1.0, "t out of bounds");
         if self.points.len() == 1 {
@@ -128,19 +210,19 @@ impl Curve {
     }
 
     #[inline]
-    pub fn max_bounds(&self) -> Option<Rect2> {
+    pub fn max_bounds(&self) -> Option<V::Rect> {
         self.slices()
             .map(|bez| bez.max_bounds())
             .reduce(|rec, b| rec.max(b))
     }
 
     #[inline]
-    pub fn calculate(&self) -> Calculate<impl Iterator<Item = &'_ PathPoint>> {
+    pub fn calculate(&self) -> Calculate<V, impl Iterator<Item = &'_ PathPoint<V, M>>> {
         Calculate::new(self.points.iter(), self.is_closed)
     }
 
     #[inline]
-    pub fn slices(&self) -> Slices<impl Iterator<Item = &'_ PathPoint>> {
+    pub fn slices(&self) -> Slices<V, impl Iterator<Item = &'_ PathPoint<V, M>>> {
         Slices::new(self.calculate())
     }
 
@@ -158,55 +240,71 @@ impl Curve {
     }
 
     pub fn draw_stroke(&self, d: &mut impl RaylibDraw, strips_per_slice: usize, thick: &WidthProfile, color: Color) {
-        if self.points.is_empty() { return; }
-        let num_points = strips_per_slice * 2 * self.points.len();
-        if num_points < 3 { return; }
-        let total_strips = self.points.len() * strips_per_slice;
+        if self.points.is_empty() {
+        } else if self.points.len() == 1 {
+            let extents = thick.extents_max(); // largest thickness would overtake smaller thicknesses
+            d.draw_circle_v(self.points[0].p, (extents.x + extents.y) * 0.5, color);
+        } else {
+            let num_points = strips_per_slice * 2 * self.points.len();
+            if num_points < 3 { return; }
+            let total_strips = self.points.len() * strips_per_slice;
 
-        let extents = thick.extents_at(0.0);
-        d.draw_circle_v(self.points[0].p, (extents.x + extents.y) * 0.5, color);
-        let extents = thick.extents_at(1.0);
-        d.draw_circle_v(self.points[self.points.len() - 1].p, (extents.x + extents.y) * 0.5, color);
-
-
-        #[cfg(not(feature = "debug_stroke"))] let mut d = d.begin_rlgl();
-        #[cfg(not(feature = "debug_stroke"))] let mut d = d.rl_begin_triangles();
-        #[cfg(not(feature = "debug_stroke"))] d.rl_color4ub(color.r, color.g, color.b, color.a);
-
-        let mut past_points: Option<[Vector2; 2]> = None;
-        for (n, bez) in self.slices().enumerate() {
-            let row = n * strips_per_slice;
-            for i in 0..strips_per_slice {
-                let t = i as f32 / (strips_per_slice - 1) as f32;
-                let v = bez.velocity_at(t);
-                if v.length_sqr() < f32::EPSILON { continue; }
-                let tangent = v.normalized();
-                let (normal_cw, normal_cc) = (tangent.rotate90_cw(), tangent.rotate90_cc());
-                let p = bez.position_at(t);
-                let t_full = (row + i) as f32 / total_strips as f32;
+            for (t, t_full, bez) in [
+                (0.0, 0.0, self.slice(0).expect("should have at least 2 points in this branch")),
+                (1.0, 1.0, self.slice(self.num_slices() - 1).expect("should have at least 2 points in this branch"))
+            ] {
                 let extents = thick.extents_at(t_full);
-                let p1 = p + normal_cc * extents.x;
-                let p2 = p + normal_cw * extents.y;
-                if let Some(past_points) = &mut past_points {
-                    let [p3, p4] = *past_points;
-                    // cannot be `cfg!()` because `d` is a different type
-                    #[cfg(not(feature = "debug_stroke"))] {
-                        d.rl_vertex2f(p1.x, p1.y);
-                        d.rl_vertex2f(p3.x, p3.y);
-                        d.rl_vertex2f(p4.x, p4.y);
-
-                        d.rl_vertex2f(p2.x, p2.y);
-                        d.rl_vertex2f(p1.x, p1.y);
-                        d.rl_vertex2f(p4.x, p4.y);
-                    } #[cfg(feature = "debug_stroke")] {
-                        d.draw_line_strip(&[p1, p3, p4], Color::RED);
-                        d.draw_line_strip(&[p2, p1, p4], Color::BLUE);
-                    }
-
-                    past_points[0] = p1;
-                    past_points[1] = p2;
+                let v = bez.velocity_at(t);
+                let p = bez.position_at(t);
+                if v.length_sqr() >= f32::EPSILON {
+                    let tangent = v.normalized();
+                    let (normal_cw, normal_cc) = (tangent.rotate90_cw(), tangent.rotate90_cc());
+                    let p1 = p + normal_cc * extents.x;
+                    let p2 = p + normal_cw * extents.y;
+                    d.draw_circle_v(p1.midpoint(p2), (extents.x + extents.y) * 0.5, color);
                 } else {
-                    past_points = Some([p1, p2]);
+                    d.draw_circle_v(p, (extents.x + extents.y) * 0.5, color);
+                }
+            }
+
+            #[cfg(not(feature = "debug_stroke"))] let mut d = d.begin_rlgl();
+            #[cfg(not(feature = "debug_stroke"))] let mut d = d.rl_begin_triangles();
+            #[cfg(not(feature = "debug_stroke"))] d.rl_color4ub(color.r, color.g, color.b, color.a);
+
+            let mut past_points: Option<[Vector2; 2]> = None;
+            for (n, bez) in self.slices().enumerate() {
+                let row = n * strips_per_slice;
+                for i in 0..strips_per_slice {
+                    let t = i as f32 / (strips_per_slice - 1) as f32;
+                    let v = bez.velocity_at(t);
+                    if v.length_sqr() < f32::EPSILON { continue; }
+                    let tangent = v.normalized();
+                    let (normal_cw, normal_cc) = (tangent.rotate90_cw(), tangent.rotate90_cc());
+                    let p = bez.position_at(t);
+                    let t_full = (row + i) as f32 / total_strips as f32;
+                    let extents = thick.extents_at(t_full);
+                    let p1 = p + normal_cc * extents.x;
+                    let p2 = p + normal_cw * extents.y;
+                    if let Some(past_points) = &mut past_points {
+                        let [p3, p4] = *past_points;
+                        #[cfg(not(feature = "debug_stroke"))] {
+                            d.rl_vertex2f(p1.x, p1.y);
+                            d.rl_vertex2f(p3.x, p3.y);
+                            d.rl_vertex2f(p4.x, p4.y);
+
+                            d.rl_vertex2f(p2.x, p2.y);
+                            d.rl_vertex2f(p1.x, p1.y);
+                            d.rl_vertex2f(p4.x, p4.y);
+                        } #[cfg(feature = "debug_stroke")] {
+                            d.draw_line_strip(&[p1, p3, p4], Color::RED);
+                            d.draw_line_strip(&[p2, p1, p4], Color::BLUE);
+                        }
+
+                        past_points[0] = p1;
+                        past_points[1] = p2;
+                    } else {
+                        past_points = Some([p1, p2]);
+                    }
                 }
             }
         }
@@ -244,12 +342,12 @@ impl Curve {
     }
 }
 
-pub struct Calculate<I> {
+pub struct Calculate<V, I> {
     iter: I,
-    wrapped: Option<Option<(Vector2, Vector2, Vector2)>>,
+    wrapped: Option<Option<(V, V, V)>>,
 }
 
-impl<I> Calculate<I> {
+impl<V, I> Calculate<V, I> {
     const fn new(iter: I, is_closed: bool) -> Self {
         Self {
             iter,
@@ -258,8 +356,8 @@ impl<I> Calculate<I> {
     }
 }
 
-impl<'a, I: Iterator<Item = &'a PathPoint>> Iterator for Calculate<I> {
-    type Item = (Vector2, Vector2, Vector2);
+impl<'a, V: Vectoral + 'a, M: Maternal<V> + 'a, I: Iterator<Item = &'a PathPoint<V, M>>> Iterator for Calculate<V, I> {
+    type Item = (V, V, V);
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(next) = self.iter.next() {
@@ -276,19 +374,19 @@ impl<'a, I: Iterator<Item = &'a PathPoint>> Iterator for Calculate<I> {
     }
 }
 
-pub struct Slices<I> {
-    prev: Option<(Vector2, Vector2, Vector2)>,
-    iter: Calculate<I>,
+pub struct Slices<V, I> {
+    prev: Option<(V, V, V)>,
+    iter: Calculate<V, I>,
 }
 
-impl<I> Slices<I> {
-    const fn new(iter: Calculate<I>) -> Self {
+impl<V, I> Slices<V, I> {
+    const fn new(iter: Calculate<V, I>) -> Self {
         Self { prev: None, iter }
     }
 }
 
-impl<'a, I: Iterator<Item = &'a PathPoint>> Iterator for Slices<I> {
-    type Item = CubicBezier;
+impl<'a, V: Vectoral + 'a, M: Maternal<V> + 'a, I: Iterator<Item = &'a PathPoint<V, M>>> Iterator for Slices<V, I> {
+    type Item = CubicBezier<V>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut next = self.iter.next();

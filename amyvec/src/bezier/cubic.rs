@@ -1,26 +1,24 @@
-use amymath::prelude::{DistanceSqr, Rect2};
+use amymath::prelude::{CrossProduct, DistanceSqr, Rect2};
 use raylib::prelude::*;
-use crate::polynomial::*;
+use crate::{path_point::Vectoral, polynomial::*};
+
+use super::{if_bounded, linear::Linear, quadratic::Quadratic, Bezier};
 
 #[derive(Debug)]
-pub struct CubicBezier {
-    pub p1:     Vector2,
-    pub c1_out: Vector2,
-    pub c2_in:  Vector2,
-    pub p2:     Vector2,
+pub struct Cubic<V: Vectoral> {
+    pub p1:     V,
+    pub c1_out: V,
+    pub c2_in:  V,
+    pub p2:     V,
 }
 
-impl CubicBezier {
-    pub(super) fn new(p1: Vector2, c1_out: Vector2, c2_in: Vector2, p2: Vector2) -> Self {
+impl<V: Vectoral> Cubic<V> {
+    pub fn new(p1: V, c1_out: V, c2_in: V, p2: V) -> Self {
         Self { p1, c1_out, c2_in, p2 }
     }
 }
 
-fn if_bounded(x: f32) -> Option<f32> {
-    (0.0 <= x && x <= 1.0).then_some(x)
-}
-
-impl CubicBezier {
+impl<V: Vectoral> Cubic<V> {
     /// Returns a broader bounding box of the curve using only the anchors and velocities.
     ///
     /// Cheaper than [`Self::bounds`], but significantly less accurate.
@@ -29,14 +27,9 @@ impl CubicBezier {
     ///
     /// **\* Describes the bounding box of *all* elements of the curve, not just the curve itself**
     #[inline]
-    pub fn max_bounds(&self) -> Rect2 {
+    pub fn max_bounds(&self) -> V::Rect {
         let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
-        Rect2 {
-            xmin: p0.x.min(p1.x).min(p2.x).min(p3.x),
-            ymin: p0.y.min(p1.y).min(p2.y).min(p3.y),
-            xmax: p0.x.max(p1.x).max(p2.x).max(p3.x),
-            ymax: p0.y.max(p1.y).max(p2.y).max(p3.y),
-        }
+        V::Rect::minmax_rec(p0, p1).max(V::Rect::minmax_rec(p2, p3))
     }
 
     /// Returns a narrower bounding box of the curve using only the anchors.
@@ -49,26 +42,16 @@ impl CubicBezier {
     /// **\* Only describes the bounding box of the start and end of the curve, not the curve itself**
     #[inline]
     pub fn min_bounds(&self) -> Rect2 {
-        let (p0, _p1, _p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
-        Rect2 {
-            xmin: p0.x.min(p3.x),
-            ymin: p0.y.min(p3.y),
-            xmax: p0.x.max(p3.x),
-            ymax: p0.y.max(p3.y),
-        }
+        Rect2::minmax_rec(self.p1, self.p2)
     }
 
     /// Returns the bounding box of the curve.
     ///
     /// ## Performance
     /// Solves the quadratic equation on both `x` and `y` axes
-    #[inline]
     pub fn bounds(&self) -> Rect2 {
         let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
-        let (a_x, a_y) = (
-            -3.0*p0.x + 9.0*p1.x - 9.0*p2.x + 3.0*p3.x,
-            -3.0*p0.y + 9.0*p1.y - 9.0*p2.y + 3.0*p3.y,
-        );
+        let a_x = -3.0*p0 + 9.0*p1 - 9.0*p2 + 3.0*p3;
         let (b_x, b_y) = (
             6.0*p0.x - 12.0*p1.x + 6.0*p2.x,
             6.0*p0.y - 12.0*p1.y + 6.0*p2.y,
@@ -177,7 +160,7 @@ impl CubicBezier {
     pub fn curvature_at(&self, t: f32) -> f32 {
         let vel = self.velocity_at(t);
         let acc = self.acceleration_at(t);
-        (vel.x*acc.y - acc.x*vel.y) / (vel.x*vel.x + vel.y*vel.y).sqrt().powi(3)
+        vel.cross(acc) / vel.length().powi(3)
     }
 
     /// Time along curve closest to the position
@@ -210,5 +193,64 @@ impl CubicBezier {
             })
             .reduce(|best, curr| if curr.2 < best.2 { curr } else { best })
             .map(|(t, p, _dist_sqr)| (t, p))
+    }
+
+    /// Tests if the curve can be expressed as a perfectly straight line from p0 to p3
+    pub fn as_linear(&self) -> Option<Linear> {
+        let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
+        (p1 == p0 && p2 == p3).then(|| Linear::new(p0, p3))
+    }
+
+    /// Tests if the curve can be expressed as a cubic bezier
+    pub fn is_quadratic(&self) -> Option<Quadratic> {
+        let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
+        (p1 == p0).then(|| Quadratic::new(p0, p2, p3)).or_else(|| (p2 == p3).then(|| Quadratic::new(p0, p1, p3)))
+    }
+}
+
+impl Bezier<Vector2> for Cubic<Vector2> {
+    #[inline]
+    fn max_bounds(&self) -> Rect2 {
+        self.max_bounds()
+    }
+
+    #[inline]
+    fn min_bounds(&self) -> Rect2 {
+        self.min_bounds()
+    }
+
+    #[inline]
+    fn bounds(&self) -> Rect2 {
+        self.bounds()
+    }
+
+    #[inline]
+    fn position_at(&self, t: f32) -> Vector2 {
+        self.position_at(t)
+    }
+
+    #[inline]
+    fn velocity_at(&self, t: f32) -> Vector2 {
+        self.velocity_at(t)
+    }
+
+    #[inline]
+    fn acceleration_at(&self, t: f32) -> Vector2 {
+        self.acceleration_at(t)
+    }
+
+    #[inline]
+    fn jerk_at(&self, _t: f32) -> Vector2 {
+        self.jerk()
+    }
+
+    #[inline]
+    fn curvature_at(&self, t: f32) -> f32 {
+        self.curvature_at(t)
+    }
+
+    #[inline]
+    fn estimate_time_at(&self, pt: Vector2) -> Option<f32> {
+        self.estimate_time_at(pt).map(|(t, _)| t)
     }
 }

@@ -2,13 +2,13 @@ use raylib::prelude::*;
 
 pub trait CrossProduct<Rhs = Self> {
     type Output;
-    fn cross(self, rhs: Rhs) -> Self::Output;
+    fn cross(&self, rhs: Rhs) -> Self::Output;
 }
 
 impl CrossProduct<Vector2> for f32 {
     type Output = Vector2;
     #[inline]
-    fn cross(self, rhs: Vector2) -> Self::Output {
+    fn cross(&self, rhs: Vector2) -> Self::Output {
         Vector2 {
             x: -self * rhs.y,
             y:  self * rhs.x,
@@ -19,8 +19,17 @@ impl CrossProduct<Vector2> for f32 {
 impl CrossProduct for Vector2 {
     type Output = f32;
     #[inline]
-    fn cross(self, rhs: Vector2) -> Self::Output {
+    fn cross(&self, rhs: Vector2) -> Self::Output {
         self.x * rhs.y - self.y * rhs.x
+    }
+}
+
+impl CrossProduct for Vector3 {
+    type Output = Self;
+
+    #[inline]
+    fn cross(&self, rhs: Self) -> Self::Output {
+        Vector3::cross(self, rhs)
     }
 }
 
@@ -59,10 +68,39 @@ impl ReflectVector for Vector2 {
     }
 }
 
-pub trait DistanceSqr {
-    /// Distance squared
-    fn distance_sqr_to(&self, v: Self) -> f32;
+impl ReflectVector for Vector3 {
+    #[inline]
+    fn reflected_over(&self, across: Self) -> Self {
+        Self {
+            x: across.x * 2.0 - self.x,
+            y: across.y * 2.0 - self.y,
+            z: across.z * 2.0 - self.z,
+        }
+    }
 
+    #[inline]
+    fn reflected_at(&self, across: Self, scale: f32) -> Self {
+        let delta = *self - across;
+        Self {
+            x: across.x - scale * delta.x,
+            y: across.y - scale * delta.y,
+            z: across.z - scale * delta.z,
+        }
+    }
+
+    #[inline]
+    fn reflected_to(&self, across: Self, mut length: f32) -> Self {
+        let delta = *self - across;
+        length /= delta.length();
+        Self {
+            x: across.x - length * delta.x,
+            y: across.y - length * delta.y,
+            z: across.z - length * delta.z,
+        }
+    }
+}
+
+pub trait MoreDistances {
     /// Rectangular distance \
     /// Radius to edge
     fn rec_distance_to(&self, v: Self) -> f32;
@@ -72,12 +110,7 @@ pub trait DistanceSqr {
     fn dia_distance_to(&self, v: Self) -> f32;
 }
 
-impl DistanceSqr for Vector2 {
-    #[inline]
-    fn distance_sqr_to(&self, v: Self) -> f32 {
-        (*self - v).length()
-    }
-
+impl MoreDistances for Vector2 {
     #[inline]
     fn rec_distance_to(&self, v: Self) -> f32 {
         (self.x - v.x).abs().max((self.y - v.y).abs())
@@ -89,13 +122,33 @@ impl DistanceSqr for Vector2 {
     }
 }
 
+pub trait DistanceSqr {
+    /// Distance squared
+    fn distance_sqr_to(&self, v: Self) -> f32;
+}
+
+impl DistanceSqr for Vector2 {
+    #[inline]
+    fn distance_sqr_to(&self, v: Self) -> f32 {
+        (*self - v).length_sqr()
+    }
+}
+
+impl DistanceSqr for Vector3 {
+    #[inline]
+    fn distance_sqr_to(&self, v: Self) -> f32 {
+        let delta = *self - v;
+        delta.dot(delta)
+    }
+}
+
 pub trait SnapTo {
-    fn snap_to_segment(&self, start: Self, end: Self) -> Self;
+    fn snap_to_line(&self, start: Self, end: Self) -> Self;
     fn distance_sqr_to_segment(&self, start: Self, end: Self) -> f32;
 }
 
 impl SnapTo for Vector2 {
-    fn snap_to_segment(&self, start: Self, end: Self) -> Self {
+    fn snap_to_line(&self, start: Self, end: Self) -> Self {
         let delta = end - start;
         let p_delta = *self - start;
         let delta_sqr = delta * delta;
@@ -106,7 +159,7 @@ impl SnapTo for Vector2 {
 
     #[inline]
     fn distance_sqr_to_segment(&self, start: Self, end: Self) -> f32 {
-        self.distance_sqr_to(self.snap_to_segment(start, end))
+        self.distance_sqr_to(self.snap_to_line(start, end))
     }
 }
 
