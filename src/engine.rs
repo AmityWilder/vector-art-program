@@ -133,10 +133,9 @@ impl Engine {
 
         d.clear_background(self.config.background_color);
         for editor in editors.iter().filter(|e| e.is_visible) {
-            let viewport: Rect2 = {
-                let Vector2 { x: xmin, y: ymin } = d.get_screen_to_world2D(rvec2(window_rect.xmin, window_rect.ymin), editor.document.camera);
-                let Vector2 { x: xmax, y: ymax } = d.get_screen_to_world2D(rvec2(window_rect.xmax, window_rect.ymax), editor.document.camera);
-                Rect2 { xmin, ymin, xmax, ymax }
+            let viewport = Rect2 {
+                min: d.get_screen_to_world2D(rvec2(window_rect.xmin, window_rect.ymin), editor.document.camera),
+                max: d.get_screen_to_world2D(rvec2(window_rect.xmax, window_rect.ymax), editor.document.camera),
             };
 
             editor.draw_background(self, d);

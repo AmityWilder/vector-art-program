@@ -1,4 +1,4 @@
-#![feature(portable_simd, more_float_constants, test, vec_push_within_capacity, generic_const_exprs)]
+#![feature(portable_simd, more_float_constants, test, vec_push_within_capacity)]
 extern crate test;
 
 pub mod generics;

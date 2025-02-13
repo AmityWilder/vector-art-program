@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use amymath::{prelude::{Matrix2x2, MinMaxRectangle, Rotate90}, rlgl::*};
 use raylib::prelude::*;
 use crate::{
-    bezier::cubic::Cubic, generics::{Maternal, Vector}, path_point::{Ctrl, PPPart, PathPoint}
+    bezier::cubic::Cubic, generics::*, path_point::{Ctrl, PPPart, PathPoint}
 };
 
 #[derive(Debug)]
@@ -18,7 +18,11 @@ pub struct WidthProfileBuilder {
 }
 
 impl WidthProfileBuilder {
-    pub fn with_point(mut self, t: f32, thick1: f32, thick2: f32) -> Self {
+    pub fn with_point1(mut self, t: f32, thick1: f32) -> Self {
+        self.points.push((t, (thick1, None)));
+        self
+    }
+    pub fn with_point2(mut self, t: f32, thick1: f32, thick2: f32) -> Self {
         self.points.push((t, (thick1, Some(thick2))));
         self
     }
@@ -150,7 +154,7 @@ impl PartialOrd for PathPointIdx {
 }
 
 #[derive(Debug)]
-pub struct Curve<V: Vector, M: Maternal<V>> {
+pub struct Curve<V: Vector = Vector2, M: Maternal<V> = Matrix2x2> {
     pub points: VecDeque<PathPoint<V, M>>,
     pub is_closed: bool,
 }
@@ -163,7 +167,7 @@ impl<V: Vector, M: Maternal<V>> Default for Curve<V, M> {
 }
 
 impl<V: Vector, M: Maternal<V>> Curve<V, M> {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             points: VecDeque::new(),
             is_closed: false,
@@ -185,27 +189,6 @@ impl<V: Vector, M: Maternal<V>> Curve<V, M> {
             return Some(Cubic::new(p1, c1_out, c2_in, p2))
         }
         None
-    }
-
-    /// Calculate the bounding box of the entire curve
-    ///
-    /// Returns [`None`] if the curve is empty
-    ///
-    /// ## Note regarding current implementation
-    /// Calls [`Curve::slices`] (which calculates every path point)
-    /// and [`Cubic::bounds`] (which solves the quadratic equation) on each.
-    #[inline]
-    pub fn bounds(&self) -> Option<V::Rect> {
-        let mut bez_iter = self.slices();
-        if let Some(bez) = bez_iter.next() {
-            let mut rec = bez.bounds();
-            for bez in bez_iter {
-                if !rec.entirely_contains(&bez.max_bounds()) {
-                    rec = rec.max(bez.bounds());
-                }
-            }
-            Some(rec)
-        } else { None }
     }
 
     #[inline]
@@ -231,6 +214,27 @@ impl<V: Vector, M: Maternal<V>> Curve<V, M> {
             .reduce(|rec, b| rec.max(b))
     }
 
+    /// Calculate the bounding box of the entire curve
+    ///
+    /// Returns [`None`] if the curve is empty
+    ///
+    /// ## Note regarding current implementation
+    /// Calls [`Curve::slices`] (which calculates every path point)
+    /// and [`Cubic::bounds`] (which solves the quadratic equation) on each.
+    #[inline]
+    pub fn bounds(&self) -> Option<V::Rect> {
+        let mut bez_iter = self.slices();
+        if let Some(bez) = bez_iter.next() {
+            let mut rec = bez.bounds();
+            for bez in bez_iter {
+                if !rec.entirely_contains(&bez.max_bounds()) {
+                    rec = rec.max(bez.bounds());
+                }
+            }
+            Some(rec)
+        } else { None }
+    }
+
     #[inline]
     pub fn calculate(&self) -> Calculate<V, impl Iterator<Item = &'_ PathPoint<V, M>>> {
         Calculate::new(self.points.iter(), self.is_closed)
@@ -240,7 +244,9 @@ impl<V: Vector, M: Maternal<V>> Curve<V, M> {
     pub fn slices(&self) -> Slices<V, impl Iterator<Item = &'_ PathPoint<V, M>>> {
         Slices::new(self.calculate())
     }
+}
 
+impl<M: Maternal<Vector2>> Curve<Vector2, M> {
     pub fn draw_lines(&self, d: &mut impl RaylibDraw, strips_per_bez: usize, color: Color) {
         if self.points.is_empty() { return; }
         let mut points = Vec::with_capacity(strips_per_bez * self.points.len());
@@ -258,7 +264,7 @@ impl<V: Vector, M: Maternal<V>> Curve<V, M> {
         if self.points.is_empty() {
         } else if self.points.len() == 1 {
             let extents = thick.extents_max(); // largest thickness would overtake smaller thicknesses
-            d.draw_circle_v(self.points[0].p, (extents.x + extents.y) * 0.5, color);
+            d.draw_circle_v(self.points[0].p, (extents.0 + extents.1) * 0.5, color);
         } else {
             let num_points = strips_per_slice * 2 * self.points.len();
             if num_points < 3 { return; }
@@ -274,11 +280,11 @@ impl<V: Vector, M: Maternal<V>> Curve<V, M> {
                 if v.length_sqr() >= f32::EPSILON {
                     let tangent = v.normalized();
                     let (normal_cw, normal_cc) = (tangent.rotate90_cw(), tangent.rotate90_cc());
-                    let p1 = p + normal_cc * extents.x;
-                    let p2 = p + normal_cw * extents.y;
-                    d.draw_circle_v(p1.midpoint(p2), (extents.x + extents.y) * 0.5, color);
+                    let p1 = p + normal_cc * extents.0;
+                    let p2 = p + normal_cw * extents.1;
+                    d.draw_circle_v(p1.midpoint(p2), (extents.0 + extents.1) * 0.5, color);
                 } else {
-                    d.draw_circle_v(p, (extents.x + extents.y) * 0.5, color);
+                    d.draw_circle_v(p, (extents.0 + extents.1) * 0.5, color);
                 }
             }
 
@@ -298,8 +304,8 @@ impl<V: Vector, M: Maternal<V>> Curve<V, M> {
                     let p = bez.position_at(t);
                     let t_full = (row + i) as f32 / total_strips as f32;
                     let extents = thick.extents_at(t_full);
-                    let p1 = p + normal_cc * extents.x;
-                    let p2 = p + normal_cw * extents.y;
+                    let p1 = p + normal_cc * extents.0;
+                    let p2 = p + normal_cw * extents.1;
                     if let Some(past_points) = &mut past_points {
                         let [p3, p4] = *past_points;
                         #[cfg(not(feature = "debug_stroke"))] {

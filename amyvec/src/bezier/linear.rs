@@ -1,64 +1,54 @@
-use amymath::prelude::Rect2;
-use raylib::prelude::*;
+use crate::generics::*;
+
 use super::Bezier;
 
 #[derive(Debug)]
-pub struct Linear {
-    pub p1: Vector2,
-    pub p2: Vector2,
+pub struct Linear<V: Vector> {
+    pub p1: V,
+    pub p2: V,
 }
 
-impl Linear {
-    pub fn new(p1: Vector2, p2: Vector2) -> Self {
+impl<V: Vector> Linear<V> {
+    pub fn new(p1: V, p2: V) -> Self {
         Self { p1, p2 }
     }
 
     #[inline]
-    pub fn bounds(&self) -> Rect2 {
-        Rect2::minmax_rec(self.p1, self.p2)
+    pub fn bounds(&self) -> V::Rect {
+        V::Rect::minmax_rec(self.p1, self.p2)
     }
 
     #[inline]
-    pub fn position_at(&self, t: f32) -> Vector2 {
-        self.p1.lerp(self.p2, t)
+    pub fn position_at(&self, t: f32) -> V {
+        self.p1 * (1.0 - t) + self.p2 * t
     }
 
     #[inline]
-    pub fn velocity(&self) -> Vector2 {
+    pub fn velocity(&self) -> V {
         self.p2 - self.p1
     }
 
     /// Super easy, barely an inconvenience.
     #[inline]
-    fn time_at(&self, pt: Vector2) -> f32 {
+    pub fn time_at(&self, pt: V) -> f32 {
         let delta = self.p2 - self.p1;
         delta.dot(pt - self.p1) / delta.length_sqr()
     }
 }
 
-impl Bezier<Vector2> for Linear {
+impl<V: Vector> Bezier<V> for Linear<V> {
     #[inline]
-    fn bounds(&self) -> Rect2 {
+    fn bounds(&self) -> V::Rect {
         self.bounds()
     }
 
     #[inline]
-    fn position_at(&self, t: f32) -> Vector2 {
+    fn position_at(&self, t: f32) -> V {
         self.position_at(t)
     }
 
     #[inline]
-    fn velocity_at(&self, _t: f32) -> Vector2 {
+    fn velocity_at(&self, _t: f32) -> V {
         self.velocity()
-    }
-
-    #[inline]
-    fn curvature_at(&self, _t: f32) -> f32 {
-        0.0
-    }
-
-    #[inline]
-    fn estimate_time_at(&self, pt: Vector2) -> Option<f32> {
-        Some(self.time_at(pt))
     }
 }

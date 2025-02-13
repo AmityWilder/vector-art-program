@@ -50,7 +50,7 @@ impl LayerType for VectorPath {
                                 self.curve.draw_stroke(d, 20, &stroke.thick, *color);
                             } else {
                                 let thickness = stroke.thick.extents_at(0.0);
-                                let thick = (thickness.x + thickness.y) * 0.5;
+                                let thick = (thickness.0 + thickness.1) * 0.5;
                                 for bez in self.curve.slices() {
                                     d.draw_spline_segment_bezier_cubic(bez.p1, bez.c1_out, bez.c2_in, bez.p2, thick, color);
                                 }

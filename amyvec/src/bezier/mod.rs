@@ -48,12 +48,6 @@ pub trait Bezier<V: Vector> {
     fn jerk_at(&self, t: f32) -> V {
         V::ZERO
     }
-
-    /// Reciprocal radius (or "radians per meter") at time along curve.
-    fn curvature_at(&self, t: f32) -> f32;
-
-    /// Time along curve closest to the position.
-    fn estimate_time_at(&self, pt: V) -> Option<f32>;
 }
 
 #[inline]

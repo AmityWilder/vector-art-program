@@ -150,17 +150,17 @@ impl Document {
             // expand icon
             if let Layer::Group(Group { is_expanded, .. }) = layer {
                 let expand_button_rec = recs.expand_button.expect("group should always have expand button");
-                let Rect2 { xmin, ymin, xmax, ymax } = expand_button_rec.into();
-                let p0 = Vector2::new(xmin, ymin);
+                let Rect2 { min, max } = expand_button_rec.into();
+                let p0 = min;
                 let [p1, p2] = if *is_expanded {
                     [
-                        Vector2::new(xmin + 5.0, ymin + 6.0),
-                        Vector2::new(xmax, ymin),
+                        Vector2::new(min.x + 5.0, min.y + 6.0),
+                        Vector2::new(max.x, min.y),
                     ]
                 } else {
                     [
-                        Vector2::new(xmin, ymax),
-                        Vector2::new(xmin + 6.0, ymin + 5.0),
+                        Vector2::new(min.x, max.y),
+                        Vector2::new(min.x + 6.0, min.y + 5.0),
                     ]
                 };
                 d.draw_triangle(p0, p1, p2, TEXT_COLOR);

@@ -5,7 +5,8 @@ pub trait Rect: Sized {
     type Vector: Vector;
     fn minmax_rec(p1: Self::Vector, p2: Self::Vector) -> Self;
     fn entirely_contains(&self, other: &Self) -> bool;
-    fn max(&self, other: &Self) -> Self;
+    fn max(self, other: Self) -> Self;
+    fn max_pt(self, p: Self::Vector) -> Self;
 }
 
 impl Rect for Rect2 {
@@ -16,11 +17,15 @@ impl Rect for Rect2 {
     }
 
     fn entirely_contains(&self, other: &Self) -> bool {
-        todo!()
+        self.entirely_contains(other)
     }
 
-    fn max(&self, other: &Self) -> Self {
-        todo!()
+    fn max(self, other: Self) -> Self {
+        self.max(other)
+    }
+
+    fn max_pt(self, p: Self::Vector) -> Self {
+        self.max_pt(p)
     }
 }
 
@@ -43,11 +48,39 @@ impl Rect for BoundingBox {
     }
 
     fn entirely_contains(&self, other: &Self) -> bool {
-        todo!()
+        self.min.x <= other.min.x && other.max.x <= self.max.x &&
+        self.min.y <= other.min.y && other.max.y <= self.max.y &&
+        self.min.z <= other.min.z && other.max.z <= self.max.z
     }
 
-    fn max(&self, other: &Self) -> Self {
-        todo!()
+    fn max(self, other: Self) -> Self {
+        Self {
+            min: Vector3 {
+                x: self.min.x.min(other.min.x),
+                y: self.min.y.min(other.min.y),
+                z: self.min.z.min(other.min.z),
+            },
+            max: Vector3 {
+                x: self.max.x.max(other.max.x),
+                y: self.max.y.max(other.max.y),
+                z: self.max.z.max(other.max.z),
+            },
+        }
+    }
+
+    fn max_pt(self, p: Self::Vector) -> Self {
+        Self {
+            min: Vector3 {
+                x: self.min.x.min(p.x),
+                y: self.min.y.min(p.y),
+                z: self.min.z.min(p.z),
+            },
+            max: Vector3 {
+                x: self.max.x.max(p.x),
+                y: self.max.y.max(p.y),
+                z: self.max.z.max(p.z),
+            },
+        }
     }
 }
 
@@ -55,6 +88,7 @@ pub trait Vector where
     Self:
         Copy +
         ReflectVector +
+        std::cmp::PartialEq +
         std::ops::Neg<Output = Self> +
         std::ops::Add<Self, Output = Self> +
         std::ops::Sub<Self, Output = Self> +
@@ -70,29 +104,68 @@ pub trait Vector where
         std::ops::DivAssign<f32>,
 {
     type Rect: Rect<Vector = Self>;
+    type IntoIter: Iterator<Item = f32>;
     const ZERO: Self;
     const ONE: Self;
     const DIM: usize;
-    fn into_arr(self) -> [f32; Self::DIM];
+    fn into_iter(self) -> Self::IntoIter;
+    #[inline]
+    fn dot(&self, v: Self) -> f32 {
+        (*self * v).into_iter().sum()
+    }
+    #[inline]
+    fn length(&self) -> f32 {
+        self.length_sqr().sqrt()
+    }
+    #[inline]
+    fn length_sqr(&self) -> f32 {
+        self.dot(*self)
+    }
 }
 
 impl Vector for Vector2 {
     type Rect = Rect2;
+    type IntoIter = <[f32; 2] as IntoIterator>::IntoIter;
     const ZERO: Self = Vector2 { x: 0.0, y: 0.0 };
     const ONE:  Self = Vector2 { x: 1.0, y: 1.0 };
     const DIM: usize = 2;
-    fn into_arr(self) -> [f32; Self::DIM] {
-        [self.x, self.y]
+    fn into_iter(self) -> Self::IntoIter {
+        [self.x, self.y].into_iter()
+    }
+    #[inline]
+    fn dot(&self, v: Self) -> f32 {
+        self.dot(v)
+    }
+    #[inline]
+    fn length(&self) -> f32 {
+        self.length()
+    }
+    #[inline]
+    fn length_sqr(&self) -> f32 {
+        self.length_sqr()
     }
 }
 
 impl Vector for Vector3 {
     type Rect = BoundingBox;
+    type IntoIter = <[f32; 3] as IntoIterator>::IntoIter;
     const ZERO: Self = Vector3 { x: 0.0, y: 0.0, z: 0.0 };
     const ONE:  Self = Vector3 { x: 1.0, y: 1.0, z: 1.0 };
     const DIM: usize = 3;
-    fn into_arr(self) -> [f32; Self::DIM] {
-        [self.x, self.y, self.z]
+    fn into_iter(self) -> Self::IntoIter {
+        [self.x, self.y, self.z].into_iter()
+    }
+    #[inline]
+    fn dot(&self, v: Self) -> f32 {
+        self.dot(v)
+    }
+    #[inline]
+    fn length(&self) -> f32 {
+        self.length()
+    }
+    #[inline]
+    fn length_sqr(&self) -> f32 {
+        self.dot(*self)
     }
 }
 
