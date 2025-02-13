@@ -24,9 +24,7 @@ impl MultiSelect {
         }
     }
 
-    pub fn end_dragging(&mut self) {
-        todo!()
-    }
+    pub fn end_dragging(&mut self) {}
 
     pub fn is_selected(&self, mouse_world_pos: Vector2, px_world_size: f32) -> bool {
         let hover_radius = HOVER_RADIUS * px_world_size;

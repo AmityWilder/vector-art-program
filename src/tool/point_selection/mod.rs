@@ -113,7 +113,7 @@ impl PointSelection {
                 let path_borrow = path.read();
                 let curve = &path_borrow.curve;
 
-                if !curve.max_bounds().is_some_and(|bounds| dbg!(bounds.grow(hover_radius)).is_overlapping_point(mouse_world_pos)) {
+                if !curve.max_bounds().is_some_and(|bounds| bounds.grow(hover_radius).is_overlapping_point(mouse_world_pos)) {
                     return None;
                 }
 
@@ -230,7 +230,6 @@ impl ToolType for PointSelection {
                 Selection::Singular(single_select) => {
                     let mut path = single_select.target.write();
                     if let Some(idx) = single_select.point {
-                        assert_eq!(idx.part, PPPart::Anchor, "cannot remove ctrl");
                         path.curve.points.remove(idx.point)
                             .expect("should not select a point that is not within the curve");
                     } else {
