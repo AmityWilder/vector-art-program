@@ -2,13 +2,13 @@ use std::collections::VecDeque;
 use amymath::{prelude::{Matrix2x2, MinMaxRectangle, Rotate90}, rlgl::*};
 use raylib::prelude::*;
 use crate::{
-    bezier::cubic::Cubic, generics::*, path_point::{Ctrl, Ctrl1, Ctrl2, PPPart, PathPoint}
+    bezier::cubic::Cubic, generics::*, path_point::{Ctrl, PPPart, PathPoint}
 };
 
 #[derive(Debug)]
 pub enum WidthProfile {
     Constant(f32, f32),
-    Variable(Curve<Vector2, Matrix2x2>),
+    Variable(Curve),
 }
 
 pub struct WidthProfileBuilder {
@@ -24,15 +24,21 @@ impl WidthProfileBuilder {
     pub fn build(mut self) -> WidthProfile {
         assert!(!self.points.is_empty(), "width profile cannot be empty");
         self.points.sort_by(|(a, _), (b, _)| a.partial_cmp(&b).expect("time should be normal"));
-        WidthProfile::Variable(Curve {
+        let curve = Curve {
             is_closed: false,
             points: self.points.into_iter()
-                .map(|(t, (thick1, thick2))| PathPoint {
+                .map(|(_, (thick1, thick2))| PathPoint {
                     p: Vector2::new(thick1, thick2),
-                    c: Some(Ctrl1 { c1: (Ctrl::Out, Vector2::new(thick1, thick2)), c2: Some(Ctrl2::Reflect) })
+                    c: None,
                 })
                 .collect(),
-        })
+        };
+        for i in 0..=10 {
+            let t = i as f32 / 10.0;
+            let p = curve.position_at(t).expect("0-1 should be within curve");
+            println!("width at {t} is {}, {}", p.x, p.y);
+        }
+        WidthProfile::Variable(curve)
     }
 }
 
@@ -156,18 +162,21 @@ impl<V: Vector, M: Maternal<V>> Curve<V, M> {
 
     #[inline]
     pub fn position_at(&self, t: f32) -> Option<V> {
-        if self.points.len() == 0 { return None; }
-        assert!(0.0 <= t && t <= 1.0, "t out of bounds");
+        if self.points.is_empty() || t < 0.0 || 1.0 < t { return None; }
         if self.points.len() == 1 {
-            return Some(self.points[0].p);
-        }
-        let t_major = t * (self.points.len() - 2) as f32;
-        let (slice_idx, t) = if t_major == 1.0 {
-            (self.points.len() - 2, 1.0)
+            Some(self.points[0].p)
+        } else if t == 0.0 {
+            Some(self.slice(0).expect("should have at least one point in this branch").position_at(0.0))
+        } else if t == 1.0 {
+            Some(self.slice(self.num_slices() - 1).expect("should have at least one point in this branch").position_at(1.0))
         } else {
-            (t_major.floor() as usize, t_major.fract())
-        };
-        Some(self.slice(slice_idx).unwrap().position_at(t))
+            let (slice_idx, t) = {
+                let t_major = t * self.num_slices() as f32;
+                let trunc = (t_major).floor();
+                (trunc as usize, t_major - trunc)
+            };
+            Some(self.slice(slice_idx).unwrap().position_at(t))
+        }
     }
 
     #[inline]
