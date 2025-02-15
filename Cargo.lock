@@ -50,6 +50,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.95"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34ac096ce696dc2fcabef30516bb13c0a68a11d30131d3df6f04711467681b04"
+
+[[package]]
 name = "arrayvec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -89,6 +95,12 @@ name = "bitflags"
 version = "2.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1be3f42a67d6d345ecd59f675f3f012d6974981560836e938c22b424b85ce1be"
+
+[[package]]
+name = "build-target"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "832133bbabbbaa9fbdba793456a2827627a7d2b8fb96032fa1e7666d7895832b"
 
 [[package]]
 name = "build_rs_macros"
@@ -142,6 +154,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c682c223677e0e5b6b7f63a64b9351844c3f1b1678a68b7ee617e30fb082620e"
 dependencies = [
  "cc",
+]
+
+[[package]]
+name = "copy_to_output"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e43a9eb1b6ba30353653c07512fd8d4eeee3c8800d84194316cbc7e148d2ebae"
+dependencies = [
+ "anyhow",
+ "build-target",
+ "fs_extra",
 ]
 
 [[package]]
@@ -655,6 +678,8 @@ dependencies = [
  "amymath",
  "amyvec",
  "build_rs_macros",
+ "copy_to_output",
+ "glob",
  "raylib",
  "rltest",
 ]

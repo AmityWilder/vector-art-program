@@ -1,10 +1,14 @@
 use amygui::{panel::Panel, rec::UIRect};
 use amymath::prelude::*;
 use raylib::prelude::*;
-use crate::{editor::Editor, shaders::ShaderTable, ui::{layers_panel::LayersPanel, tool_panel::{ToolIcon, ToolPanel}}};
+use crate::{editor::Editor, shaders::ShaderTable, engine::{layers_panel::LayersPanel, tool_panel::{ToolIcon, ToolPanel}}};
 
 #[allow(clippy::enum_glob_use, reason = "every frickin one of these is prefixed with its type name >:T")]
 use KeyboardKey::*;
+
+pub mod layers_panel;
+pub mod color_wheel;
+pub mod tool_panel;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum HoverRegion {

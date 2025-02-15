@@ -13,48 +13,14 @@ struct ToolIconTextures {
 
 impl ToolIconTextures {
     pub fn load(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
-        const WIDTH: f32 = ToolIcon::WIDTH as f32;
+        let mut dir = std::env::current_exe().unwrap();
+        dir.pop();
+        let dir = dir.join("assets");
         Self {
-            icon_point_selection: {
-                let mut img = Image::gen_image_color(ToolIcon::WIDTH, ToolIcon::WIDTH, Color::BLANK);
-                img.draw_line_v(
-                    Vector2::new(WIDTH * 0.5, 0.0),
-                    Vector2::new(0.0, WIDTH),
-                    Color::WHITE);
-                img.draw_line_v(
-                    Vector2::new(WIDTH * 0.5, 0.0),
-                    Vector2::new(WIDTH, WIDTH),
-                    Color::WHITE);
-                img.draw_line_v(
-                    Vector2::new(0.0, WIDTH - 1.0),
-                    Vector2::new(WIDTH, WIDTH - 1.0),
-                    Color::WHITE);
-                rl.load_texture_from_image(thread, &img).unwrap()
-            },
-            icon_pen: {
-                let mut img = Image::gen_image_color(ToolIcon::WIDTH, ToolIcon::WIDTH, Color::BLANK);
-                img.draw_line_v(
-                    Vector2::new(0.0, WIDTH),
-                    Vector2::new(WIDTH, 0.0),
-                    Color::WHITE);
-                rl.load_texture_from_image(thread, &img).unwrap()
-            },
-            icon_vector_brush: {
-                let mut img = Image::gen_image_color(ToolIcon::WIDTH, ToolIcon::WIDTH, Color::BLANK);
-                img.draw_circle_lines_v(
-                    Vector2::new(WIDTH * 0.5, WIDTH * 0.5),
-                    ToolIcon::WIDTH / 2 - 1,
-                    Color::WHITE);
-                rl.load_texture_from_image(thread, &img).unwrap()
-            },
-            icon_raster_brush: {
-                let mut img = Image::gen_image_color(ToolIcon::WIDTH, ToolIcon::WIDTH, Color::BLANK);
-                img.draw_rectangle_lines(
-                    Rectangle::new(0.0, 0.0, WIDTH, WIDTH),
-                    1,
-                    Color::WHITE);
-                rl.load_texture_from_image(thread, &img).unwrap()
-            },
+            icon_point_selection: rl.load_texture(thread, dir.join("icon_point_selection.png").to_str().unwrap()).unwrap(),
+            icon_pen:             rl.load_texture(thread, dir.join("icon_pen.png"            ).to_str().unwrap()).unwrap(),
+            icon_vector_brush:    rl.load_texture(thread, dir.join("icon_vector_brush.png"   ).to_str().unwrap()).unwrap(),
+            icon_raster_brush:    rl.load_texture(thread, dir.join("icon_raster_brush.png"   ).to_str().unwrap()).unwrap(),
         }
     }
 
@@ -142,7 +108,7 @@ impl ToolPanel {
                         ToolIcon::PointSelection => editor.current_tool.switch_to_point_selection(),
                         ToolIcon::Pen => editor.current_tool.switch_to_pen(),
                         ToolIcon::VectorBrush => editor.current_tool.switch_to_vector_brush(),
-                        ToolIcon::RasterBrush => todo!("raster brush requires additional arguments"), // editor.current_tool.switch_to_raster_brush(rl, thread, shader, target, stroke)
+                        ToolIcon::RasterBrush => (/*editor.current_tool.switch_to_raster_brush(rl, thread, shader, target, stroke)*/),
                     }
                     break;
                 }

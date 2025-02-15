@@ -96,7 +96,6 @@ mod raster;
 mod appearance;
 mod document;
 mod tool;
-mod ui;
 
 fn main() {
     let (mut rl, thread) = init()

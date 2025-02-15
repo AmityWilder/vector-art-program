@@ -11,46 +11,21 @@ pub enum WidthProfile {
     Variable(Curve),
 }
 
-pub struct WidthProfileBuilder {
-    points: Vec<(f32, (f32, f32))>,
-}
-
-impl WidthProfileBuilder {
-    pub fn with_point(mut self, t: f32, thick1: f32, thick2: f32) -> Self {
-        self.points.push((t, (thick1, thick2)));
-        self
-    }
-
-    pub fn build(mut self) -> WidthProfile {
-        assert!(!self.points.is_empty(), "width profile cannot be empty");
-        self.points.sort_by(|(a, _), (b, _)| a.partial_cmp(&b).expect("time should be normal"));
-        let curve = Curve {
-            is_closed: false,
-            points: self.points.into_iter()
-                .map(|(_, (thick1, thick2))| PathPoint {
-                    p: Vector2::new(thick1, thick2),
-                    c: None,
-                })
-                .collect(),
-        };
-        for i in 0..=10 {
-            let t = i as f32 / 10.0;
-            let p = curve.position_at(t).expect("0-1 should be within curve");
-            println!("width at {t} is {}, {}", p.x, p.y);
-        }
-        WidthProfile::Variable(curve)
-    }
-}
-
 impl WidthProfile {
-    pub const fn new_constant2(thick1: f32, thick2: f32) -> Self {
+    pub const fn new_constant(thick1: f32, thick2: f32) -> Self {
         Self::Constant(thick1, thick2)
     }
 
-    pub fn init() -> WidthProfileBuilder {
-        WidthProfileBuilder {
-            points: Vec::with_capacity(1),
-        }
+    pub fn new_variable(thick1: f32, thick2: f32) -> Self {
+        Self::Variable(Curve {
+            points: VecDeque::from([
+                PathPoint {
+                    p: Vector2::new(thick1, thick2),
+                    c: None,
+                }
+            ]),
+            is_closed: false,
+        })
     }
 
     pub fn extents_at(&self, t: f32) -> (f32, f32) {

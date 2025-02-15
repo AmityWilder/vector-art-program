@@ -17,3 +17,5 @@ rltest = { path = "rltest" }
 
 [build-dependencies]
 build_rs_macros = { path = "build_rs_macros" }
+copy_to_output = "2.2.0"
+glob = "0.3"
