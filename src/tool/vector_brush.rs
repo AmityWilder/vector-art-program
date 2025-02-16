@@ -231,6 +231,20 @@ impl VectorBrush {
     pub fn new() -> Self {
         Self::Inactive(InactiveVectorBrush(None))
     }
+
+    pub fn target(&self) -> Option<Strong<VectorPath>> {
+        if let Self::Inactive(InactiveVectorBrush(Some(target))) | Self::Active(ActiveVectorBrush { target, .. }) = self {
+            return Some(target.clone_ref());
+        }
+        None
+    }
+
+    pub fn target_mut(&mut self) -> Option<StrongMut<VectorPath>> {
+        if let Self::Inactive(InactiveVectorBrush(Some(target))) | Self::Active(ActiveVectorBrush { target, .. }) = self {
+            return Some(target.clone_mut());
+        }
+        None
+    }
 }
 
 impl ToolType for VectorBrush {

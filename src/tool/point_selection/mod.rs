@@ -1,7 +1,7 @@
 use amymath::prelude::*;
 use amyvec::{curve::PathPointIdx, path_point::{Ctrl, Ctrl1, Ctrl2}};
 use raylib::prelude::*;
-use amylib::{iter::directed::DirectibleDoubleEndedIterator, prelude::StrongMut};
+use amylib::{iter::directed::DirectibleDoubleEndedIterator, prelude::{Strong, StrongMut}};
 use crate::{document::layer::Layer, layer::{BackToFore, ForeToBack, LayerType}, shaders::ShaderTable, vector_path::{path_point::PPPart, DrawPathPoint, VectorPath, ANCHOR_EXTENT_OUTER}, Document};
 use super::ToolType;
 
@@ -50,6 +50,22 @@ impl PointSelection {
             state: None,
             selection_points: None,
         }
+    }
+
+    /// Returns the target only if there is exactly one path selected
+    pub fn only_target(&self) -> Option<Strong<VectorPath>> {
+        if let Some(SelectionState { selection: Selection::Singular(single_select), .. }) = &self.state {
+            return Some(single_select.target.clone_ref());
+        }
+        None
+    }
+
+    /// Returns the target only if there is exactly one path selected
+    pub fn only_target_mut(&mut self) -> Option<StrongMut<VectorPath>> {
+        if let Some(SelectionState { selection: Selection::Singular(single_select), .. }) = &self.state {
+            return Some(single_select.target.clone_mut());
+        }
+        None
     }
 
     pub fn with_target(target: &StrongMut<VectorPath>) -> Self {

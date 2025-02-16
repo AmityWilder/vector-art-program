@@ -74,7 +74,7 @@ impl Engine {
                 &window_rect,
                 UIRect::init()
                     .from_left(0)
-                    .with_width(ToolPanel::width(2))
+                    .with_width(ToolPanel::calculate_width(2))
                     .build(),
                 LAYER_PANEL_BACKGROUND,
             ),

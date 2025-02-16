@@ -1,10 +1,8 @@
 use raylib::prelude::*;
 use crate::layer::{LayerSettings, LayerType};
 
-pub mod raster_brush;
-
 pub struct RasterTex {
-    rtex: RenderTexture2D,
+    pub rtex: RenderTexture2D,
     /// Allows cropping
     pub src_rec: Rectangle,
     /// Allows stretching

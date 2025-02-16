@@ -114,6 +114,20 @@ impl Pen {
         Self::Inactive(InactivePen(None))
     }
 
+    pub fn target(&self) -> Option<Strong<VectorPath>> {
+        if let Pen::Inactive(InactivePen(Some(target))) | Pen::Active(ActivePen { target, .. }) = self {
+            return Some(target.clone_ref());
+        }
+        None
+    }
+
+    pub fn target_mut(&mut self) -> Option<StrongMut<VectorPath>> {
+        if let Pen::Inactive(InactivePen(Some(target))) | Pen::Active(ActivePen { target, .. }) = self {
+            return Some(target.clone_mut());
+        }
+        None
+    }
+
     fn find_target(document: &mut Document, mouse_world_pos: Vector2) -> ActivePen {
         // starting a new path
         for layer in document.layers.dfs_iter_mut(|_| false).cdir::<ForeToBack>() {

@@ -4,7 +4,7 @@ use amylib::prelude::DirectibleDoubleEndedIterator;
 use amymath::prelude::{DrawRect2Lines, IRect2, RaylibRlglDraw, RaylibRlglExt, Rect2};
 use raylib::prelude::*;
 use undo_redo::{Action, EditHistory, RedoError, UndoError};
-use crate::{appearance::Blending, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, raster::{raster_brush, RasterTex}, shaders::ShaderTable, tool::{Tool, ToolType}};
+use crate::{appearance::{Appearance, Blending}, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, raster::RasterTex, shaders::ShaderTable, tool::{raster_brush, Tool, ToolType}};
 
 #[allow(clippy::enum_glob_use, reason = "every frickin one of these is prefixed with its type name >:T")]
 use {KeyboardKey::*, MouseButton::*};

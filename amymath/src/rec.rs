@@ -369,6 +369,15 @@ impl IRect2 {
             .flat_map(move |x| (ymin..=ymax)
                 .map(move |y| (x, y)))
     }
+
+    pub fn grow(self, amount: i32) -> Self {
+        Self {
+            xmin: self.xmin - amount,
+            ymin: self.ymin - amount,
+            xmax: self.xmax + amount,
+            ymax: self.ymax + amount,
+        }
+    }
 }
 
 impl From<Rectangle> for IRect2 {

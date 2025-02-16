@@ -1,12 +1,11 @@
 pub mod rec;
 pub mod panel;
-pub mod number_input;
 
 #[cfg(test)]
 mod tests {
     use amymath::prelude::*;
     use rltest::*;
-    use super::{panel::*, rec::*, number_input::*};
+    use super::{panel::*, rec::*};
 
     #[test]
     fn test0() -> rltest::Result {

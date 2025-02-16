@@ -1,16 +1,18 @@
-use amylib::prelude::StrongMut;
+use amylib::prelude::{Strong, StrongMut};
 use amymath::prelude::Rect2;
 use raylib::prelude::*;
-use crate::{raster::{raster_brush::{self, RasterBrush}, Raster}, shaders::ShaderTable, Document};
+use crate::{raster::Raster, shaders::ShaderTable, vector_path::VectorPath, Document};
 
 pub mod point_selection;
 pub mod pen;
 pub mod vector_brush;
+pub mod raster_brush;
 
 use self::{
     vector_brush::VectorBrush,
     point_selection::PointSelection,
     pen::Pen,
+    raster_brush::RasterBrush,
 };
 
 pub trait ToolType {
@@ -51,6 +53,24 @@ impl Default for Tool {
 
 // todo: have direct selection set pen/brush target
 impl Tool {
+    pub fn target_path(&self) -> Option<Strong<VectorPath>> {
+        match self {
+            Tool::PointSelection(point_selection) => point_selection.only_target(),
+            Tool::Pen(pen) => pen.target(),
+            Tool::VectorBrush(vector_brush) => vector_brush.target(),
+            Tool::RasterBrush(_) => None,
+        }
+    }
+
+    pub fn target_path_mut(&mut self) -> Option<StrongMut<VectorPath>> {
+        match self {
+            Tool::PointSelection(point_selection) => point_selection.only_target_mut(),
+            Tool::Pen(pen) => pen.target_mut(),
+            Tool::VectorBrush(vector_brush) => vector_brush.target_mut(),
+            Tool::RasterBrush(_) => None,
+        }
+    }
+
     pub fn switch_to_point_selection(&mut self) {
         println!("switched to point selection");
         match self {
