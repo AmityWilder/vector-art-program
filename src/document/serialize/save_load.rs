@@ -329,20 +329,14 @@ fn save_stroke_style(
         },
         pattern,
         thick,
-        align,
     }: &mut stroke::Stroke,
 ) -> io::Result<()> {
     writer.write_le(b's')?;
 
     let opacity_byte = opacity_byte(opacity);
     writer.write_all(&[
-        (u8::from(matches!(pattern, stroke::Pattern::Gradient { .. })) << 6)
-        | (u8::from(matches!(thick, WidthProfile::Variable(_))) << 5)
-        | (match align {
-            stroke::Align::Inside  => 0,
-            stroke::Align::Middle  => 1,
-            stroke::Align::Outside => 2,
-        } << 3)
+        (u8::from(matches!(pattern, stroke::Pattern::Gradient { .. })) << 3)
+        | (u8::from(matches!(thick, WidthProfile::Variable(_))) << 2)
         | blend_mode_to_byte(*blend_mode),
         opacity_byte])?;
 
@@ -357,12 +351,6 @@ fn read_stroke_style(reader: &mut impl Read) -> io::Result<stroke::Stroke> {
     let opacity = opacity_from_byte(opacity_byte);
     let is_gradient = (flags >> 6) & 1 != 0;
     let is_variable_thickness = (flags >> 5) & 1 != 0;
-    let align = match (flags >> 3) & 0b11 {
-        0 => stroke::Align::Inside,
-        1 => stroke::Align::Middle,
-        2 => stroke::Align::Outside,
-        3.. => unreachable!("bitmask restricts possible cases"),
-    };
     let blend_mode = extract_blend_mode(flags);
     let pattern = read_stroke_pattern(reader, is_gradient)?;
     let thick = read_stroke_thickness(reader, is_variable_thickness)?;
@@ -373,7 +361,6 @@ fn read_stroke_style(reader: &mut impl Read) -> io::Result<stroke::Stroke> {
         },
         pattern,
         thick,
-        align,
     })
 }
 

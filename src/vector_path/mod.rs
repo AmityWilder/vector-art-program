@@ -26,11 +26,11 @@ pub struct VectorPath {
 }
 
 impl VectorPath {
-    pub fn new(settings: LayerSettings) -> Self {
+    pub fn new(settings: LayerSettings, appearance: Appearance) -> Self {
         Self {
             settings,
             curve: Curve::new(),
-            appearance: Appearance::default(),
+            appearance,
         }
     }
 }
@@ -40,11 +40,8 @@ impl LayerType for VectorPath {
         for item in &self.appearance.items {
             match item {
                 StyleItem::Stroke(stroke) => {
-                    match (&stroke.align, &stroke.pattern) {
-                        (
-                            stroke::Align::Middle,
-                            stroke::Pattern::Solid(color),
-                        ) => {
+                    match &stroke.pattern {
+                        stroke::Pattern::Solid(color) => {
                             const EXPERIMENTAL_IMPL: bool = true;
                             if EXPERIMENTAL_IMPL {
                                 self.curve.draw_stroke(d, 20, &stroke.thick, *color);

@@ -1,7 +1,7 @@
 use raylib::prelude::*;
 use amylib::rc::prelude::*;
 use amymath::prelude::*;
-use crate::{layer::LayerType, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath, DrawPathPoint}, Document};
+use crate::{appearance::Appearance, document::Document, editor::Editor, layer::LayerType, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, DrawPathPoint, VectorPath}};
 use super::{point_selection::SNAP_VERT_RADIUS_SQR, ToolType};
 
 use MouseButton::MOUSE_BUTTON_LEFT;
@@ -11,12 +11,13 @@ pub struct InactiveVectorBrush(pub(super) Option<StrongMut<VectorPath>>);
 impl InactiveVectorBrush {
     fn tick(
         rl: &mut RaylibHandle,
+        current_appearance: &Appearance,
         document: &mut Document,
     ) -> Option<ActiveVectorBrush> {
         if rl.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) {
             // create a new path
             return Some(ActiveVectorBrush {
-                target: document.create_path(None, None).clone_mut(),
+                target: document.create_path(None, None, current_appearance.clone()).clone_mut(),
                 signal: PathSignal::default(),
             })
         }
@@ -173,7 +174,6 @@ impl ActiveVectorBrush {
 
     fn finish_path(
         &mut self,
-        _document: &mut Document,
         mouse_world_pos: Vector2,
     ) -> InactiveVectorBrush {
         {
@@ -194,7 +194,6 @@ impl ActiveVectorBrush {
     fn tick(
         &mut self,
         rl: &mut RaylibHandle,
-        document: &mut Document,
         mouse_world_pos: Vector2,
     ) -> Option<InactiveVectorBrush> {
         if rl.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) {
@@ -207,12 +206,12 @@ impl ActiveVectorBrush {
 
         // stroke complete
         if rl.is_mouse_button_released(MOUSE_BUTTON_LEFT) {
-            Some(self.finish_path(document, mouse_world_pos))
+            Some(self.finish_path(mouse_world_pos))
         } else { None }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, _shader_table: &ShaderTable) {
-        let px_world_size = document.camera.zoom.recip();
+    fn draw(&self, d: &mut impl RaylibDraw, editor: &Editor, _shader_table: &ShaderTable) {
+        let px_world_size = editor.document.camera.zoom.recip();
         let path = self.target.read();
         path.draw_selected(d, px_world_size);
         let color = path.settings.color;
@@ -248,24 +247,24 @@ impl VectorBrush {
 }
 
 impl ToolType for VectorBrush {
-    fn tick(&mut self, rl: &mut RaylibHandle, _thread: &RaylibThread, document: &mut Document, mouse_world_pos: Vector2, _px_world_size: f32) {
+    fn tick(&mut self, rl: &mut RaylibHandle, _thread: &RaylibThread, current_appearance: &mut Appearance, document: &mut Document, mouse_world_pos: Vector2, _px_world_size: f32) {
         if let VectorBrush::Inactive(_) = self {
-            if let Some(active_brush) = InactiveVectorBrush::tick(rl, document) {
+            if let Some(active_brush) = InactiveVectorBrush::tick(rl, current_appearance, document) {
                 *self = Self::Active(active_brush);
             }
         }
 
         if let VectorBrush::Active(brush) = self {
-            if let Some(inactive_brush) = brush.tick(rl, document, mouse_world_pos) {
+            if let Some(inactive_brush) = brush.tick(rl, mouse_world_pos) {
                 *self = Self::Inactive(inactive_brush);
             }
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32, _viewport: &Rect2, #[cfg(dev)] _mouse_world_pos: Vector2) {
+    fn draw(&self, d: &mut impl RaylibDraw, editor: &Editor, shader_table: &ShaderTable, px_world_size: f32, _viewport: &Rect2, #[cfg(dev)] _mouse_world_pos: Vector2) {
         const DRAW_DEBUG: bool = false;
         if let VectorBrush::Active(brush) = self {
-            brush.draw(d, document, shader_table);
+            brush.draw(d, editor, shader_table);
 
             if DRAW_DEBUG {
                 let last_changed = brush.signal.last_changed;

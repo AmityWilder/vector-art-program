@@ -1,7 +1,7 @@
 use raylib::prelude::*;
 use crate::vector_path::{fill::Fill, stroke::Stroke};
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Blending {
     pub opacity: f32,
     pub mode: BlendMode,
@@ -16,24 +16,15 @@ impl Default for Blending {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum StyleItem {
     Stroke(Stroke),
     Fill(Fill),
 }
 
+#[derive(Default, Clone)]
 pub struct Appearance {
     pub items: Vec<StyleItem>,
-}
-
-impl Default for Appearance {
-    fn default() -> Self {
-        Self {
-            items: vec![
-                StyleItem::Fill(Fill::default()),
-                StyleItem::Stroke(Stroke::default()),
-            ],
-        }
-    }
 }
 
 impl Appearance {

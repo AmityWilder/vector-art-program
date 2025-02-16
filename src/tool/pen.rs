@@ -1,7 +1,7 @@
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::{iter::directed::DirectibleDoubleEndedIterator, rc::prelude::*};
-use crate::{layer::{BackToFore, ForeToBack, Layer, LayerType}, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, VectorPath, DrawPathPoint}, Document};
+use crate::{appearance::Appearance, document::Document, editor::Editor, layer::{BackToFore, ForeToBack, Layer, LayerType}, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, DrawPathPoint, VectorPath}};
 use super::{point_selection::HOVER_RADIUS_SQR, ToolType};
 
 pub struct InactivePen(pub(super) Option<StrongMut<VectorPath>>);
@@ -23,7 +23,7 @@ pub struct ActivePen {
 }
 
 impl ActivePen {
-    fn tick(&mut self, rl: &mut RaylibHandle, _document: &mut Document, mouse_world_pos: Vector2) -> Option<InactivePen> {
+    fn tick(&mut self, rl: &mut RaylibHandle, mouse_world_pos: Vector2) -> Option<InactivePen> {
         let mut path = self.target.write();
 
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
@@ -128,7 +128,7 @@ impl Pen {
         None
     }
 
-    fn find_target(document: &mut Document, mouse_world_pos: Vector2) -> ActivePen {
+    fn find_target(current_appearance: &Appearance, document: &mut Document, mouse_world_pos: Vector2) -> ActivePen {
         // starting a new path
         for layer in document.layers.dfs_iter_mut(|_| false).cdir::<ForeToBack>() {
             // find hovered endpoint
@@ -152,7 +152,7 @@ impl Pen {
 
         // no luck? create a new path
         ActivePen {
-            target: document.create_path(None, None).clone_mut(),
+            target: document.create_path(None, None, current_appearance.clone()).clone_mut(),
             is_dragging: false,
             direction: Ctrl::Out,
         }
@@ -160,7 +160,7 @@ impl Pen {
 }
 
 impl ToolType for Pen {
-    fn tick(&mut self, rl: &mut RaylibHandle, _thread: &RaylibThread, document: &mut Document, mouse_world_pos: Vector2, _px_world_size: f32) {
+    fn tick(&mut self, rl: &mut RaylibHandle, _thread: &RaylibThread, current_appearance: &mut Appearance, document: &mut Document, mouse_world_pos: Vector2, _px_world_size: f32) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             match self {
                 Pen::Active(_) => (),
@@ -169,18 +169,18 @@ impl ToolType for Pen {
                     is_dragging: false,
                     direction: Ctrl::Out,
                 }),
-                Pen::Inactive(InactivePen(None)) => *self = Self::Active(Self::find_target(document, mouse_world_pos)),
+                Pen::Inactive(InactivePen(None)) => *self = Self::Active(Self::find_target(current_appearance, document, mouse_world_pos)),
             }
         }
 
         if let Self::Active(pen) = self {
-            if let Some(inactive_pen) = pen.tick(rl, document, mouse_world_pos) {
+            if let Some(inactive_pen) = pen.tick(rl, mouse_world_pos) {
                 *self = Self::Inactive(inactive_pen);
             }
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, _shader_table: &ShaderTable, px_world_size: f32, viewport: &Rect2, #[cfg(dev)] _mouse_world_pos: Vector2) {
+    fn draw(&self, d: &mut impl RaylibDraw, editor: &Editor, _shader_table: &ShaderTable, px_world_size: f32, viewport: &Rect2, #[cfg(dev)] _mouse_world_pos: Vector2) {
         let info = match self {
             Self::Active(ActivePen { target, direction, .. }) => Some((target, Some(direction))),
             Self::Inactive(InactivePen(Some(target))) => Some((target, None)),
@@ -203,7 +203,7 @@ impl ToolType for Pen {
             }
         } else {
             // show selectable
-            for layer in document.layers.shallow_iter().cdir::<BackToFore>() {
+            for layer in editor.document.layers.shallow_iter().cdir::<BackToFore>() {
                 if let Layer::Path(path) = layer {
                     let path = path.read();
                     let color = path.settings.color;

@@ -5,10 +5,16 @@ use crate::{
     bezier::cubic::Cubic, generics::*, path_point::{Ctrl, PPPart, PathPoint}
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum WidthProfile {
     Constant(f32, f32),
     Variable(Curve),
+}
+
+impl Default for WidthProfile {
+    fn default() -> Self {
+        Self::Constant(5.0, 5.0)
+    }
 }
 
 impl WidthProfile {
@@ -97,7 +103,7 @@ impl PartialOrd for PathPointIdx {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Curve<V: Vector = Vector2, M: Maternal<V> = Matrix2x2> {
     pub points: VecDeque<PathPoint<V, M>>,
     pub is_closed: bool,

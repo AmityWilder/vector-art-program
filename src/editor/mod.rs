@@ -4,7 +4,7 @@ use amylib::prelude::DirectibleDoubleEndedIterator;
 use amymath::prelude::{DrawRect2Lines, IRect2, RaylibRlglDraw, RaylibRlglExt, Rect2};
 use raylib::prelude::*;
 use undo_redo::{Action, EditHistory, RedoError, UndoError};
-use crate::{appearance::{Appearance, Blending}, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, raster::RasterTex, shaders::ShaderTable, tool::{raster_brush, Tool, ToolType}};
+use crate::{appearance::{Appearance, Blending, StyleItem}, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, raster::RasterTex, shaders::ShaderTable, tool::{raster_brush, Tool, ToolType}, vector_path::{fill, stroke}};
 
 #[allow(clippy::enum_glob_use, reason = "every frickin one of these is prefixed with its type name >:T")]
 use {KeyboardKey::*, MouseButton::*};
@@ -81,10 +81,7 @@ pub struct Editor {
     pub document: Document,
     history: EditHistory,
     pub current_tool: Tool,
-    /// as opposed to being in a background tab
-    ///
-    /// todo: this feels extremely fragile
-    pub is_visible: bool,
+    pub current_appearance: Appearance,
 }
 
 impl Editor {
@@ -99,7 +96,18 @@ impl Editor {
             document,
             history: EditHistory::with_capacity(128),
             current_tool: Tool::default(),
-            is_visible: true,
+            current_appearance: Appearance {
+                items: Vec::from([
+                    StyleItem::Fill(fill::Fill {
+                        pattern: fill::Pattern::Solid(Color::SLATEBLUE),
+                        ..Default::default()
+                    }),
+                    StyleItem::Stroke(stroke::Stroke {
+                        pattern: stroke::Pattern::Solid(Color::BLACK),
+                        ..Default::default()
+                    }),
+                ]),
+            },
         }
     }
 
@@ -195,7 +203,7 @@ impl Editor {
 
         if !is_mouse_event_handled {
             let px_world_size = self.document.camera.zoom.recip();
-            self.current_tool.tick(rl, thread, &mut self.document, mouse_world_pos, px_world_size);
+            self.current_tool.tick(rl, thread, &mut self.current_appearance, &mut self.document, mouse_world_pos, px_world_size);
         }
 
         // if (is_ctrl_down) && rl.is_key_pressed(KEY_Z) {
@@ -283,6 +291,6 @@ impl Editor {
         }
         let mut d = d.begin_mode2D(self.document.camera);
         let px_world_size = self.document.camera.zoom.recip();
-        self.current_tool.draw(&mut d, &self.document, &shader_table, px_world_size, viewport, #[cfg(dev)] mouse_world_pos);
+        self.current_tool.draw(&mut d, &self, &shader_table, px_world_size, viewport, #[cfg(dev)] mouse_world_pos);
     }
 }

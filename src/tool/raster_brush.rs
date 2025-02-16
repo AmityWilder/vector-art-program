@@ -1,7 +1,7 @@
 use amylib::{prelude::RoundToInt, rc::prelude::*};
 use amymath::prelude::{DistanceSqr, FlipRectangle, Rect2};
 use raylib::prelude::*;
-use crate::{appearance::Blending, document::Document, shaders::ShaderTable, tool::ToolType};
+use crate::{appearance::{Appearance, Blending}, document::Document, editor::Editor, shaders::ShaderTable, tool::ToolType};
 use super::Raster;
 
 pub enum Pattern {
@@ -122,7 +122,7 @@ impl RasterBrush {
 }
 
 impl ToolType for RasterBrush {
-    fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, _document: &mut Document, mouse_world_pos: Vector2, _px_world_size: f32) {
+    fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, _current_appearance: &mut Appearance, _document: &mut Document, mouse_world_pos: Vector2, _px_world_size: f32) {
         self.mouse_curr = mouse_world_pos;
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             self.begin_stroke(rl, thread, mouse_world_pos);
@@ -135,7 +135,7 @@ impl ToolType for RasterBrush {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, _document: &Document, _shader_table: &ShaderTable, px_world_size: f32, _viewport: &Rect2, #[cfg(dev)] _mouse_world_pos: Vector2) {
+    fn draw(&self, d: &mut impl RaylibDraw, _editor: &Editor, _shader_table: &ShaderTable, px_world_size: f32, _viewport: &Rect2, #[cfg(dev)] _mouse_world_pos: Vector2) {
         let raster = self.target.read();
         let (src_rec, dest_rec) = (raster.texture.src_rec.flipped(), raster.texture.dest_rec);
         Self::draw_buffer(d, &self.buffer, self.shader.as_ref(), src_rec, dest_rec, &self.stroke);

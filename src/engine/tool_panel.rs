@@ -2,7 +2,7 @@ use raylib::prelude::*;
 use amymath::{prelude::IRect2, rec::RaylibIntRect2Ex};
 use std::num::NonZeroUsize;
 use amygui::panel::Panel;
-use crate::{appearance::StyleItem, editor::Editor, tool::Tool, vector_path::{fill, stroke}};
+use crate::{appearance::{Appearance, StyleItem}, editor::Editor, tool::Tool, vector_path::{fill, stroke}};
 
 struct ToolIconTextures {
     icon_point_selection: Texture2D,
@@ -174,16 +174,44 @@ impl ToolPanel {
             } else {
                 // palette
                 let [fill_rec, stroke_rec] = self.mini_palette_recs(&panel_rec, tools_height);
-                if let Some(mut target_path) = editor.current_tool.target_path_mut() {
-                    let mut target_borrow = target_path.write();
-                    let current_appearance = &mut target_borrow.appearance;
+                let handle_mini_palette_click = |current_appearance: &mut Appearance| {
                     if stroke_rec.is_overlapping_v(mouse_screen_pos) {
                         if fill_rec.is_overlapping_v(mouse_screen_pos) {
+                            let current_fill = if let Some(current_fill) = current_appearance.items.iter_mut()
+                                .find_map(|item| if let StyleItem::Fill(fill) = item { Some(fill) } else { None }) {
+                                    current_fill
+                                } else {
+                                    current_appearance.items.push(StyleItem::Fill(fill::Fill::default()));
+                                    let Some(StyleItem::Fill(new_fill)) = current_appearance.items.last_mut() else { panic!("should have just pushed a fill") };
+                                    new_fill
+                                };
                             println!("clicked fill");
+                            match &mut current_fill.pattern {
+                                fill::Pattern::Solid(color) => *color = Color::RED,
+                                fill::Pattern::Gradient { .. } => todo!(),
+                            }
                         } else {
+                            let current_stroke = if let Some(current_stroke) = current_appearance.items.iter_mut()
+                                .find_map(|item| if let StyleItem::Stroke(stroke) = item { Some(stroke) } else { None }) {
+                                    current_stroke
+                                } else {
+                                    current_appearance.items.push(StyleItem::Stroke(stroke::Stroke::default()));
+                                    let Some(StyleItem::Stroke(new_stroke)) = current_appearance.items.last_mut() else { panic!("should have just pushed a stroke") };
+                                    new_stroke
+                                };
                             println!("clicked stroke");
+                            match &mut current_stroke.pattern {
+                                stroke::Pattern::Solid(color) => *color = Color::BLUE,
+                                stroke::Pattern::Gradient { .. } => todo!(),
+                            }
                         }
                     }
+                };
+                if let Some(mut target_path) = editor.current_tool.target_path_mut() {
+                    let mut target_borrow = target_path.write();
+                    handle_mini_palette_click(&mut target_borrow.appearance);
+                } else {
+                    handle_mini_palette_click(&mut editor.current_appearance);
                 }
             }
         }
@@ -229,9 +257,7 @@ impl ToolPanel {
         }
         {
             let [fill_rec, stroke_rec] = self.mini_palette_recs(&panel_rec, tools_height);
-            if let Some(target_path) = editor.current_tool.target_path() {
-                let target_borrow = target_path.read();
-                let current_appearance = &target_borrow.appearance;
+            let mut draw_mini_palette = |current_appearance: &Appearance| {
                 let mut stroke_pattern = None;
                 let mut fill_pattern = None;
                 for item in &current_appearance.items {
@@ -243,10 +269,16 @@ impl ToolPanel {
                 }
                 let stroke_pattern = stroke_pattern.unwrap_or(&stroke::Pattern::Solid(Color::BLANK));
                 let fill_pattern = fill_pattern.unwrap_or(&fill::Pattern::Solid(Color::BLANK));
-                d.draw_rectangle_irect2(&stroke_rec, self.panel.background); // in case stroke color has transparency
+                d.draw_rectangle_irect2(&stroke_rec, Color::GRAY); // in case stroke color has transparency
                 stroke_pattern.draw_preview_rec(&mut d, &stroke_rec);
-                d.draw_rectangle_irect2(&fill_rec, self.panel.background); // in case fill color has transparency
+                d.draw_rectangle_irect2(&fill_rec, Color::GRAY); // in case fill color has transparency
                 fill_pattern.draw_preview_rec(&mut d, &fill_rec);
+            };
+            if let Some(target_path) = editor.current_tool.target_path() {
+                let target_borrow = target_path.read();
+                draw_mini_palette(&target_borrow.appearance);
+            } else {
+                draw_mini_palette(&editor.current_appearance);
             }
         }
     }

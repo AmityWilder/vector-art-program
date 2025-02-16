@@ -2,7 +2,7 @@ use amyvec::{curve::PathPointIdx, path_point::PathPoint};
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::rc::prelude::*;
-use crate::{layer::LayerType, shaders::ShaderTable, vector_path::{path_point::{Ctrl1, Ctrl2, PPPart}, VectorPath, DrawPathPoint}, Document};
+use crate::{layer::LayerType, shaders::ShaderTable, vector_path::{path_point::{Ctrl1, Ctrl2, PPPart}, VectorPath, DrawPathPoint}};
 use super::{HOVER_RADIUS, SNAP_VERT_RADIUS, SNAP_VERT_RADIUS_SQR};
 
 /// Allows manipulating velocity controls on one point
@@ -115,7 +115,7 @@ impl SingleSelect {
         }
     }
 
-    pub fn draw(&self, d: &mut impl RaylibDraw, _document: &Document, px_world_size: f32, selection_rec: Option<Rectangle>, _shader_table: &ShaderTable) {
+    pub fn draw(&self, d: &mut impl RaylibDraw, px_world_size: f32, selection_rec: Option<Rectangle>, _shader_table: &ShaderTable) {
         if let Some(_selection_rec) = selection_rec {
             unreachable!("2025-02-10: at present, creating a selection rectangle inherently clears the selection. this may change in the future with `shift+select`.");
             // use amylib::prelude::DirectibleDoubleEndedIterator;

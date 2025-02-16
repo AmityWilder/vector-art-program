@@ -1,11 +1,13 @@
 use amymath::prelude::*;
 use raylib::prelude::*;
 
+#[derive(Debug, Clone, Copy)]
 pub struct Control {
     pub pos: u8,
     pub color: Color,
 }
 
+#[derive(Debug, Clone)]
 pub struct Ramp {
     /// Should be sorted and unique by `pos`
     pub colors: Vec<Control>,

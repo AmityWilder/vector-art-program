@@ -1,7 +1,7 @@
 use raylib::prelude::*;
 use amymath::prelude::*;
 use amylib::rc::prelude::*;
-use crate::{document::layer::Layer, layer::LayerType, shaders::ShaderTable, vector_path::{VectorPath, DrawPathPoint}, Document};
+use crate::{document::layer::Layer, editor::Editor, layer::LayerType, shaders::ShaderTable, vector_path::{DrawPathPoint, VectorPath}};
 use super::HOVER_RADIUS;
 
 pub struct SelectionPiece {
@@ -35,10 +35,10 @@ impl MultiSelect {
             })
     }
 
-    pub fn draw(&self, d: &mut impl RaylibDraw, document: &Document, px_world_size: f32, selection_rec: Option<Rectangle>, _shader_table: &ShaderTable) {
+    pub fn draw(&self, d: &mut impl RaylibDraw, editor: &Editor, px_world_size: f32, selection_rec: Option<Rectangle>, _shader_table: &ShaderTable) {
         if let Some(selection_rec) = selection_rec {
             let mut selected_layers = self.pieces.iter().peekable();
-            for (selected, path) in document.layers.shallow_iter()
+            for (selected, path) in editor.document.layers.shallow_iter()
                 .filter_map(|layer|
                     if let Layer::Path(path) = layer {
                         Some((selected_layers.next_if(|selected| path == &selected.target), path.clone_ref()))

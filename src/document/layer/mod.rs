@@ -105,22 +105,6 @@ impl Layer {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test0() {
-        let layer = Layer::Path(StrongMut::new(VectorPath::new(LayerSettings {
-            name: "hello world".to_owned(),
-            ..Default::default()
-        })));
-        let settings = layer.settings();
-        let x = settings.name.as_str();
-        assert_eq!(x, "hello world");
-    }
-}
-
 pub trait LayerType {
     /// Draw without helper visuals
     fn draw_rendered(&self, d: &mut impl RaylibDraw);

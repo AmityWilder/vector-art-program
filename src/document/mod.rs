@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use amygui::panel::Panel;
 use amymath::prelude::*;
 use layer::{Layer, LayerTree};
-use crate::{raster::{Raster, RasterTex}, vector_path::VectorPath};
+use crate::{appearance::Appearance, raster::{Raster, RasterTex}, vector_path::VectorPath};
 use amylib::rc::prelude::*;
 use raylib::prelude::*;
 
@@ -102,9 +102,9 @@ impl Document {
         LayerSettings::new(name, color)
     }
 
-    pub fn create_path(&mut self, name: Option<String>, color: Option<Color>) -> &mut StrongMut<VectorPath> {
+    pub fn create_path(&mut self, name: Option<String>, color: Option<Color>, appearance: Appearance) -> &mut StrongMut<VectorPath> {
         let settings = self.gen_layer_settings(name, color);
-        self.layers.push(Layer::Path(StrongMut::new(VectorPath::new(settings))));
+        self.layers.push(Layer::Path(StrongMut::new(VectorPath::new(settings, appearance))));
         match self.layers.last_mut() {
             Some(Layer::Path(path)) => path,
             _ => unreachable!("vector path layer should exist when one is pushed"),

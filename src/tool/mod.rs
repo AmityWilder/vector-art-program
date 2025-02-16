@@ -1,7 +1,7 @@
 use amylib::prelude::{Strong, StrongMut};
 use amymath::prelude::Rect2;
 use raylib::prelude::*;
-use crate::{raster::Raster, shaders::ShaderTable, vector_path::VectorPath, Document};
+use crate::{appearance::Appearance, document::Document, editor::Editor, raster::Raster, shaders::ShaderTable, vector_path::VectorPath};
 
 pub mod point_selection;
 pub mod pen;
@@ -20,6 +20,7 @@ pub trait ToolType {
         &mut self,
         rl: &mut RaylibHandle,
         thread: &RaylibThread,
+        current_appearance: &mut Appearance,
         document: &mut Document,
         mouse_world_pos: Vector2,
         px_world_size: f32,
@@ -30,7 +31,7 @@ pub trait ToolType {
     fn draw(
         &self,
         d: &mut impl RaylibDraw,
-        document: &Document,
+        editor: &Editor,
         shader_table: &ShaderTable,
         px_world_size: f32,
         viewport: &Rect2,
@@ -121,29 +122,37 @@ impl Tool {
 }
 
 impl ToolType for Tool {
-    fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, document: &mut Document, mouse_world_pos: Vector2, px_world_size: f32) {
+    fn tick(
+        &mut self,
+        rl: &mut RaylibHandle,
+        thread: &RaylibThread,
+        current_appearance: &mut Appearance,
+        document: &mut Document,
+        mouse_world_pos: Vector2,
+        px_world_size: f32,
+    ) {
         match self {
-            Tool::PointSelection(tool) => tool.tick(rl, thread, document, mouse_world_pos, px_world_size),
-            Tool::Pen           (tool) => tool.tick(rl, thread, document, mouse_world_pos, px_world_size),
-            Tool::VectorBrush   (tool) => tool.tick(rl, thread, document, mouse_world_pos, px_world_size),
-            Tool::RasterBrush   (tool) => tool.tick(rl, thread, document, mouse_world_pos, px_world_size),
+            Tool::PointSelection(tool) => tool.tick(rl, thread, current_appearance, document, mouse_world_pos, px_world_size),
+            Tool::Pen           (tool) => tool.tick(rl, thread, current_appearance, document, mouse_world_pos, px_world_size),
+            Tool::VectorBrush   (tool) => tool.tick(rl, thread, current_appearance, document, mouse_world_pos, px_world_size),
+            Tool::RasterBrush   (tool) => tool.tick(rl, thread, current_appearance, document, mouse_world_pos, px_world_size),
         }
     }
 
     fn draw(
         &self,
         d: &mut impl RaylibDraw,
-        document: &Document,
+        editor: &Editor,
         shader_table: &ShaderTable,
         px_world_size: f32,
         viewport: &Rect2,
         #[cfg(dev)] mouse_world_pos: Vector2,
     ) {
         match self {
-            Tool::PointSelection(tool) => tool.draw(d, document, shader_table, px_world_size, viewport, #[cfg(dev)] mouse_world_pos),
-            Tool::Pen           (tool) => tool.draw(d, document, shader_table, px_world_size, viewport, #[cfg(dev)] mouse_world_pos),
-            Tool::VectorBrush   (tool) => tool.draw(d, document, shader_table, px_world_size, viewport, #[cfg(dev)] mouse_world_pos),
-            Tool::RasterBrush   (tool) => tool.draw(d, document, shader_table, px_world_size, viewport, #[cfg(dev)] mouse_world_pos),
+            Tool::PointSelection(tool) => tool.draw(d, editor, shader_table, px_world_size, viewport, #[cfg(dev)] mouse_world_pos),
+            Tool::Pen           (tool) => tool.draw(d, editor, shader_table, px_world_size, viewport, #[cfg(dev)] mouse_world_pos),
+            Tool::VectorBrush   (tool) => tool.draw(d, editor, shader_table, px_world_size, viewport, #[cfg(dev)] mouse_world_pos),
+            Tool::RasterBrush   (tool) => tool.draw(d, editor, shader_table, px_world_size, viewport, #[cfg(dev)] mouse_world_pos),
         }
     }
 }

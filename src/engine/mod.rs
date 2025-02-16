@@ -97,9 +97,8 @@ impl Engine {
     }
 
     /// Automatically makes the new layer active and visible
-    pub fn create_editor(&mut self, mut editor: Editor) -> usize {
+    pub fn create_editor(&mut self, editor: Editor) -> usize {
         let idx = self.editors.len();
-        editor.is_visible = true;
         self.editors.push(editor);
         self.active_editor = Some(idx);
         idx
@@ -171,7 +170,7 @@ impl Engine {
         let shader_table = &self.shader_table;
 
         d.clear_background(self.config.background_color);
-        for editor in editors.iter().filter(|e| e.is_visible) {
+        for editor in editors {
             let viewport = Rect2 {
                 min: d.get_screen_to_world2D(rvec2(window_rect.xmin, window_rect.ymin), editor.document.camera),
                 max: d.get_screen_to_world2D(rvec2(window_rect.xmax, window_rect.ymax), editor.document.camera),

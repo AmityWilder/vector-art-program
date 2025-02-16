@@ -2,7 +2,7 @@ use amymath::prelude::*;
 use amyvec::{curve::PathPointIdx, path_point::{Ctrl, Ctrl1, Ctrl2}};
 use raylib::prelude::*;
 use amylib::{iter::directed::DirectibleDoubleEndedIterator, prelude::{Strong, StrongMut}};
-use crate::{document::layer::Layer, layer::{BackToFore, ForeToBack, LayerType}, shaders::ShaderTable, vector_path::{path_point::PPPart, DrawPathPoint, VectorPath, ANCHOR_EXTENT_OUTER}, Document};
+use crate::{appearance::Appearance, document::{layer::Layer, Document}, editor::Editor, layer::{BackToFore, ForeToBack, LayerType}, shaders::ShaderTable, vector_path::{path_point::PPPart, DrawPathPoint, VectorPath, ANCHOR_EXTENT_OUTER}};
 use super::ToolType;
 
 pub const HOVER_RADIUS: f32 = 6.0;
@@ -222,7 +222,7 @@ impl PointSelection {
 }
 
 impl ToolType for PointSelection {
-    fn tick(&mut self, rl: &mut RaylibHandle, _thread: &RaylibThread, document: &mut Document, mouse_world_pos: Vector2, px_world_size: f32) {
+    fn tick(&mut self, rl: &mut RaylibHandle, _thread: &RaylibThread, _current_appearance: &mut Appearance, document: &mut Document, mouse_world_pos: Vector2, px_world_size: f32) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             self.begin_dragging(rl, document, mouse_world_pos, px_world_size);
         }
@@ -267,7 +267,7 @@ impl ToolType for PointSelection {
         }
     }
 
-    fn draw(&self, d: &mut impl RaylibDraw, document: &Document, shader_table: &ShaderTable, px_world_size: f32, viewport: &Rect2, #[cfg(dev)] _mouse_world_pos: Vector2) {
+    fn draw(&self, d: &mut impl RaylibDraw, editor: &Editor, shader_table: &ShaderTable, px_world_size: f32, viewport: &Rect2, #[cfg(dev)] _mouse_world_pos: Vector2) {
         let selection_rec = self.selection_points.as_ref().copied().map(|(start, end)|
             start.minmax_rec(end)
         );
@@ -278,16 +278,16 @@ impl ToolType for PointSelection {
 
         match self.state.as_ref() {
             Some(SelectionState { selection: Selection::Singular(selected), .. }) => {
-                selected.draw(d, document, px_world_size, selection_rec, shader_table);
+                selected.draw(d, px_world_size, selection_rec, shader_table);
             }
 
             Some(SelectionState { selection: Selection::Multiple(selected), .. }) => {
-                selected.draw(d, document, px_world_size, selection_rec, shader_table);
+                selected.draw(d, editor, px_world_size, selection_rec, shader_table);
             }
 
             None => {
                 // draw selection options
-                for layer in document.layers.shallow_iter().cdir::<BackToFore>() {
+                for layer in editor.document.layers.shallow_iter().cdir::<BackToFore>() {
                     if let Layer::Path(path) = layer {
                         let path = path.read();
                         if path.curve.bounds().is_some_and(|bounds| viewport.is_overlapping(&bounds)) {
