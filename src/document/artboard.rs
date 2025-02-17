@@ -1,5 +1,5 @@
-use amymath::prelude::*;
-use raylib::prelude::*;
+use amymath::prelude::{*, Vector2};
+use raylib::prelude::Vector2 as RlVector2;
 
 pub struct ArtBoard {
     pub name: String,
@@ -11,9 +11,9 @@ impl ArtBoard {
         Self { name, rect }
     }
 
-    pub fn get_screen_tl_br(&self, world_to_screen: impl Fn(Vector2) -> Vector2) -> (Vector2, Vector2) {
-        let tl_world = Vector2::new(self.rect.xmin as f32, self.rect.ymin as f32);
-        let br_world = Vector2::new(self.rect.xmax as f32, self.rect.ymax as f32);
-        (world_to_screen(tl_world), world_to_screen(br_world))
+    pub fn get_screen_tl_br(&self, world_to_screen: impl Fn(RlVector2) -> RlVector2) -> (Vector2, Vector2) {
+        let tl_world = RlVector2::new(self.rect.min.x as f32, self.rect.min.y as f32);
+        let br_world = RlVector2::new(self.rect.max.x as f32, self.rect.max.y as f32);
+        (world_to_screen(tl_world).into(), world_to_screen(br_world).into())
     }
 }

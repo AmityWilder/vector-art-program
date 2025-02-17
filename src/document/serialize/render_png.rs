@@ -1,6 +1,5 @@
 use std::{io, path::Path};
-use amymath::prelude::IntRectangle;
-use raylib::prelude::*;
+use raylib::prelude::{*, Vector2 as RlVector2};
 use amylib::iter::directed::DirectibleDoubleEndedIterator;
 use crate::{document::Document, layer::{BackToFore, LayerType}};
 
@@ -33,7 +32,7 @@ impl Document {
             (width as u32, height as u32)
         };
 
-        let (artboard_x, artboard_y) = (artboard.xmin as f32, artboard.ymin as f32);
+        let (artboard_x, artboard_y) = (artboard.min.x as f32, artboard.min.y as f32);
 
         let mut rtex = rl.load_render_texture(
             thread,
@@ -42,8 +41,8 @@ impl Document {
         ).map_err(io::Error::other)?;
 
         let camera = Camera2D {
-            offset: Vector2::zero(),
-            target: Vector2::new(artboard_x, artboard_y),
+            offset: RlVector2::zero(),
+            target: RlVector2::new(artboard_x, artboard_y),
             rotation: 0.0,
             zoom: if is_supersampled {
                 const _: () = assert!(SUPERSAMPLE_FACTOR.ilog2() < f32::MANTISSA_DIGITS); // proof
@@ -71,7 +70,7 @@ impl Document {
             match downscale_algo {
                 DownscaleAlgorithm::Nearest => image.resize_nn(width, height),
                 DownscaleAlgorithm::Bicubic => image.resize(width, height),
-                DownscaleAlgorithm::Lanczos => image.resize_custom(width, height, l),
+                DownscaleAlgorithm::Lanczos => todo!(),//image.resize_custom(width, height, l),
             }
         }
         image.flip_vertical();
@@ -99,94 +98,102 @@ pub trait Resize {
     fn resize_custom(&mut self, new_width: i32, new_height: i32, weight_fn: WeightFn);
 }
 
-impl Resize for Image {
-    fn resize_custom(&mut self, new_width: i32, new_height: i32, weight_fn: WeightFn) {
-        let old_width = self.width;
-        let old_height = self.height;
-        if self.data.is_null() || old_width <= 0 || old_height <= 0 { return; }
-        if self.format == PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 as i32 {
-            let bytes_per_pixel =
-                #[allow(clippy::cast_sign_loss, reason = "data should never take up a negative amount of space")]
-                (unsafe { ffi::GetPixelDataSize(1, 1, self.format) } as u32);
-            let (old_data_len, new_data_len) =
-                #[allow(clippy::cast_sign_loss, reason = "guarded by `if old_width <= 0 || old_height <= 0 { return; }`")] {(
-                    old_width as u32 * old_height as u32 * bytes_per_pixel,
-                    new_width as u32 * new_height as u32 * bytes_per_pixel,
-                )};
-            let new_data = unsafe { ffi::MemAlloc(new_data_len) };
+// impl Resize for Image {
+//     fn resize_custom(&mut self, new_width: i32, new_height: i32, weight_fn: WeightFn) {
+//         let old_width = self.width;
+//         let old_height = self.height;
+//         if self.data.is_null() || old_width <= 0 || old_height <= 0 { return; }
+//         if self.format == PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 as i32 {
+//             let bytes_per_pixel =
+//                 #[allow(clippy::cast_sign_loss, reason = "data should never take up a negative amount of space")]
+//                 (unsafe { ffi::GetPixelDataSize(1, 1, self.format) } as u32);
+//             let (old_data_len, new_data_len) =
+//                 #[allow(clippy::cast_sign_loss, reason = "guarded by `if old_width <= 0 || old_height <= 0 { return; }`")] {(
+//                     old_width as u32 * old_height as u32 * bytes_per_pixel,
+//                     new_width as u32 * new_height as u32 * bytes_per_pixel,
+//                 )};
+//             let new_data = unsafe { ffi::MemAlloc(new_data_len) };
 
-            if !new_data.is_null() {
-                let new_data_color_slice = unsafe {
-                    std::slice::from_raw_parts_mut(new_data.cast::<Color>(), new_data_len as usize)
-                };
-                let old_data_color_slice = unsafe {
-                    std::slice::from_raw_parts(self.data.cast::<Color>(), old_data_len as usize)
-                };
+//             if !new_data.is_null() {
+//                 let new_data_color_slice = unsafe {
+//                     std::slice::from_raw_parts_mut(new_data.cast::<Color>(), new_data_len as usize)
+//                 };
+//                 let old_data_color_slice = unsafe {
+//                     std::slice::from_raw_parts(self.data.cast::<Color>(), old_data_len as usize)
+//                 };
 
-                let src_rec = IntRectangle {
-                    x: 0,
-                    y: 0,
-                    width:  old_width,
-                    height: old_height,
-                };
-                let dest_rec = IntRectangle {
-                    x: 0,
-                    y: 0,
-                    width:  new_width,
-                    height: new_height,
-                };
+//                 let src_rec = IRect2 {
+//                     min: IVector2 {
+//                         x: 0,
+//                         y: 0,
+//                     },
+//                     max: IVector2 {
+//                         x: old_width,
+//                         y: old_height,
+//                     },
+//                 };
+//                 let dest_rec = IRect2 {
+//                     min: IVector2 {
+//                         x: 0,
+//                         y: 0,
+//                     },
+//                     max: IVector2 {
+//                         x: new_width,
+//                         y: new_height,
+//                     },
+//                 };
 
-                let (ratio_x, ratio_y) = (
-                    f64::from(old_width ) / f64::from(new_width ),
-                    f64::from(old_height) / f64::from(new_height),
-                );
-                let sample_rec =
-                    #[allow(clippy::cast_possible_truncation, reason = "they're being floor'd and ceil'd")]
-                    IntRectangle {
-                        x: (ratio_x * -0.5).floor() as i32,
-                        y: (ratio_y * -0.5).floor() as i32,
-                        width:  (ratio_x).ceil() as i32,
-                        height: (ratio_y).ceil() as i32,
-                    };
-                // let weights: Box<[f32]> = sample_rec
-                //     .iter_uv_row_col()
-                //     .map(|(_, (u, v))| weight_fn(2.0 * (u - 0.5), 2.0 * (v - 0.5)))
-                //     .collect();
+//                 let (ratio_x, ratio_y) = (
+//                     f64::from(old_width ) / f64::from(new_width ),
+//                     f64::from(old_height) / f64::from(new_height),
+//                 );
+//                 let sample_rec =
+//                     #[allow(clippy::cast_possible_truncation, reason = "they're being floor'd and ceil'd")]
+//                     IRect2 {
+//                         min: IVector2 {
+//                             x: (ratio_x * -0.5).floor() as i32,
+//                             y: (ratio_y * -0.5).floor() as i32,
+//                         },
+//                         max: IVector2 {
+//                             x: ((ratio_x).ceil() - (ratio_x * -0.5).floor()) as i32,
+//                             y: ((ratio_y).ceil() - (ratio_y * -0.5).floor()) as i32,
+//                         },
+//                     };
 
-                for (dest_x, dest_y) in dest_rec.iter_xy_row_col() {
-                    let sample_rec = sample_rec.with_offset(dest_x, dest_y).intersect(&src_rec);
-                    let (sum, sum_weight) = sample_rec.iter_uv_row_col().fold(
-                        (Vector4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 }, 0.0),
-                        |(sum, sum_weight), ((src_x, src_y), (u, v))| {
-                            let weight = weight_fn(2.0 * (u - 0.5), 2.0 * (v - 0.5));
-                            let normalized = old_data_color_slice[src_rec.index_of(src_x, src_y)].color_normalize();
-                            (
-                                Vector4 {
-                                    x: sum.x + normalized.x * weight,
-                                    y: sum.y + normalized.y * weight,
-                                    z: sum.z + normalized.z * weight,
-                                    w: sum.w + normalized.w * weight,
-                                },
-                                sum_weight + weight,
-                            )
-                        }
-                    );
-                    let sum_weight_inv = sum_weight.recip();
-                    new_data_color_slice[dest_rec.index_of(dest_x, dest_y)] = Color::color_from_normalized(Vector4 {
-                        x: (sum.x * sum_weight_inv).clamp(0.0, 1.0),
-                        y: (sum.y * sum_weight_inv).clamp(0.0, 1.0),
-                        z: (sum.z * sum_weight_inv).clamp(0.0, 1.0),
-                        w: (sum.w * sum_weight_inv).clamp(0.0, 1.0),
-                    });
-                }
-            }
+//                 for dest in dest_rec.y_range().flat_map(|y| dest_rec.x_range().map(|x| IVector2::new(x, y))) {
+//                     let sample_rec = sample_rec.offset(dest) & src_rec;
+//                     let (sum, sum_weight) = sample_rec.y_range().flat_map(|y| sample_rec.x_range().map(|x| IVector2::new(x, y))).fold(
+//                         (Vector4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 }, 0.0),
+//                         |(sum, sum_weight), ((src_x, src_y), (u, v))| {
+//                             let weight = weight_fn(2.0 * (u - 0.5), 2.0 * (v - 0.5));
+//                             let normalized = old_data_color_slice[src_y as usize * src_rec.width() as usize + src_x as usize].color_normalize();
+//                             (
+//                                 Vector4 {
+//                                     x: sum.x + normalized.x * weight,
+//                                     y: sum.y + normalized.y * weight,
+//                                     z: sum.z + normalized.z * weight,
+//                                     w: sum.w + normalized.w * weight,
+//                                 },
+//                                 sum_weight + weight,
+//                             )
+//                         }
+//                     );
+//                     let sum_weight_inv = sum_weight.recip();
+//                     new_data_color_slice[dest.y as usize * dest_rec.width() as usize + dest.x as usize] = Color::color_from_normalized(Vector4 {
+//                         x: (sum.x * sum_weight_inv).clamp(0.0, 1.0),
+//                         y: (sum.y * sum_weight_inv).clamp(0.0, 1.0),
+//                         z: (sum.z * sum_weight_inv).clamp(0.0, 1.0),
+//                         w: (sum.w * sum_weight_inv).clamp(0.0, 1.0),
+//                     });
+//                 }
+//             }
 
-            unsafe { ffi::MemFree(self.data) };
-            self.data = new_data;
-            self.width = new_width;
-            self.height = new_height;
-        } else {
-            println!("unsupported pixel format, enjoy your oversized image");
-        }
-    }
-}
+//             unsafe { ffi::MemFree(self.data) };
+//             self.data = new_data;
+//             self.width = new_width;
+//             self.height = new_height;
+//         } else {
+//             println!("unsupported pixel format, enjoy your oversized image");
+//         }
+//     }
+// }

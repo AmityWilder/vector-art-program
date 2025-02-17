@@ -11,8 +11,8 @@ mod tests {
     fn test0() -> rltest::Result {
         rl_test("test0", 1280, 720, 60, |rl| {
             let window_rec = IRect2 {
-                min: IVec2::ZERO,
-                max: IVec2 {
+                min: IVector2::ZERO,
+                max: IVector2 {
                     x: rl.get_screen_width (),
                     y: rl.get_screen_height(),
                 },

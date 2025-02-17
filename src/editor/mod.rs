@@ -1,8 +1,8 @@
 use std::{path::Path, time::Instant};
 
 use amylib::prelude::DirectibleDoubleEndedIterator;
-use amymath::prelude::{DrawRect2Lines, IRect2, RaylibRlglDraw, RaylibRlglExt, Rect2};
-use raylib::prelude::*;
+use amymath::prelude::{*, Vector2};
+use raylib::prelude::{*, Vector2 as RlVector2};
 use undo_redo::{Action, EditHistory, RedoError, UndoError};
 use crate::{appearance::{Appearance, Blending, StyleItem}, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, raster::RasterTex, shaders::ShaderTable, tool::{raster_brush, Tool, ToolType}, vector_path::{fill, stroke}};
 
@@ -87,8 +87,8 @@ pub struct Editor {
 impl Editor {
     pub fn new(screen_width: i32, screen_height: i32) -> Self {
         let mut document = Document::new();
-        document.create_artboard(None, None, 512, 512);
-        document.camera.target = Vector2::new(
+        document.create_artboard(None, None, IVector2::new(512, 512));
+        document.camera.target = RlVector2::new(
             0.5 * (document.artboards[0].rect.width () - screen_width ) as f32,
             0.5 * (document.artboards[0].rect.height() - screen_height) as f32,
         );
@@ -152,7 +152,7 @@ impl Editor {
         {
             let is_zooming = rl.is_key_down(KEY_LEFT_ALT);
 
-            let mut pan = Vector2::zero();
+            let mut pan = Vector2::ZERO;
             if rl.is_mouse_button_down(MOUSE_BUTTON_MIDDLE) {
                 pan += mouse_screen_delta;
             }
@@ -164,7 +164,7 @@ impl Editor {
                 pan += scroll_v * 20.0;
             }
 
-            self.document.camera.target += (mouse_screen_delta - pan) / self.document.camera.zoom;
+            self.document.camera.target += RlVector2::from((mouse_screen_delta - pan) / self.document.camera.zoom);
             self.document.camera.offset = rl.get_mouse_position();
 
             if is_zooming {

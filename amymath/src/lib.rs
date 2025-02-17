@@ -1,23 +1,55 @@
-#![feature(const_trait_impl)]
+#![feature(const_trait_impl, const_ops, more_float_constants, maybe_uninit_array_assume_init, maybe_uninit_uninit_array)]
 
 pub mod color;
 pub mod vec;
-pub mod nvec;
+pub mod vec2;
+pub mod ivec2;
+pub mod uvec2;
 pub mod mat;
-pub mod nrect;
+pub mod nmat;
+pub mod rec;
+pub mod rect2;
+pub mod irect2;
+pub mod urect2;
 pub mod rlgl;
-pub mod num;
+// pub mod num;
 pub mod set;
 
 pub mod prelude {
     pub use crate::{
         color::*,
         vec::*,
-        nvec::*,
+        vec2::*,
+        ivec2::*,
+        uvec2::*,
         mat::*,
-        nrect::*,
+        nmat::*,
+        rec::*,
+        rect2::*,
+        irect2::*,
+        urect2::*,
         rlgl::*,
-        num::*,
         set::*,
     };
+}
+
+#[const_trait]
+pub trait MinMax: Sized {
+    fn minmax(self, other: Self) -> (Self, Self);
+}
+
+macro_rules! impl_minmax {
+    ($($T:ty),+ $(,)?) => {$(
+        impl const MinMax for $T {
+            fn minmax(self, other: $T) -> ($T, $T) {
+                if self <= other { (self, other) } else { (other, self) }
+            }
+        }
+    )+};
+}
+
+impl_minmax!{
+    i8, i16, i32, i64, i128, isize,
+    u8, u16, u32, u64, u128, usize,
+    f32, f64,
 }

@@ -5,10 +5,6 @@ unsafe extern "C" {
     static texShapes: ffi::Texture2D;
 }
 
-pub unsafe fn tex_shapes() -> &'static ffi::Texture2D {
-    &texShapes
-}
-
 pub trait RaylibRlglExt {
     /// Example
     /// ```no_run
@@ -59,6 +55,12 @@ impl<D: ?Sized> RlglHandle<'_, D> {
     /// Set current texture to use
     pub fn rl_set_texture(&mut self, texture: impl AsRef<ffi::Texture2D>) -> RlglTexture<'_, Self> {
         unsafe { ffi::rlSetTexture(texture.as_ref().id); }
+        RlglTexture(self)
+    }
+
+    /// Set current texture to use with that of `texShapes`
+    pub fn rl_set_texture_tex_shapes(&mut self) -> RlglTexture<'_, Self> {
+        unsafe { ffi::rlSetTexture(texShapes.id); }
         RlglTexture(self)
     }
 

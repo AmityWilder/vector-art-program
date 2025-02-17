@@ -94,7 +94,7 @@ impl UIRect {
     pub fn rect(&self, container: &IRect2) -> IRect2 {
         let (xmin, xmax) = self.h.to_range((container.min.x, container.max.x));
         let (ymin, ymax) = self.v.to_range((container.min.y, container.max.y));
-        IRect2 { min: IVec2 { x: xmin, y: ymin }, max: IVec2 { x: xmax, y: ymax } }
+        IRect2 { min: IVector2 { x: xmin, y: ymin }, max: IVector2 { x: xmax, y: ymax } }
     }
 }
 

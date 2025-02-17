@@ -1,9 +1,11 @@
+#[const_trait]
 pub trait Union<Rhs = Self> {
     type Output;
     #[must_use]
     fn union(self, rhs: Rhs) -> Self::Output;
 }
 
+#[const_trait]
 pub trait Intersection<Rhs = Self> {
     type Output;
     #[must_use]

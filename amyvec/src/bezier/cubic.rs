@@ -1,25 +1,24 @@
-use amymath::prelude::{CrossProduct, DistanceSqr};
-use raylib::prelude::*;
-use crate::{generics::*, polynomial::*};
-
+// use raylib::prelude::*;
+use amymath::prelude::{*, Vector2};
+use crate::polynomial::*;
 use super::{if_bounded, linear::Linear, quadratic::Quadratic, Bezier};
 
 #[derive(Debug)]
-pub struct Cubic<V: Vector> {
-    pub p1:     V,
-    pub c1_out: V,
-    pub c2_in:  V,
-    pub p2:     V,
+pub struct Cubic {
+    pub p1:     Vector2,
+    pub c1_out: Vector2,
+    pub c2_in:  Vector2,
+    pub p2:     Vector2,
 }
 
-impl<V: Vector> Cubic<V> {
-    pub const fn new(p1: V, c1_out: V, c2_in: V, p2: V) -> Self {
+impl Cubic {
+    pub const fn new(p1: Vector2, c1_out: Vector2, c2_in: Vector2, p2: Vector2) -> Self {
         Self { p1, c1_out, c2_in, p2 }
     }
 
     /// Calculate the position at time along the curve
     #[inline]
-    pub fn position_at(&self, t: f32) -> V {
+    pub fn position_at(&self, t: f32) -> Vector2 {
         let coefs = (
             (1.0 - t)*(1.0 - t)*(1.0 - t),
             3.0*(1.0 - t)*(1.0 - t)*t,
@@ -34,7 +33,7 @@ impl<V: Vector> Cubic<V> {
     ///
     /// Normalize to get tangent direction
     #[inline]
-    pub fn velocity_at(&self, t: f32) -> V {
+    pub fn velocity_at(&self, t: f32) -> Vector2 {
         let coefs = (
             3.0*(1.0 - t)*(1.0 - t),
             6.0*(1.0 - t)*t,
@@ -46,7 +45,7 @@ impl<V: Vector> Cubic<V> {
 
     /// Second-degree derivative at time along curve
     #[inline]
-    pub fn acceleration_at(&self, t: f32) -> V {
+    pub fn acceleration_at(&self, t: f32) -> Vector2 {
         let coefs = (
             6.0*(1.0 - t),
             6.0*t,
@@ -57,25 +56,25 @@ impl<V: Vector> Cubic<V> {
 
     /// Third-degree derivative at time along curve
     #[inline]
-    pub fn jerk(&self) -> V {
+    pub fn jerk(&self) -> Vector2 {
         let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
         (p3 + (p1 - p2)*3.0 - p0)*6.0
     }
 
     /// Tests if the curve can be expressed as a perfectly straight line from p0 to p3
-    pub fn as_linear(&self) -> Option<Linear<V>> {
+    pub fn as_linear(&self) -> Option<Linear> {
         let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
         (p1 == p0 && p2 == p3).then(|| Linear::new(p0, p3))
     }
 
     /// Tests if the curve can be expressed as a cubic bezier
-    pub fn is_quadratic(&self) -> Option<Quadratic<V>> {
+    pub fn is_quadratic(&self) -> Option<Quadratic> {
         let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
         (p1 == p0).then(|| Quadratic::new(p0, p2, p3)).or_else(|| (p2 == p3).then(|| Quadratic::new(p0, p1, p3)))
     }
 }
 
-impl<V: Vector> Cubic<V> {
+impl Cubic {
     /// Returns a broader bounding box of the curve using only the anchors and velocities.
     ///
     /// Cheaper than [`Self::bounds`], but significantly less accurate.
@@ -84,9 +83,9 @@ impl<V: Vector> Cubic<V> {
     ///
     /// **\* Describes the bounding box of *all* elements of the curve, not just the curve itself**
     #[inline]
-    pub fn max_bounds(&self) -> V::Rect {
+    pub const fn max_bounds(&self) -> Rect2 {
         let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
-        V::Rect::minmax_rec(p0, p1).max(V::Rect::minmax_rec(p2, p3))
+        Rect2::from_minmax(p0, p1).union(Rect2::from_minmax(p2, p3))
     }
 
     /// Returns a narrower bounding box of the curve using only the anchors.
@@ -98,21 +97,21 @@ impl<V: Vector> Cubic<V> {
     ///
     /// **\* Only describes the bounding box of the start and end of the curve, not the curve itself**
     #[inline]
-    pub fn min_bounds(&self) -> V::Rect {
-        V::Rect::minmax_rec(self.p1, self.p2)
+    pub const fn min_bounds(&self) -> Rect2 {
+        Rect2::from_minmax(self.p1, self.p2)
     }
 
     /// Returns the bounding box of the curve.
     ///
     /// ## Performance
     /// Solves the quadratic equation on both `x` and `y` axes
-    pub fn bounds(&self) -> V::Rect {
+    pub fn bounds(&self) -> Rect2 {
         let (p0, p1, p2, p3) = (self.p1, self.c1_out, self.c2_in, self.p2);
         let a = p0*-3.0 + p1* 9.0 - p2*9.0 + p3*3.0;
         let b = p0* 6.0 - p1*12.0 + p2*6.0;
         let c = p0*-3.0 + p1* 3.0;
-        a.into_iter().zip(b.into_iter()).zip(c.into_iter())
-            .flat_map(|((a, b), c)| {
+        [(a.x, b.x, c.x), (a.y, b.y, c.y)].into_iter()
+            .flat_map(|(a, b, c)| {
                 match quadratic_zero(a, b, c) {
                     QuadraticZeros::NoSolution | QuadraticZeros::InfiniteSolutions => [None, None],
                     QuadraticZeros::OneSolution(x0) => [if_bounded(x0), None],
@@ -120,19 +119,19 @@ impl<V: Vector> Cubic<V> {
                 }.into_iter().flatten()
             })
             .map(|t| self.position_at(t))
-            .fold(self.min_bounds(), |rec, p| rec.max_pt(p))
+            .fold(self.min_bounds(), |rec, p| rec.union_v(p))
     }
 
     /// Reciprocal radius (or "radians per meter") at time along curve
     #[inline]
-    pub fn curvature_at(&self, t: f32) -> f32 where V: CrossProduct<Output = f32> {
+    pub fn curvature_at(&self, t: f32) -> f32 {
         let vel = self.velocity_at(t);
         let acc = self.acceleration_at(t);
-        vel.cross(acc) / vel.length().powi(3)
+        vel.cross(acc) / vel.magnitude().powi(3)
     }
 }
 
-impl Cubic<Vector2> {
+impl Cubic {
     /// Time along curve closest to the position
     ///
     /// ## Performance
@@ -159,46 +158,46 @@ impl Cubic<Vector2> {
             .filter_map(|x| x.and_then(|x| if_bounded(x)))
             .map(|t| {
                 let p = self.position_at(t);
-                (t, p, p.distance_sqr_to(pt))
+                (t, p, p.distance_sqr(pt))
             })
             .reduce(|best, curr| if curr.2 < best.2 { curr } else { best })
             .map(|(t, p, _dist_sqr)| (t, p))
     }
 }
 
-impl<V: Vector> Bezier<V> for Cubic<V> {
+impl Bezier for Cubic {
     #[inline]
-    fn max_bounds(&self) -> V::Rect {
+    fn max_bounds(&self) -> Rect2 {
         self.max_bounds()
     }
 
     #[inline]
-    fn min_bounds(&self) -> V::Rect {
+    fn min_bounds(&self) -> Rect2 {
         self.min_bounds()
     }
 
     #[inline]
-    fn bounds(&self) -> V::Rect {
+    fn bounds(&self) -> Rect2 {
         self.bounds()
     }
 
     #[inline]
-    fn position_at(&self, t: f32) -> V {
+    fn position_at(&self, t: f32) -> Vector2 {
         self.position_at(t)
     }
 
     #[inline]
-    fn velocity_at(&self, t: f32) -> V {
+    fn velocity_at(&self, t: f32) -> Vector2 {
         self.velocity_at(t)
     }
 
     #[inline]
-    fn acceleration_at(&self, t: f32) -> V {
+    fn acceleration_at(&self, t: f32) -> Vector2 {
         self.acceleration_at(t)
     }
 
     #[inline]
-    fn jerk_at(&self, _t: f32) -> V {
+    fn jerk_at(&self, _t: f32) -> Vector2 {
         self.jerk()
     }
 }

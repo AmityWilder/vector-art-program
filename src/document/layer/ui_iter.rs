@@ -32,25 +32,25 @@ impl LayerUIRecs {
         let width = rec.width();
         let slot_rec = rec;
         let color_rec = {
-            rec.xmax = rec.xmin + LAYER_COLOR_WIDTH;
+            rec.max.x = rec.min.x + LAYER_COLOR_WIDTH;
             rec
         };
         let thumbnail_rec = {
-            rec.xmin += LAYER_COLOR_WIDTH + THUMBNAIL_INSET;
-            rec.ymin += THUMBNAIL_INSET;
-            (rec.xmax, rec.ymax) = (rec.xmin + THUMBNAIL_SIZE, rec.ymin + THUMBNAIL_SIZE);
+            rec.min.x += LAYER_COLOR_WIDTH + THUMBNAIL_INSET;
+            rec.min.y += THUMBNAIL_INSET;
+            (rec.max.x, rec.max.y) = (rec.min.x + THUMBNAIL_SIZE, rec.min.y + THUMBNAIL_SIZE);
             rec
         };
         let name_rec = {
-            rec.xmin += THUMBNAIL_SIZE + THUMBNAIL_INSET;
-            rec.ymax = rec.ymin + TEXT_FONT_SIZE;
-            rec.xmax = rec.xmin + width - LAYER_COLOR_WIDTH + THUMBNAIL_INSET - THUMBNAIL_SIZE;
+            rec.min.x += THUMBNAIL_SIZE + THUMBNAIL_INSET;
+            rec.max.y = rec.min.y + TEXT_FONT_SIZE;
+            rec.max.x = rec.min.x + width - LAYER_COLOR_WIDTH + THUMBNAIL_INSET - THUMBNAIL_SIZE;
             rec
         };
         let expand_button_rec = is_group.then(|| {
-            rec.ymin += TEXT_FONT_SIZE + INSET;
-            rec.xmax = rec.xmin + EXPAND_COLLAPSE_SIZE;
-            rec.ymax = rec.ymin + EXPAND_COLLAPSE_SIZE;
+            rec.min.y += TEXT_FONT_SIZE + INSET;
+            rec.max.x = rec.min.x + EXPAND_COLLAPSE_SIZE;
+            rec.max.y = rec.min.y + EXPAND_COLLAPSE_SIZE;
             rec
         });
         LayerUIRecs {
@@ -91,23 +91,23 @@ impl<L: IsGroup, I: Iterator<Item = (usize, L)>> Iterator for LayerUiIter<I> {
     fn next(&mut self) -> Option<Self::Item> {
         let container = &self.container;
         for (depth, layer) in self.tree_iter.by_ref() {
-            let ymin = self.slot.ymin;
-            if ymin >= container.ymax {
+            let ymin = self.slot.min.y;
+            if ymin >= container.max.y {
                 return None; // no more are going to be visible
             }
-            let bottom = self.slot.ymin + LAYER_HEIGHT + GAP;
-            if bottom < container.ymin {
-                self.slot.ymin = bottom;
+            let bottom = self.slot.min.y + LAYER_HEIGHT + GAP;
+            if bottom < container.min.y {
+                self.slot.min.y = bottom;
                 continue; // sprint to first visible
             }
             let indentation =
                 #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation, reason = "guarded by `min(256)`")]
                 (depth.min(256) as i32) * INDENT;
-            self.slot.xmin = container.xmin + indentation;
-            self.slot.xmax = container.xmax - indentation;
-            let recs = self.slot.is_overlapping(container)
+            self.slot.min.x = container.min.x + indentation;
+            self.slot.max.x = container.max.x - indentation;
+            let recs = self.slot.overlaps(container)
                 .then(|| LayerUIRecs::generate(self.slot, layer.is_group()));
-            self.slot.ymin = bottom;
+            self.slot.min.y = bottom;
             if let Some(recs) = recs {
                 return Some((layer, recs));
             }
@@ -125,10 +125,14 @@ impl Document {
                 .enumerate_depth()
                 .cdir::<TopToBot>(),
             slot: IRect2 {
-                xmin: container.xmin,
-                ymin: top + INSET,
-                xmax: container.xmax,
-                ymax: top + INSET + LAYER_HEIGHT,
+                min: IVector2 {
+                    x: container.min.x,
+                    y: top + INSET,
+                },
+                max: IVector2 {
+                    x: container.max.x,
+                    y: top + INSET + LAYER_HEIGHT,
+                },
             },
             container: *container,
         }
@@ -142,10 +146,14 @@ impl Document {
                 .enumerate_depth()
                 .cdir::<TopToBot>(),
             slot: IRect2 {
-                xmin: container.xmin,
-                ymin: top + INSET,
-                xmax: container.xmax,
-                ymax: top + INSET + LAYER_HEIGHT,
+                min: IVector2 {
+                    x: container.min.x,
+                    y: top + INSET,
+                },
+                max: IVector2 {
+                    x: container.max.x,
+                    y: top + INSET + LAYER_HEIGHT,
+                },
             },
             container: *container,
         }

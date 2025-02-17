@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 use amygui::panel::Panel;
-use amymath::prelude::*;
+use amymath::prelude::{*, Vector2};
 use layer::{Layer, LayerTree};
 use crate::{appearance::Appearance, raster::{Raster, RasterTex}, vector_path::VectorPath};
 use amylib::rc::prelude::*;
-use raylib::prelude::*;
+use raylib::prelude::{*, Vector2 as RlVector2};
 
 pub mod layer;
 pub mod artboard;
@@ -66,8 +66,8 @@ impl Document {
             path: None,
             title: "untitled".to_string(),
             camera: Camera2D {
-                offset: Vector2::zero(),
-                target: Vector2::zero(),
+                offset: RlVector2::zero(),
+                target: RlVector2::zero(),
                 rotation: 0.0,
                 zoom: 1.0,
             },
@@ -81,17 +81,15 @@ impl Document {
         }
     }
 
-    pub fn create_artboard(&mut self, name: Option<String>, xy: Option<(i32, i32)>, width: i32, height: i32) {
+    pub fn create_artboard(&mut self, name: Option<String>, pos: Option<IVector2>, size: IVector2) {
         const AUTO_GAP: i32 = 10;
         let name = name.unwrap_or_else(|| self.auto_artboard_name());
-        let (xmin, ymin) = xy.unwrap_or_else(|| self.artboards.last().map_or((0, 0), |b| (b.rect.xmax + AUTO_GAP, b.rect.ymin)));
+        let pos = pos.unwrap_or_else(|| self.artboards.last().map_or(IVector2::ZERO, |b| b.rect.max + IVector2 { x: AUTO_GAP, y: 0 }));
         self.artboards.push(ArtBoard {
             name,
             rect: IRect2 {
-                xmin,
-                ymin,
-                xmax: xmin + width,
-                ymax: ymin + height,
+                min: pos,
+                max: pos + size,
             },
         });
     }
@@ -136,21 +134,26 @@ impl Document {
         let panel_rec = panel.rect();
         let mut d = d.begin_scissor_mode_irect2(panel_rec);
         d.draw_rectangle_irect2(panel_rec, panel.background);
-        for (layer, recs) in self.ui_iter(panel_rec, panel_rec.ymin) {
+        for (layer, recs) in self.ui_iter(panel_rec, panel_rec.min.y) {
             let name = match layer {
                 Layer::Group(group) => &group.settings.name,
                 Layer::Path(path) => &path.read().settings.name,
                 Layer::Raster(raster) => &raster.read().settings.name,
             };
             let color = layer.settings().color;
-            d.draw_rectangle_rec(recs.slot, SLOT_COLOR);
-            d.draw_rectangle_rec(recs.color, color);
-            d.draw_rectangle_rec(recs.thumbnail, Color::GRAY);
-            d.draw_text(name, recs.name.xmin, recs.name.ymin, 10, TEXT_COLOR);
+            d.draw_rectangle_irect2(&recs.slot, SLOT_COLOR);
+            d.draw_rectangle_irect2(&recs.color, color);
+            d.draw_rectangle_irect2(&recs.thumbnail, Color::GRAY);
+            d.draw_text(name, recs.name.min.x, recs.name.min.y, 10, TEXT_COLOR);
             // expand icon
             if let Layer::Group(Group { is_expanded, .. }) = layer {
                 let expand_button_rec = recs.expand_button.expect("group should always have expand button");
-                let Rect2 { min, max } = expand_button_rec.into();
+                let IRect2 {
+                    min: IVector2 { x: xmin, y: ymin },
+                    max: IVector2 { x: xmax, y: ymax },
+                } = expand_button_rec;
+                let min = RlVector2 { x: xmin as f32, y: ymin as f32 };
+                let max = RlVector2 { x: xmax as f32, y: ymax as f32 };
                 let p0 = min;
                 let [p1, p2] = if *is_expanded {
                     [

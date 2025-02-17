@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
-use amymath::prelude::*;
 use raylib::prelude::*;
+use amymath::prelude::{*, Vector2};
 use crate::{
-    bezier::cubic::Cubic, generics::*, path_point::{Ctrl, PPPart, PathPoint}
+    bezier::cubic::Cubic, path_point::{Ctrl, PPPart, PathPoint}
 };
 
 #[derive(Debug, Clone)]
@@ -104,19 +104,19 @@ impl PartialOrd for PathPointIdx {
 }
 
 #[derive(Debug, Clone)]
-pub struct Curve<V: Vector = Vec2, M: Maternal<V> = Matrix2x2> {
-    pub points: VecDeque<PathPoint<V, M>>,
+pub struct Curve {
+    pub points: VecDeque<PathPoint>,
     pub is_closed: bool,
 }
 
-impl<V: Vector, M: Maternal<V>> Default for Curve<V, M> {
+impl Default for Curve {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<V: Vector, M: Maternal<V>> Curve<V, M> {
+impl Curve {
     pub const fn new() -> Self {
         Self {
             points: VecDeque::new(),
@@ -130,7 +130,7 @@ impl<V: Vector, M: Maternal<V>> Curve<V, M> {
     }
 
     #[inline]
-    pub fn slice(&self, start_index: usize) -> Option<Cubic<V>> {
+    pub fn slice(&self, start_index: usize) -> Option<Cubic> {
         if let Some((pp2, pp1)) = start_index.checked_add(1)
             .and_then(|end_index| self.points.get(end_index))
             .map(|pp2| (pp2, self.points.get(start_index).expect("existence of [i+1] should guarantee existence of [i]")))
@@ -142,7 +142,7 @@ impl<V: Vector, M: Maternal<V>> Curve<V, M> {
     }
 
     #[inline]
-    pub fn position_at(&self, t: f32) -> Option<V> {
+    pub fn position_at(&self, t: f32) -> Option<Vector2> {
         if self.points.is_empty() || t < 0.0 || 1.0 < t { return None; }
         if self.points.len() == 1 {
             Some(self.points[0].p)
@@ -161,10 +161,10 @@ impl<V: Vector, M: Maternal<V>> Curve<V, M> {
     }
 
     #[inline]
-    pub fn max_bounds(&self) -> Option<V::Rect> {
+    pub fn max_bounds(&self) -> Option<Rect2> {
         self.slices()
             .map(|bez| bez.max_bounds())
-            .reduce(|rec, b| rec.max(b))
+            .reduce(|rec, b| rec.union(b))
     }
 
     /// Calculate the bounding box of the entire curve
@@ -175,13 +175,13 @@ impl<V: Vector, M: Maternal<V>> Curve<V, M> {
     /// Calls [`Curve::slices`] (which calculates every path point)
     /// and [`Cubic::bounds`] (which solves the quadratic equation) on each.
     #[inline]
-    pub fn bounds(&self) -> Option<V::Rect> {
+    pub fn bounds(&self) -> Option<Rect2> {
         let mut bez_iter = self.slices();
         if let Some(bez) = bez_iter.next() {
             let mut rec = bez.bounds();
             for bez in bez_iter {
-                if !rec.entirely_contains(&bez.max_bounds()) {
-                    rec = rec.max(bez.bounds());
+                if !rec.contains(&bez.max_bounds()) {
+                    rec = rec.union(bez.bounds());
                 }
             }
             Some(rec)
@@ -189,28 +189,38 @@ impl<V: Vector, M: Maternal<V>> Curve<V, M> {
     }
 
     #[inline]
-    pub fn calculate(&self) -> Calculate<V, impl Iterator<Item = &'_ PathPoint<V, M>>> {
+    pub fn calculate(&self) -> Calculate<impl Iterator<Item = &'_ PathPoint>> {
         Calculate::new(self.points.iter(), self.is_closed)
     }
 
     #[inline]
-    pub fn slices(&self) -> Slices<V, impl Iterator<Item = &'_ PathPoint<V, M>>> {
+    pub fn slices(&self) -> Slices<impl Iterator<Item = &'_ PathPoint>> {
         Slices::new(self.calculate())
     }
 }
 
-impl<M: Maternal<Vector2>> Curve<Vector2, M> {
+impl Curve {
     pub fn draw_lines(&self, d: &mut impl RaylibDraw, strips_per_bez: usize, color: Color) {
-        if self.points.is_empty() { return; }
-        let mut points = Vec::with_capacity(strips_per_bez * self.points.len());
-        for bez in self.slices() {
-            for i in 0..strips_per_bez {
-                let t = i as f32 / (strips_per_bez - 1) as f32;
-                let p = bez.position_at(t);
-                points.push_within_capacity(p).expect("should not realloc");
+        if self.points.len() >= 2 {
+            let mut d = d.begin_rlgl();
+            let mut d = d.rl_begin_lines();
+            d.rl_color4ub(color.r, color.g, color.b, color.a);
+
+            let mut prev: Option<Vector2> = None;
+            for bez in self.slices() {
+                for i in 0..strips_per_bez {
+                    let t = i as f32 / (strips_per_bez - 1) as f32;
+                    let p = bez.position_at(t);
+                    if let Some(prev) = prev.as_mut() {
+                        d.rl_vertex2f(prev.x, prev.y);
+                        d.rl_vertex2f(p.x, p.y);
+                        *prev = p;
+                    } else {
+                        prev = Some(p);
+                    }
+                }
             }
         }
-        d.draw_line_strip(&points[..], color);
     }
 
     pub fn draw_stroke(&self, d: &mut impl RaylibDraw, strips_per_slice: usize, thick: &WidthProfile, color: Color) {
@@ -230,12 +240,12 @@ impl<M: Maternal<Vector2>> Curve<Vector2, M> {
                 let extents = thick.extents_at(t_full);
                 let v = bez.velocity_at(t_vel);
                 let p = bez.position_at(t);
-                if v.length_sqr() >= f32::EPSILON {
+                if v.magnitude_sqr() >= f32::EPSILON {
                     let tangent = v.normalized();
-                    let (normal_cw, normal_cc) = (tangent.rotate90_cw(), tangent.rotate90_cc());
+                    let (normal_cw, normal_cc) = (tangent.rotate_cw(), tangent.rotate_cc());
                     let p1 = p + normal_cc * extents.0;
                     let p2 = p + normal_cw * extents.1;
-                    d.draw_circle_v(p1.midpoint(p2), (extents.0 + extents.1) * 0.5, color);
+                    d.draw_circle_v(p1.midpoint_v(p2), (extents.0 + extents.1) * 0.5, color);
                 } else {
                     d.draw_circle_v(p, (extents.0 + extents.1) * 0.5, color);
                 }
@@ -251,9 +261,9 @@ impl<M: Maternal<Vector2>> Curve<Vector2, M> {
                 for i in 0..strips_per_slice {
                     let t = i as f32 / (strips_per_slice - 1) as f32;
                     let v = bez.velocity_at(t);
-                    if v.length_sqr() < f32::EPSILON { continue; }
+                    if v.magnitude_sqr() < f32::EPSILON { continue; }
                     let tangent = v.normalized();
-                    let (normal_cw, normal_cc) = (tangent.rotate90_cw(), tangent.rotate90_cc());
+                    let (normal_cw, normal_cc) = (tangent.rotate_cw(), tangent.rotate_cc());
                     let p = bez.position_at(t);
                     let t_full = (row + i) as f32 / total_strips as f32;
                     let extents = thick.extents_at(t_full);
@@ -316,12 +326,12 @@ impl<M: Maternal<Vector2>> Curve<Vector2, M> {
     }
 }
 
-pub struct Calculate<V, I> {
+pub struct Calculate<I> {
     iter: I,
-    wrapped: Option<Option<(V, V, V)>>,
+    wrapped: Option<Option<(Vector2, Vector2, Vector2)>>,
 }
 
-impl<V, I> Calculate<V, I> {
+impl<I> Calculate<I> {
     const fn new(iter: I, is_closed: bool) -> Self {
         Self {
             iter,
@@ -330,8 +340,8 @@ impl<V, I> Calculate<V, I> {
     }
 }
 
-impl<'a, V: Vector + 'a, M: Maternal<V> + 'a, I: Iterator<Item = &'a PathPoint<V, M>>> Iterator for Calculate<V, I> {
-    type Item = (V, V, V);
+impl<'a, I: Iterator<Item = &'a PathPoint>> Iterator for Calculate<I> {
+    type Item = (Vector2, Vector2, Vector2);
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(next) = self.iter.next() {
@@ -348,19 +358,19 @@ impl<'a, V: Vector + 'a, M: Maternal<V> + 'a, I: Iterator<Item = &'a PathPoint<V
     }
 }
 
-pub struct Slices<V, I> {
-    prev: Option<(V, V, V)>,
-    iter: Calculate<V, I>,
+pub struct Slices<I> {
+    prev: Option<(Vector2, Vector2, Vector2)>,
+    iter: Calculate<I>,
 }
 
-impl<V, I> Slices<V, I> {
-    const fn new(iter: Calculate<V, I>) -> Self {
+impl<I> Slices<I> {
+    const fn new(iter: Calculate<I>) -> Self {
         Self { prev: None, iter }
     }
 }
 
-impl<'a, V: Vector + 'a, M: Maternal<V> + 'a, I: Iterator<Item = &'a PathPoint<V, M>>> Iterator for Slices<V, I> {
-    type Item = Cubic<V>;
+impl<'a, I: Iterator<Item = &'a PathPoint>> Iterator for Slices<I> {
+    type Item = Cubic;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut next = self.iter.next();

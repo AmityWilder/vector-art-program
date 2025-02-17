@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, fs::File, io::{self, BufRead, BufReader, BufWriter, Read, Write}, path::Path};
-use amymath::prelude::{IRect2, Matrix2x2};
+use amymath::prelude::{*, Vector2};
 use amyvec::curve::{Curve, WidthProfile};
-use raylib::prelude::*;
+use raylib::prelude::{*, Vector2 as RlVector2};
 use amylib::{collections::Tree, io::{ReadArr, ReadBytes, WriteArr, WriteBytes}, rc::prelude::*};
 use crate::{
     appearance::{Appearance, Blending, StyleItem}, document::{
@@ -47,17 +47,19 @@ fn read_color_rgba(reader: &mut impl Read) -> io::Result<Color> {
 }
 
 fn write_irect2(writer: &mut impl Write, r: &IRect2) -> io::Result<()> {
-    writer.write_le_arr([r.xmin, r.ymin, r.xmax, r.ymax])
+    writer.write_le_arr([r.min.x, r.min.y, r.max.x, r.max.y])
 }
 fn read_irect2(reader: &mut impl Read) -> io::Result<IRect2> {
-    reader.read_le_arr().map(|[xmin, ymin, xmax, ymax]| IRect2 { xmin, ymin, xmax, ymax })
+    reader.read_le_arr().map(|[xmin, ymin, xmax, ymax]| IRect2 { min: IVector2 { x: xmin, y: ymin }, max: IVector2 { x: xmax, y: ymax } })
 }
 
 fn write_vector2(writer: &mut impl Write, v: Vector2) -> io::Result<()> {
-    writer.write_le_arr([v.x, v.y])
+    writer.write_all(&v.to_le_bytes())
 }
 fn read_vector2(reader: &mut impl Read) -> io::Result<Vector2> {
-    reader.read_le_arr().map(|[x, y]| Vector2 { x, y  })
+    let mut buf = [0; std::mem::size_of::<Vector2>()];
+    reader.read_exact(&mut buf)?;
+    Ok(Vector2::from_le_bytes(buf))
 }
 
 fn read_vec(reader: &mut impl Read) -> io::Result<Vec<u8>> {
@@ -130,7 +132,7 @@ impl Document {
         writer.write_le(*layer_name_acc)?;
         writer.write_le(*artboard_name_acc)?;
 
-        let camera_peculiar = camera.target * camera.zoom - camera.offset;
+        let camera_peculiar = Vector2::from(camera.target * camera.zoom - camera.offset);
         writer.write_le(camera.zoom)?;
         write_vector2(&mut writer, camera_peculiar)?;
 
@@ -174,8 +176,8 @@ impl Document {
                 document.camera.zoom = reader.read_le()?;
                 // camera.target * camera.zoom - camera.offset;
                 let camera_peculiar = read_vector2(&mut reader)?;
-                document.camera.target = (camera_peculiar + mouse_screen_pos) / document.camera.zoom;
-                document.camera.offset = mouse_screen_pos;
+                document.camera.target = RlVector2::from(camera_peculiar + mouse_screen_pos) / document.camera.zoom;
+                document.camera.offset = RlVector2::from(mouse_screen_pos);
 
                 // artboards
                 {
