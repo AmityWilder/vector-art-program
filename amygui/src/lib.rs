@@ -11,10 +11,11 @@ mod tests {
     fn test0() -> rltest::Result {
         rl_test("test0", 1280, 720, 60, |rl| {
             let window_rec = IRect2 {
-                xmin: 0,
-                ymin: 0,
-                xmax: rl.get_screen_width (),
-                ymax: rl.get_screen_height(),
+                min: IVec2::ZERO,
+                max: IVec2 {
+                    x: rl.get_screen_width (),
+                    y: rl.get_screen_height(),
+                },
             };
             let panel = Panel::new(&window_rec, UIRect::init().from_left(0).with_width(50).build(), Color::WHITE);
             rl.run(|rl| {

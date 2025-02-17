@@ -1,8 +1,10 @@
 use raylib::prelude::*;
 use amymath::{prelude::IRect2, rec::RaylibIntRect2Ex};
 use std::num::NonZeroUsize;
-use amygui::panel::Panel;
-use crate::{appearance::{Appearance, StyleItem}, editor::Editor, tool::Tool, vector_path::{fill, stroke}};
+use amygui::{panel::Panel, rec::UIRect};
+use crate::{appearance::{Appearance, StyleItem}, editor::Editor, shaders::ShaderTable, tool::Tool, vector_path::{fill, stroke}};
+
+use super::color_wheel::ColorWheel;
 
 struct ToolIconTextures {
     icon_point_selection: Texture2D,
@@ -57,13 +59,11 @@ impl ToolIcon {
     pub const WIDTH: i32 = 24;
 }
 
-struct MiniPalette(());
-
 pub struct ToolPanel {
     pub panel: Panel,
     pub num_cols: NonZeroUsize,
     pub items: Vec<ToolIcon>,
-    mini_palette: MiniPalette,
+    pub color_wheel: Option<ColorWheel>,
     textures: ToolIconTextures,
 }
 
@@ -128,7 +128,7 @@ impl ToolPanel {
             panel,
             num_cols: unsafe { NonZeroUsize::new_unchecked(2) },
             items: items.into_iter().collect(),
-            mini_palette: MiniPalette(()),
+            color_wheel: None,
             textures: ToolIconTextures::load(rl, thread),
         }
     }
@@ -174,7 +174,7 @@ impl ToolPanel {
             } else {
                 // palette
                 let [fill_rec, stroke_rec] = self.mini_palette_recs(&panel_rec, tools_height);
-                let handle_mini_palette_click = |current_appearance: &mut Appearance| {
+                let mut handle_mini_palette_click = |current_appearance: &mut Appearance| {
                     if stroke_rec.is_overlapping_v(mouse_screen_pos) {
                         if fill_rec.is_overlapping_v(mouse_screen_pos) {
                             let current_fill = if let Some(current_fill) = current_appearance.items.iter_mut()
@@ -186,10 +186,11 @@ impl ToolPanel {
                                     new_fill
                                 };
                             println!("clicked fill");
-                            match &mut current_fill.pattern {
-                                fill::Pattern::Solid(color) => *color = Color::RED,
-                                fill::Pattern::Gradient { .. } => todo!(),
-                            }
+                            self.color_wheel = Some(ColorWheel::new(Panel::new(&panel_rec, UIRect::init().with_width(100).with_height(100).build(), Color::BLACK)));
+                            // match &mut current_fill.pattern {
+                            //     fill::Pattern::Solid(color) => *color = Color::RED,
+                            //     fill::Pattern::Gradient { .. } => todo!(),
+                            // }
                         } else {
                             let current_stroke = if let Some(current_stroke) = current_appearance.items.iter_mut()
                                 .find_map(|item| if let StyleItem::Stroke(stroke) = item { Some(stroke) } else { None }) {
@@ -200,10 +201,11 @@ impl ToolPanel {
                                     new_stroke
                                 };
                             println!("clicked stroke");
-                            match &mut current_stroke.pattern {
-                                stroke::Pattern::Solid(color) => *color = Color::BLUE,
-                                stroke::Pattern::Gradient { .. } => todo!(),
-                            }
+                            self.color_wheel = Some(ColorWheel::new(Panel::new(&panel_rec, UIRect::init().with_width(100).with_height(100).build(), Color::BLACK)));
+                            // match &mut current_stroke.pattern {
+                            //     stroke::Pattern::Solid(color) => *color = Color::BLUE,
+                            //     stroke::Pattern::Gradient { .. } => todo!(),
+                            // }
                         }
                     }
                 };
@@ -217,7 +219,7 @@ impl ToolPanel {
         }
     }
 
-    pub fn draw(&self, d: &mut impl RaylibDraw, editor: &Editor) {
+    pub fn draw(&self, d: &mut impl RaylibDraw, editor: &Editor, shader_table: &ShaderTable) {
         let panel_rec = self.panel.rect();
         let tools_height = self.num_rows() as i32 * Self::SLOT_WIDTH;
         let mut d = d.begin_scissor_mode_irect2(panel_rec);
@@ -280,6 +282,10 @@ impl ToolPanel {
             } else {
                 draw_mini_palette(&editor.current_appearance);
             }
+        }
+
+        if let Some(color_wheel) = &self.color_wheel {
+            color_wheel.draw(&mut d, shader_table);
         }
     }
 }

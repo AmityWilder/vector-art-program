@@ -1,4 +1,4 @@
-use amymath::prelude::IRect2;
+use amymath::prelude::*;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Side {
@@ -92,9 +92,9 @@ impl UIRect {
     }
 
     pub fn rect(&self, container: &IRect2) -> IRect2 {
-        let (xmin, xmax) = self.h.to_range((container.xmin, container.xmax));
-        let (ymin, ymax) = self.v.to_range((container.ymin, container.ymax));
-        IRect2 { xmin, ymin, xmax, ymax }
+        let (xmin, xmax) = self.h.to_range((container.min.x, container.max.x));
+        let (ymin, ymax) = self.v.to_range((container.min.y, container.max.y));
+        IRect2 { min: IVec2 { x: xmin, y: ymin }, max: IVec2 { x: xmax, y: ymax } }
     }
 }
 

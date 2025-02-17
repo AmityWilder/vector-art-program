@@ -191,7 +191,7 @@ impl Engine {
 
         if let Some(active_editor) = self.get_active_editor() {
             self.layers_panel.draw(d, &active_editor.document);
-            self.tool_panel.draw(d, &active_editor);
+            self.tool_panel.draw(d, &active_editor, &self.shader_table);
         }
     }
 }

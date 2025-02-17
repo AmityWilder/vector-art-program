@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use amymath::{prelude::{Matrix2x2, MinMaxRectangle, Rotate90}, rlgl::*};
+use amymath::prelude::*;
 use raylib::prelude::*;
 use crate::{
     bezier::cubic::Cubic, generics::*, path_point::{Ctrl, PPPart, PathPoint}
@@ -104,7 +104,7 @@ impl PartialOrd for PathPointIdx {
 }
 
 #[derive(Debug, Clone)]
-pub struct Curve<V: Vector = Vector2, M: Maternal<V> = Matrix2x2> {
+pub struct Curve<V: Vector = Vec2, M: Maternal<V> = Matrix2x2> {
     pub points: VecDeque<PathPoint<V, M>>,
     pub is_closed: bool,
 }
