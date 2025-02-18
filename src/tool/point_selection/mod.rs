@@ -282,7 +282,7 @@ impl ToolType for PointSelection {
             }
 
             Some(SelectionState { selection: Selection::Multiple(selected), .. }) => {
-                selected.draw(d, editor, px_world_size, selection_rec, shader_table);
+                selected.draw(d, editor, px_world_size, shader_table);
             }
 
             None => {

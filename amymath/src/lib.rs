@@ -1,10 +1,12 @@
+#![allow(internal_features, reason = "unchecked_div and unchecked_rem used in `crate::uvec2::UVector2::grid_pos`")]
 #![feature(
     const_trait_impl,
     const_ops,
     more_float_constants,
     maybe_uninit_array_assume_init,
     maybe_uninit_uninit_array,
-    core_intrinsics, // unchecked_div and unchecked_rem used in `crate::uvec2::UVector2::grid_pos`
+    core_intrinsics,
+    trivial_bounds,
 )]
 
 pub mod color;
@@ -19,8 +21,6 @@ pub mod rect2;
 pub mod irect2;
 pub mod urect2;
 pub mod rlgl;
-// pub mod num;
-pub mod set;
 
 pub mod prelude {
     pub use crate::{
@@ -36,7 +36,6 @@ pub mod prelude {
         irect2::*,
         urect2::*,
         rlgl::*,
-        set::*,
     };
 }
 

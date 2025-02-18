@@ -1,7 +1,7 @@
 use raylib::prelude::*;
-use amymath::prelude::{Rect2, Vector2};
+use amymath::prelude::Vector2;
 use amylib::rc::prelude::*;
-use crate::{document::layer::Layer, editor::Editor, layer::LayerType, shaders::ShaderTable, vector_path::{DrawPathPoint, VectorPath}};
+use crate::{editor::Editor, layer::LayerType, shaders::ShaderTable, vector_path::{DrawPathPoint, VectorPath}};
 use super::HOVER_RADIUS;
 
 pub struct SelectionPiece {
@@ -35,45 +35,16 @@ impl MultiSelect {
             })
     }
 
-    pub fn draw(&self, d: &mut impl RaylibDraw, _editor: &Editor, px_world_size: f32, selection_rec: Option<Rect2>, _shader_table: &ShaderTable) {
-        if let Some(_selection_rec) = selection_rec {
-            panic!("found one");
-            // let mut selected_layers = self.pieces.iter().peekable();
-            // for (selected, path) in editor.document.layers.shallow_iter()
-            //     .filter_map(|layer|
-            //         if let Layer::Path(path) = layer {
-            //             Some((selected_layers.next_if(|selected| path == &selected.target), path.clone_ref()))
-            //         } else { None })
-            // {
-            //     let path = path.read();
-            //     path.draw_selected(d, px_world_size);
-            //     if let Some(selected) = selected {
-            //         let mut selected_points = selected.points.iter().peekable();
-            //         for (is_point_selected, pp) in path.curve.points.iter()
-            //             .enumerate()
-            //             .map(|(i, pp)| (selected_points.next_if_eq(&&i).is_some(), pp))
-            //         {
-            //             let is_selected = is_point_selected || selection_rec.contains_v(&pp.p);
-            //             d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
-            //         }
-            //     } else {
-            //         for pp in &path.curve.points {
-            //             let is_selected = selection_rec.contains_v(&pp.p);
-            //             d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
-            //         }
-            //     }
-            // }
-        } else {
-            for piece in &self.pieces {
-                let path = piece.target.read();
-                path.draw_selected(d, px_world_size);
-                let mut indices = piece.points.iter().copied();
-                let mut idx = indices.next();
-                for (pp_idx, pp) in path.curve.points.iter().enumerate() {
-                    let is_selected = idx.is_some_and(|idx| pp_idx == idx);
-                    if is_selected { idx = indices.next(); }
-                    d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
-                }
+    pub fn draw(&self, d: &mut impl RaylibDraw, _editor: &Editor, px_world_size: f32, _shader_table: &ShaderTable) {
+        for piece in &self.pieces {
+            let path = piece.target.read();
+            path.draw_selected(d, px_world_size);
+            let mut indices = piece.points.iter().copied();
+            let mut idx = indices.next();
+            for (pp_idx, pp) in path.curve.points.iter().enumerate() {
+                let is_selected = idx.is_some_and(|idx| pp_idx == idx);
+                if is_selected { idx = indices.next(); }
+                d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
             }
         }
     }

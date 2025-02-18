@@ -116,41 +116,21 @@ impl SingleSelect {
     }
 
     pub fn draw(&self, d: &mut impl RaylibDraw, px_world_size: f32, _shader_table: &ShaderTable) {
-        if let Some(_selection_rec) = Option::<Rectangle>::None {
-            unreachable!("2025-02-10: at present, creating a selection rectangle inherently clears the selection. this may change in the future with `shift+select`.");
-            // use amylib::prelude::DirectibleDoubleEndedIterator;
-            // use crate::{Layer, tool::point_selection::BackToFore};
-            // // draw selection options
-            // let selected_idx = self.pt_idx.expect("pt_idx should not be None when selecting with rectangle");
-            // for (has_selected, path) in document.layers.shallow_iter().cdir::<BackToFore>().filter_map(|layer|
-            //     if let Layer::Path(path) = layer {
-            //         Some((&self.target == path, path.clone_ref()))
-            //     } else { None })
-            // {
-            //     let path = path.read();
-            //     path.draw_selected(d, px_world_size);
-            //     for (is_point_selected, pp) in path.curve.points.iter().enumerate().map(|(i, pp)| (has_selected && i == selected_idx, pp)) {
-            //         let is_selected = is_point_selected || selection_rec.check_collision_point_rec(pp.p);
-            //         d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
-            //     }
-            // }
-        } else {
-            let path = self.target.read();
-            if let Some(idx) = self.point {
-                path.draw_selected(d, px_world_size);
-                let pp = &path.curve.points[idx.point];
-                d.draw_path_point(pp, px_world_size, path.settings.color, true, true, true);
-                if let (PPPart::Ctrl(side), &PathPoint { p, c: Some(Ctrl1 { c1: (c1_side, c1), c2: Some(Ctrl2::Exact(c2)) }) }) = (idx.part, pp) {
-                    let (c_self, c_opp) = if c1_side == side { (c1, c2) } else { (c2, c1) };
-                    let refl = c_opp.reflected_over(p);
-                    let mirror = c_opp.reflected_to(p, (refl - p).normalized().dot(c_self - p));
-                    d.draw_line_v(p, mirror, Color::new(255, 0, 255, 127));
-                    d.draw_ring(refl, (SNAP_VERT_RADIUS - 0.5) * px_world_size, (SNAP_VERT_RADIUS + 0.5) * px_world_size, 0.0, 360.0, 16, Color::new(255, 0, 255, 127));
-                    d.draw_ring(p, (SNAP_VERT_RADIUS - 0.5) * px_world_size, (SNAP_VERT_RADIUS + 0.5) * px_world_size, 0.0, 360.0, 16, Color::new(255, 0, 255, 127));
-                }
-            } else {
-                path.draw_selected(d, px_world_size * 3.0);
+        let path = self.target.read();
+        if let Some(idx) = self.point {
+            path.draw_selected(d, px_world_size);
+            let pp = &path.curve.points[idx.point];
+            d.draw_path_point(pp, px_world_size, path.settings.color, true, true, true);
+            if let (PPPart::Ctrl(side), &PathPoint { p, c: Some(Ctrl1 { c1: (c1_side, c1), c2: Some(Ctrl2::Exact(c2)) }) }) = (idx.part, pp) {
+                let (c_self, c_opp) = if c1_side == side { (c1, c2) } else { (c2, c1) };
+                let refl = c_opp.reflected_over(p);
+                let mirror = c_opp.reflected_to(p, (refl - p).normalized().dot(c_self - p));
+                d.draw_line_v(p, mirror, Color::new(255, 0, 255, 127));
+                d.draw_ring(refl, (SNAP_VERT_RADIUS - 0.5) * px_world_size, (SNAP_VERT_RADIUS + 0.5) * px_world_size, 0.0, 360.0, 16, Color::new(255, 0, 255, 127));
+                d.draw_ring(p, (SNAP_VERT_RADIUS - 0.5) * px_world_size, (SNAP_VERT_RADIUS + 0.5) * px_world_size, 0.0, 360.0, 16, Color::new(255, 0, 255, 127));
             }
+        } else {
+            path.draw_selected(d, px_world_size * 3.0);
         }
     }
 }
