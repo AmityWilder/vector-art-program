@@ -1,4 +1,4 @@
-use amymath::prelude::RectangleCenter;
+use amymath::prelude::Vector2;
 use raylib::prelude::*;
 use amygui::panel::Panel;
 use crate::shaders::ShaderTable;
@@ -70,7 +70,7 @@ impl ColorWheel {
     }
 
     pub fn draw(&self, d: &mut impl RaylibDraw, shader_table: &ShaderTable) {
-        let (center, extent) = self.panel.rect().center_and_extent();
+        let (center, extent) = self.panel.rect().as_rect2().center_and_extent();
         let radius = extent.x.min(extent.y);
         let mut d = d.begin_shader_mode(&shader_table.hue_wheel);
         shader_table.draw_uv_tex(&mut d, center, radius, Color::WHITE);

@@ -1,6 +1,6 @@
 use std::ops::*;
 use raylib::prelude::{*, Vector2 as RlVector2};
-use crate::prelude::Vector2;
+use crate::prelude::{IRect2, IVector2, Vector2};
 use crate::rlgl::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -88,6 +88,24 @@ impl Rect2 {
     #[inline]
     pub const fn new(min: Vector2, max: Vector2) -> Self {
         Self { min, max }
+    }
+
+    #[inline]
+    pub const fn as_irect2(self) -> IRect2 {
+        IRect2 {
+            min: self.min.as_ivec2(),
+            max: self.max.as_ivec2(),
+        }
+    }
+
+    #[inline]
+    pub const fn center_and_extent(self) -> (Vector2, Vector2) {
+        let extent = Vector2 {
+            x: (self.max.x - self.min.x) * 0.5,
+            y: (self.max.y - self.min.y) * 0.5,
+        };
+        let center = self.min + extent;
+        (center, extent)
     }
 
     /// Sorts the inputs
@@ -275,7 +293,10 @@ impl RangeBounds<Vector2> for Rect2 {
 
 pub trait DrawRect2: RaylibDraw {
     #[inline]
-    fn draw_rectangle_rect2(&mut self, rec: Rect2, color: Color) where Self: RaylibRlglExt {
+    fn draw_rectangle_rect2(&mut self, rec: &Rect2, color: Color) where Self: RaylibRlglExt {
+        let shapes_rec = Rect2::from(tex_shapes_rec());
+        let shapes_size = IVector2::from(tex_shapes_size()).as_vec2();
+
         let mut d = self.begin_rlgl();
         d.rl_set_texture_tex_shapes();
         let mut d = d.rl_begin_quads();
@@ -283,16 +304,16 @@ pub trait DrawRect2: RaylibDraw {
         d.rl_normal3f(0.0, 0.0, 1.0);
         d.rl_color4ub(color.r, color.g, color.b, color.a);
 
-        d.rl_tex_coord2f(0.0, 0.0);
+        d.rl_tex_coord2f(shapes_rec.min.x/shapes_size.x, shapes_rec.min.y/shapes_size.y);
         d.rl_vertex2f(rec.min.x, rec.min.y);
 
-        d.rl_tex_coord2f(0.0, 1.0);
+        d.rl_tex_coord2f(shapes_rec.min.x/shapes_size.x, shapes_rec.max.y/shapes_size.y);
         d.rl_vertex2f(rec.min.x, rec.max.y);
 
-        d.rl_tex_coord2f(1.0, 1.0);
+        d.rl_tex_coord2f(shapes_rec.max.x/shapes_size.x, shapes_rec.max.y/shapes_size.y);
         d.rl_vertex2f(rec.max.x, rec.max.y);
 
-        d.rl_tex_coord2f(1.0, 0.0);
+        d.rl_tex_coord2f(shapes_rec.max.x/shapes_size.x, shapes_rec.min.y/shapes_size.y);
         d.rl_vertex2f(rec.max.x, rec.min.y);
     }
 

@@ -1,5 +1,5 @@
 use amygui::{panel::Panel, rec::UIRect};
-use amymath::prelude::*;
+use amymath::prelude::{*, Vector2};
 use raylib::prelude::*;
 use crate::{editor::Editor, shaders::ShaderTable, engine::{layers_panel::LayersPanel, tool_panel::{ToolIcon, ToolPanel}}};
 
@@ -53,10 +53,8 @@ impl Engine {
         let (screen_width, screen_height) = (rl.get_screen_width(), rl.get_screen_height());
         assert!(screen_width >= 0 && screen_height >= 0);
         let window_rect = IRect2 {
-            xmin: 0,
-            ymin: 0,
-            xmax: screen_width,
-            ymax: screen_height,
+            min: IVector2::ZERO,
+            max: IVector2::new(screen_width, screen_height),
         };
         let layers_panel = LayersPanel::new(
             Panel::new(
@@ -141,9 +139,9 @@ impl Engine {
             println!("toggled trim view");
         }
 
-        let hover_region = if self.tool_panel.panel.rect().is_overlapping_v(mouse_screen_pos) {
+        let hover_region = if self.tool_panel.panel.rect().contains_v(&mouse_screen_pos.as_ivec2()) {
             HoverRegion::ToolPanel
-        } else if self.layers_panel.panel.rect().is_overlapping_v(mouse_screen_pos) {
+        } else if self.layers_panel.panel.rect().contains_v(&mouse_screen_pos.as_ivec2()) {
             HoverRegion::LayersPanel
         } else {
             HoverRegion::Editor
@@ -172,8 +170,8 @@ impl Engine {
         d.clear_background(self.config.background_color);
         for editor in editors {
             let viewport = Rect2 {
-                min: d.get_screen_to_world2D(rvec2(window_rect.xmin, window_rect.ymin), editor.document.camera),
-                max: d.get_screen_to_world2D(rvec2(window_rect.xmax, window_rect.ymax), editor.document.camera),
+                min: d.get_screen_to_world2D(window_rect.min.as_vec2(), editor.document.camera).into(),
+                max: d.get_screen_to_world2D(window_rect.max.as_vec2(), editor.document.camera).into(),
             };
 
             editor.draw_background(self, d);

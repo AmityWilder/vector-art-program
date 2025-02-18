@@ -1,4 +1,4 @@
-use std::{ops::*, mem};
+use std::{mem, ops::*};
 use crate::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -35,6 +35,17 @@ impl From<(i32, i32)> for IVector2 {
     }
 }
 
+impl TryFrom<UVector2> for IVector2 {
+    type Error = std::num::TryFromIntError;
+    /// Returns an error if x or y is greater than [`i32::MAX`]
+    fn try_from(UVector2 { x, y }: UVector2) -> Result<Self, Self::Error> {
+        Ok(Self {
+            x: x.try_into()?,
+            y: y.try_into()?,
+        })
+    }
+}
+
 impl IVector2 {
     pub const MIN: Self = Self { x: i32::MIN, y: i32::MIN };
     pub const MAX: Self = Self { x: i32::MAX, y: i32::MAX };
@@ -44,6 +55,22 @@ impl IVector2 {
     #[inline]
     pub const fn new(x: i32, y: i32) -> Self {
         Self { x, y }
+    }
+
+    #[inline]
+    pub const fn as_uvec2(self) -> UVector2 {
+        UVector2 {
+            x: self.x as u32,
+            y: self.y as u32,
+        }
+    }
+
+    #[inline]
+    pub const fn as_vec2(self) -> Vector2 {
+        Vector2 {
+            x: self.x as f32,
+            y: self.y as f32,
+        }
     }
 
     #[inline]
@@ -64,6 +91,14 @@ impl IVector2 {
     #[inline]
     pub const fn prod(self) -> i32 {
         self.x * self.y
+    }
+
+    #[inline]
+    pub const fn delta(self, other: Self) -> Self {
+        Self {
+            x: other.x - self.x,
+            y: other.y - self.y,
+        }
     }
 
     #[inline]

@@ -1,6 +1,6 @@
 use raylib::prelude::*;
 use amylib::rc::prelude::*;
-use amymath::prelude::*;
+use amymath::prelude::{*, Vector2};
 use crate::{appearance::Appearance, document::Document, editor::Editor, layer::LayerType, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, DrawPathPoint, VectorPath}};
 use super::{point_selection::SNAP_VERT_RADIUS_SQR, ToolType};
 
@@ -58,7 +58,7 @@ impl PathSignal {
         let mut change_type = ChangeType::None;
         let last_changed = self.last_changed;
         let delta = p - last_changed;
-        let distance_sqr = delta.length_sqr();
+        let distance_sqr = delta.magnitude_sqr();
 
         if distance_sqr > MIN_DISTANCE_SQR {
             change_type = ChangeType::Position;
@@ -66,27 +66,27 @@ impl PathSignal {
             if self.last_straight != last_changed {
                 let last_straight = self.last_straight;
                 let delta_prev = last_changed - last_straight;
-                let distance_sqr_prev = delta_prev.length_sqr();
+                let distance_sqr_prev = delta_prev.magnitude_sqr();
                 assert!(distance_sqr_prev.is_normal() && distance_sqr_prev > 0.0, "delta_prev: {delta_prev:?}");
-                let adj_length = (delta_prev / distance_sqr_prev.sqrt()).dot(delta);
-                let opp_length_sqr = distance_sqr - adj_length * adj_length;
+                let adj_magnitude = (delta_prev / distance_sqr_prev.sqrt()).dot(delta);
+                let opp_magnitude_sqr = distance_sqr - adj_magnitude * adj_magnitude;
 
-                if adj_length < 0.0 {
+                if adj_magnitude < 0.0 {
                     change_type = ChangeType::Curvature;
 
                     self.last_curved = p;
                     self.last_straight = p;
-                } else if opp_length_sqr > MIN_OPP_LENGTH_SQR {
+                } else if opp_magnitude_sqr > MIN_OPP_LENGTH_SQR {
                     change_type = ChangeType::Direction;
 
                     if self.last_curved != last_straight {
                         let last_curved = self.last_curved;
                         let delta_prev_prev = last_straight - last_curved;
-                        let distance_sqr_prev_prev = delta_prev_prev.length_sqr();
-                        let adj_length_prev = (delta_prev_prev / distance_sqr_prev_prev.sqrt()).dot(delta_prev);
-                        let opp_length_sqr_prev = distance_sqr_prev - adj_length_prev * adj_length_prev;
+                        let distance_sqr_prev_prev = delta_prev_prev.magnitude_sqr();
+                        let adj_magnitude_prev = (delta_prev_prev / distance_sqr_prev_prev.sqrt()).dot(delta_prev);
+                        let opp_magnitude_sqr_prev = distance_sqr_prev - adj_magnitude_prev * adj_magnitude_prev;
 
-                        if (opp_length_sqr - opp_length_sqr_prev).abs() > MIN_OPP_LENGTH_SQR_CHANGE {
+                        if (opp_magnitude_sqr - opp_magnitude_sqr_prev).abs() > MIN_OPP_LENGTH_SQR_CHANGE {
                             change_type = ChangeType::Curvature;
 
                             self.last_curved = p;
@@ -121,11 +121,11 @@ impl ActiveVectorBrush {
         }
     }
 
-    // At high speeds, a point can be made with a zero-length control, creating what looks like a distinct path.
+    // At high speeds, a point can be made with a zero-magnitude control, creating what looks like a distinct path.
     // This function fixes that.
     fn merge_confirmed_verts(path: &mut VectorPath) {
         // join points confirmed to be no longer editing
-        if let Some(idx) = path.curve.points.len().checked_sub(3) && path.curve.points[idx].p.distance_sqr_to(path.curve.points[idx + 1].p) < SNAP_VERT_RADIUS_SQR {
+        if let Some(idx) = path.curve.points.len().checked_sub(3) && path.curve.points[idx].p.distance_sqr(path.curve.points[idx + 1].p) < SNAP_VERT_RADIUS_SQR {
             let b = path.curve.points.remove(idx + 1).expect("checked sub should ensure element existence");
             let a = &mut path.curve.points[idx];
             println!("merging points\n  {a:?}\n  {b:?}");
@@ -144,8 +144,8 @@ impl ActiveVectorBrush {
 
         if let Some(idx) = path.curve.points.len().checked_sub(3) {
             let (prev, curr, next) = (path.curve.points[idx].p, path.curve.points[idx + 1].p, path.curve.points[idx + 2].p);
-            let speed_in  = (curr - prev).length();
-            let speed_out = (next - curr).length();
+            let speed_in  = (curr - prev).magnitude();
+            let speed_out = (next - curr).magnitude();
             let t_hat = (next - prev).normalized();
             let c_out = curr + t_hat * speed_out / 3.0;
             {
@@ -182,7 +182,7 @@ impl ActiveVectorBrush {
             if path.curve.points.len() >= 2 {
                 let first = path.curve.points.front().expect("len >= 2 should guarantee 2 points").p;
                 let last  = path.curve.points.back ().expect("len >= 2 should guarantee 2 points").p;
-                if first.distance_sqr_to(last) <= SNAP_VERT_RADIUS_SQR {
+                if first.distance_sqr(last) <= SNAP_VERT_RADIUS_SQR {
                     path.curve.is_closed = true;
                 }
             }

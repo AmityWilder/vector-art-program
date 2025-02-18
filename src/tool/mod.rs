@@ -1,5 +1,5 @@
 use amylib::prelude::{Strong, StrongMut};
-use amymath::prelude::Rect2;
+use amymath::prelude::{Rect2, Vector2};
 use raylib::prelude::*;
 use crate::{appearance::Appearance, document::Document, editor::Editor, raster::Raster, shaders::ShaderTable, vector_path::VectorPath};
 

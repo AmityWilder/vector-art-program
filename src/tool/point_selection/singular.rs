@@ -1,6 +1,6 @@
 use amyvec::{curve::PathPointIdx, path_point::PathPoint};
 use raylib::prelude::*;
-use amymath::prelude::*;
+use amymath::prelude::Vector2;
 use amylib::rc::prelude::*;
 use crate::{layer::LayerType, shaders::ShaderTable, vector_path::{path_point::{Ctrl1, Ctrl2, PPPart}, VectorPath, DrawPathPoint}};
 use super::{HOVER_RADIUS, SNAP_VERT_RADIUS, SNAP_VERT_RADIUS_SQR};
@@ -52,16 +52,16 @@ impl SingleSelect {
                 let is_c_self_c1 = *c1_side == side;
                 let (c_self, c_opp) = if is_c_self_c1 { (*c1, c2_pos) } else { (c2_pos, *c1) };
 
-                let snapped = if c_self.distance_sqr_to(p) <= snap_vert_radius_sqr {
+                let snapped = if c_self.distance_sqr(p) <= snap_vert_radius_sqr {
                     Some(None) // corner
                 } else {
                     let refl = c_opp.reflected_over(p);
-                    if c_self.distance_sqr_to(refl) <= snap_vert_radius_sqr {
+                    if c_self.distance_sqr(refl) <= snap_vert_radius_sqr {
                         Some(Some(Ctrl2::Reflect))
                     } else {
                         let len = (refl - p).normalized().dot(c_self - p);
                         let mirror = c_opp.reflected_to(p, len);
-                        if c_self.distance_sqr_to(mirror) <= snap_vert_radius_sqr {
+                        if c_self.distance_sqr(mirror) <= snap_vert_radius_sqr {
                             Some(Some(Ctrl2::Mirror(len)))
                         } else { None }
                     }
@@ -79,7 +79,7 @@ impl SingleSelect {
                     }
                 }
             } else if let (PPPart::Ctrl(side), &mut Some(Ctrl1 { c1: (ref mut c1_side, ref mut c1), c2: None })) = (idx.part, &mut pp.c) {
-                if *c1_side == side && c1.distance_sqr_to(p) <= snap_vert_radius_sqr {
+                if *c1_side == side && c1.distance_sqr(p) <= snap_vert_radius_sqr {
                     pp.c = None;
                 }
             }
@@ -97,11 +97,11 @@ impl SingleSelect {
             let p_dist = pp.p.rec_distance_to(mouse_world_pos);
             items[0] = (p_dist <= hover_radius).then_some((PPPart::Anchor, p_dist));
             if let Some(Ctrl1 { c1: (c1_side, c1), c2 }) = pp.c {
-                let c1_dist = c1.distance_sqr_to(mouse_world_pos);
+                let c1_dist = c1.distance_sqr(mouse_world_pos);
                 items[1] = (c1_dist <= hover_radius_sqr).then_some((PPPart::Ctrl(c1_side), c1_dist));
                 if let Some(c2) = c2 {
                     let c2 = c2.calculate(pp.p, c1);
-                    let c2_dist = c2.distance_sqr_to(mouse_world_pos);
+                    let c2_dist = c2.distance_sqr(mouse_world_pos);
                     let c2_side = c1_side.opposite();
                     items[2] = (c2_dist <= hover_radius_sqr).then_some((PPPart::Ctrl(c2_side), c2_dist));
                 }
@@ -115,8 +115,8 @@ impl SingleSelect {
         }
     }
 
-    pub fn draw(&self, d: &mut impl RaylibDraw, px_world_size: f32, selection_rec: Option<Rectangle>, _shader_table: &ShaderTable) {
-        if let Some(_selection_rec) = selection_rec {
+    pub fn draw(&self, d: &mut impl RaylibDraw, px_world_size: f32, _shader_table: &ShaderTable) {
+        if let Some(_selection_rec) = Option::<Rectangle>::None {
             unreachable!("2025-02-10: at present, creating a selection rectangle inherently clears the selection. this may change in the future with `shift+select`.");
             // use amylib::prelude::DirectibleDoubleEndedIterator;
             // use crate::{Layer, tool::point_selection::BackToFore};

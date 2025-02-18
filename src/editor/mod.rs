@@ -1,5 +1,4 @@
 use std::{path::Path, time::Instant};
-
 use amylib::prelude::DirectibleDoubleEndedIterator;
 use amymath::prelude::{*, Vector2};
 use raylib::prelude::{*, Vector2 as RlVector2};
@@ -85,13 +84,10 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn new(screen_width: i32, screen_height: i32) -> Self {
+    pub fn new(screen_size: IVector2) -> Self {
         let mut document = Document::new();
         document.create_artboard(None, None, IVector2::new(512, 512));
-        document.camera.target = RlVector2::new(
-            0.5 * (document.artboards[0].rect.width () - screen_width ) as f32,
-            0.5 * (document.artboards[0].rect.height() - screen_height) as f32,
-        );
+        document.camera.target = (0.5 * (document.artboards[0].rect.size() - screen_size).as_vec2()).into();
         Self {
             document,
             history: EditHistory::with_capacity(128),
@@ -147,7 +143,7 @@ impl Editor {
             handle_serialization(rl, thread, &mut self.document, &kind, mouse_screen_pos);
         }
 
-        let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, self.document.camera);
+        let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, self.document.camera).into();
 
         {
             let is_zooming = rl.is_key_down(KEY_LEFT_ALT);
@@ -234,14 +230,14 @@ impl Editor {
 
         // Artboards background
         for board in &self.document.artboards {
-            d.draw_rectangle_rec(board.rect, if engine.is_trim_view { engine.config.background_color } else { self.document.paper_color });
+            d.draw_rectangle_irect2(&board.rect, if engine.is_trim_view { engine.config.background_color } else { self.document.paper_color });
         }
     }
 
     pub fn draw_trimmed(&self, d: &mut RaylibDrawHandle<'_>, trim_rtex: &RenderTexture2D, window_rec: &IRect2) {
         for board in &self.document.artboards {
             let board_rec = &board.rect;
-            if board_rec.is_overlapping(window_rec) {
+            if board_rec.overlaps(window_rec) {
                 let (Vector2 { y: top, x: left }, Vector2 { y: bottom, x: right })
                     = board.get_screen_tl_br(|v| d.get_world_to_screen2D(v, self.document.camera));
                 let inv_width  = (trim_rtex.width () as f32).recip();
@@ -287,7 +283,7 @@ impl Editor {
         for board in &self.document.artboards {
             let (tl, br) = board.get_screen_tl_br(|v| d.get_world_to_screen2D(v, self.document.camera));
             d.draw_text(&board.name, tl.x.floor() as i32, tl.y.floor() as i32 - FONT_SIZE, FONT_SIZE, Color::WHITE);
-            d.draw_rectangle_lines_rect2(Rect2::minmax_rec(tl, br), Color::BLACK);
+            d.draw_rectangle_lines_rect2(&Rect2::from_minmax(tl, br), Color::BLACK);
         }
         let mut d = d.begin_mode2D(self.document.camera);
         let px_world_size = self.document.camera.zoom.recip();

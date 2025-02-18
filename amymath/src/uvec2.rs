@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use std::{ops::*, mem};
+use std::{mem, num::NonZeroUsize, ops::*};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct UVector2 {
@@ -35,6 +35,17 @@ impl From<(u32, u32)> for UVector2 {
     }
 }
 
+impl TryFrom<IVector2> for UVector2 {
+    type Error = std::num::TryFromIntError;
+    /// Returns an error if either x or y is negative
+    fn try_from(IVector2 { x, y }: IVector2) -> Result<Self, Self::Error> {
+        Ok(Self {
+            x: x.try_into()?,
+            y: y.try_into()?,
+        })
+    }
+}
+
 impl UVector2 {
     pub const MIN: Self = Self { x: u32::MIN, y: u32::MIN };
     pub const MAX: Self = Self { x: u32::MAX, y: u32::MAX };
@@ -47,6 +58,22 @@ impl UVector2 {
     }
 
     #[inline]
+    pub const fn as_ivec2(self) -> IVector2 {
+        IVector2 {
+            x: self.x as i32,
+            y: self.y as i32,
+        }
+    }
+
+    #[inline]
+    pub const fn as_vec2(self) -> Vector2 {
+        Vector2 {
+            x: self.x as f32,
+            y: self.y as f32,
+        }
+    }
+
+    #[inline]
     pub const fn max_element(self) -> u32 {
         if self.x <= self.y { self.y } else { self.x }
     }
@@ -54,6 +81,21 @@ impl UVector2 {
     #[inline]
     pub const fn min_element(self) -> u32 {
         if self.x <= self.y { self.y } else { self.y }
+    }
+
+    /// Returns an error if the result is larger than [`u32::MAX`]
+    #[inline]
+    pub const fn grid_pos(i: usize, num_columns: NonZeroUsize) -> Result<Self, [usize; 2]> {
+        // Safety: NonZeroUsize guarantees we are not dividing by 0
+        let (y, x) = unsafe {(
+            std::intrinsics::unchecked_div(i, num_columns.get()),
+            std::intrinsics::unchecked_rem(i, num_columns.get()),
+        )};
+        if x > u32::MAX as usize || y > u32::MAX as usize {
+            Err([x, y])
+        } else {
+            Ok(Self { x: x as u32, y: y as u32 })
+        }
     }
 
     #[inline]

@@ -1,4 +1,11 @@
-#![feature(const_trait_impl, const_ops, more_float_constants, maybe_uninit_array_assume_init, maybe_uninit_uninit_array)]
+#![feature(
+    const_trait_impl,
+    const_ops,
+    more_float_constants,
+    maybe_uninit_array_assume_init,
+    maybe_uninit_uninit_array,
+    core_intrinsics, // unchecked_div and unchecked_rem used in `crate::uvec2::UVector2::grid_pos`
+)]
 
 pub mod color;
 pub mod vec;

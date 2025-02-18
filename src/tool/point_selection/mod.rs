@@ -1,4 +1,4 @@
-use amymath::prelude::*;
+use amymath::prelude::{*, Vector2};
 use amyvec::{curve::PathPointIdx, path_point::{Ctrl, Ctrl1, Ctrl2}};
 use raylib::prelude::*;
 use amylib::{iter::directed::DirectibleDoubleEndedIterator, prelude::{Strong, StrongMut}};
@@ -129,7 +129,7 @@ impl PointSelection {
                 let path_borrow = path.read();
                 let curve = &path_borrow.curve;
 
-                if !curve.max_bounds().is_some_and(|bounds| bounds.grow(hover_radius).is_overlapping_point(mouse_world_pos)) {
+                if !curve.max_bounds().is_some_and(|bounds| bounds.grow(hover_radius).contains_v(&mouse_world_pos)) {
                     return None;
                 }
 
@@ -147,7 +147,7 @@ impl PointSelection {
                     Some((path, Some(PathPointIdx::new_anchor(idx))))
                 } else if curve.slices().any(|bez| bez
                     .estimate_time_at(mouse_world_pos)
-                    .is_some_and(|(_, p)| p.distance_sqr_to(mouse_world_pos) <= hover_radius_sqr)
+                    .is_some_and(|(_, p)| p.distance_sqr(mouse_world_pos) <= hover_radius_sqr)
                 ) {
                     drop(path_borrow);
                     Some((path, None))
@@ -181,7 +181,7 @@ impl PointSelection {
 
         // finalize selection
         if let Some((selection_start, _)) = self.selection_points.take() {
-            let selection_rec = selection_start.minmax_rec(mouse_world_pos);
+            let selection_rec = Rect2::from_minmax(selection_start, mouse_world_pos);
 
             let selected = document.layers
                 .shallow_iter_mut()
@@ -190,7 +190,7 @@ impl PointSelection {
                         let points = path.read().curve.points.iter()
                             .enumerate()
                             .filter_map(|(idx, pp)|
-                                selection_rec.check_collision_point_rec(pp.p)
+                                selection_rec.contains_v(&pp.p)
                                     .then_some(idx))
                             .collect::<Vec<usize>>();
 
@@ -269,16 +269,16 @@ impl ToolType for PointSelection {
 
     fn draw(&self, d: &mut impl RaylibDraw, editor: &Editor, shader_table: &ShaderTable, px_world_size: f32, viewport: &Rect2, #[cfg(dev)] _mouse_world_pos: Vector2) {
         let selection_rec = self.selection_points.as_ref().copied().map(|(start, end)|
-            start.minmax_rec(end)
+            Rect2::from_minmax(start, end)
         );
 
         if let Some(selection_rec) = selection_rec.as_ref() {
-            d.draw_rectangle_rec(selection_rec, Color::BLUE.alpha(0.125));
+            d.draw_rectangle_rect2(selection_rec, Color::BLUE.alpha(0.125));
         }
 
         match self.state.as_ref() {
             Some(SelectionState { selection: Selection::Singular(selected), .. }) => {
-                selected.draw(d, px_world_size, selection_rec, shader_table);
+                selected.draw(d, px_world_size, shader_table);
             }
 
             Some(SelectionState { selection: Selection::Multiple(selected), .. }) => {
@@ -290,11 +290,11 @@ impl ToolType for PointSelection {
                 for layer in editor.document.layers.shallow_iter().cdir::<BackToFore>() {
                     if let Layer::Path(path) = layer {
                         let path = path.read();
-                        if path.curve.bounds().is_some_and(|bounds| viewport.is_overlapping(&bounds)) {
+                        if path.curve.bounds().is_some_and(|bounds| viewport.overlaps(&bounds)) {
                             path.draw_selected(d, px_world_size);
                             for pp in &path.curve.points {
-                                let is_selected = selection_rec.is_some_and(|rec| rec.check_collision_point_rec(pp.p));
-                                if viewport.is_overlapping_point(pp.p) {
+                                let is_selected = selection_rec.is_some_and(|rec| rec.contains_v(&pp.p));
+                                if viewport.contains_v(&pp.p) {
                                     d.draw_path_point(pp, px_world_size, path.settings.color, is_selected, false, false);
                                 }
                             }

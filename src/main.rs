@@ -81,7 +81,7 @@
 #[allow(clippy::enum_glob_use, reason = "every frickin one of these is prefixed with its type name >:T")]
 pub use {KeyboardKey::*, MouseButton::*};
 
-use amymath::prelude::{DrawRect2Lines, IRect2};
+use amymath::prelude::{*, Vector2};
 use document::layer::Layer;
 use raylib::prelude::*;
 use editor::Editor;
@@ -114,35 +114,40 @@ fn main() {
     rl.set_target_fps(60);
 
     let mut window_rect = IRect2 {
-        xmin: 0,
-        ymin: 0,
-        xmax: rl.get_screen_width(),
-        ymax: rl.get_screen_height(),
+        min: IVector2 {
+            x: 0,
+            y: 0,
+        },
+        max: IVector2 {
+            x: rl.get_screen_width(),
+            y: rl.get_screen_height(),
+        },
     };
     let mut trim_rtex = {
-        assert!(window_rect.xmax.is_positive() && window_rect.ymax.is_positive());
+        assert!(window_rect.max.x.is_positive() && window_rect.max.y.is_positive());
         #[allow(clippy::cast_sign_loss, reason = "screen should not have negative width/height")]
-        rl.load_render_texture(&thread, window_rect.xmax as u32, window_rect.ymax as u32).unwrap()
+        rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap()
     };
     let mut engine = Engine::new(&mut rl, &thread);
-    engine.create_editor(Editor::new(window_rect.xmax, window_rect.ymax));
+    engine.create_editor(Editor::new(window_rect.max));
 
     while !rl.window_should_close() {
         let is_window_resized = rl.is_window_resized();
         if is_window_resized {
-            (window_rect.xmax, window_rect.ymax) = (rl.get_screen_width(), rl.get_screen_height());
+            window_rect.max = IVector2::new(rl.get_screen_width(), rl.get_screen_height());
 
             trim_rtex = {
-                assert!(window_rect.xmax.is_positive() && window_rect.ymax.is_positive());
+                debug_assert_eq!(window_rect.min, IVector2::ZERO);
+                assert!(window_rect.max.x.is_positive() && window_rect.max.y.is_positive());
                 #[allow(clippy::cast_sign_loss, reason = "guarded by `width.is_positive() && height.is_positive()` assertion")]
-                rl.load_render_texture(&thread, window_rect.xmax as u32, window_rect.ymax as u32).unwrap()
+                rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap()
             };
         }
 
         let mouse_screen_pos = rl.get_mouse_position();
         let mouse_screen_delta = rl.get_mouse_delta();
 
-        engine.tick(&mut rl, &thread, is_window_resized, &window_rect, mouse_screen_pos, mouse_screen_delta);
+        engine.tick(&mut rl, &thread, is_window_resized, &window_rect, Vector2::from(mouse_screen_pos), Vector2::from(mouse_screen_delta));
         {
             #[cfg(debug_assertions)]
             let mut d = rl.begin_drawing(&thread);
@@ -159,10 +164,10 @@ fn main() {
                             if let Layer::Path(path) = layer {
                                 let path = path.read();
                                 if let Some(bounds) = path.curve.bounds() {
-                                    d.draw_rectangle_lines_rect2(bounds, Color::MAGENTA);
+                                    d.draw_rectangle_lines_rect2(&bounds, Color::MAGENTA);
                                 }
                                 for bounds in path.curve.slices().map(|bez| bez.bounds()) {
-                                    d.draw_rectangle_lines_rect2(bounds, Color::BLUE);
+                                    d.draw_rectangle_lines_rect2(&bounds, Color::BLUE);
                                 }
                             }
                         }

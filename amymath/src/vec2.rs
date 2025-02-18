@@ -15,6 +15,20 @@ impl From<RlVector2> for Vector2 {
     }
 }
 
+impl From<&RlVector2> for Vector2 {
+    #[inline]
+    fn from(&RlVector2 { x, y }: &RlVector2) -> Self {
+        Self { x, y }
+    }
+}
+
+impl From<&mut RlVector2> for Vector2 {
+    #[inline]
+    fn from(&mut RlVector2 { x, y }: &mut RlVector2) -> Self {
+        Self { x, y }
+    }
+}
+
 impl From<Vector2> for RlVector2 {
     #[inline]
     fn from(Vector2 { x, y }: Vector2) -> Self {
@@ -22,9 +36,37 @@ impl From<Vector2> for RlVector2 {
     }
 }
 
+impl From<&Vector2> for RlVector2 {
+    #[inline]
+    fn from(&Vector2 { x, y }: &Vector2) -> Self {
+        Self { x, y }
+    }
+}
+
+impl From<&mut Vector2> for RlVector2 {
+    #[inline]
+    fn from(&mut Vector2 { x, y }: &mut Vector2) -> Self {
+        Self { x, y }
+    }
+}
+
 impl From<ffi::Vector2> for Vector2 {
     #[inline]
     fn from(ffi::Vector2 { x, y }: ffi::Vector2) -> Self {
+        Self { x, y }
+    }
+}
+
+impl From<&Vector2> for ffi::Vector2 {
+    #[inline]
+    fn from(&Vector2 { x, y }: &Vector2) -> Self {
+        Self { x, y }
+    }
+}
+
+impl From<&mut Vector2> for ffi::Vector2 {
+    #[inline]
+    fn from(&mut Vector2 { x, y }: &mut Vector2) -> Self {
         Self { x, y }
     }
 }
@@ -65,33 +107,57 @@ impl From<(f32, f32)> for Vector2 {
 }
 
 impl Vector2 {
+    /// A vector with 0 in both x and y
     pub const ZERO: Self = Self { x: 0.0, y: 0.0 };
+    /// A vector with 1 in both x and y
     pub const ONE: Self = Self { x: 1.0, y: 1.0 };
 
-    pub const ANGLE_0_RAD: Self = Self { x: 1.0, y: 0.0 };
-    pub const ANGLE_FRAC_PI_6_RAD: Self = Self { x: 0.5 * std::f32::consts::SQRT_3, y: 0.5 };
-    pub const ANGLE_FRAC_PI_4_RAD: Self = Self { x: std::f32::consts::FRAC_1_SQRT_2, y: std::f32::consts::FRAC_1_SQRT_2 };
-    pub const ANGLE_FRAC_PI_3_RAD: Self = Self { x: 0.5, y: 0.5 * std::f32::consts::SQRT_3 };
-    pub const ANGLE_FRAC_PI_2_RAD: Self = Self { x: 0.0, y: 1.0 };
-    pub const ANGLE_FRAC_2PI_3_RAD: Self = Self { x: -0.5, y: 0.5 * std::f32::consts::SQRT_3 };
-    pub const ANGLE_FRAC_3PI_4_RAD: Self = Self { x: -std::f32::consts::FRAC_1_SQRT_2, y: std::f32::consts::FRAC_1_SQRT_2 };
-    pub const ANGLE_FRAC_5PI_6_RAD: Self = Self { x: -0.5 * std::f32::consts::SQRT_3, y: 0.5 };
-    pub const ANGLE_PI_RAD: Self = Self { x: -1.0, y: 0.0 };
-    pub const ANGLE_FRAC_7PI_6_RAD: Self = Self { x: -0.5 * std::f32::consts::SQRT_3, y: -0.5 };
-    pub const ANGLE_FRAC_5PI_4_RAD: Self = Self { x: -std::f32::consts::FRAC_1_SQRT_2, y: -std::f32::consts::FRAC_1_SQRT_2 };
-    pub const ANGLE_FRAC_4PI_3_RAD: Self = Self { x: -0.5, y: 0.5 * -std::f32::consts::SQRT_3 };
-    pub const ANGLE_FRAC_3PI_2_RAD: Self = Self { x: 0.0, y: -1.0 };
-    pub const ANGLE_FRAC_5PI_3_RAD: Self = Self { x: 0.5, y: -0.5 * std::f32::consts::SQRT_3 };
-    pub const ANGLE_FRAC_7PI_4_RAD: Self = Self { x: std::f32::consts::FRAC_1_SQRT_2, y: -std::f32::consts::FRAC_1_SQRT_2 };
-    pub const ANGLE_FRAC_11PI_6_RAD: Self = Self { x: 0.5 * std::f32::consts::SQRT_3, y: -0.5 };
-
+    /// A vector with [`f32::EPSILON`] in both x and y
     pub const EPSILON: Self = Self { x: f32::EPSILON, y: f32::EPSILON };
+    /// A vector with [`f32::MIN`] in both x and y
     pub const MIN: Self = Self { x: f32::MIN, y: f32::MIN };
+    /// A vector with [`f32::MIN_POSITIVE`] in both x and y
     pub const MIN_POSITIVE: Self = Self { x: f32::MIN_POSITIVE, y: f32::MIN_POSITIVE };
+    /// A vector with [`f32::MAX`] in both x and y
     pub const MAX: Self = Self { x: f32::MAX, y: f32::MAX };
+    /// A vector with [`f32::NAN`] in both x and y
     pub const NAN: Self = Self { x: f32::NAN, y: f32::NAN };
     pub const INFINITY: Self = Self { x: f32::INFINITY, y: f32::INFINITY };
+    /// A vector with [`f32::NEG_INFINITY`] in both x and y
     pub const NEG_INFINITY: Self = Self { x: f32::NEG_INFINITY, y: f32::NEG_INFINITY };
+
+    /// 0 radians: a vector pointing East &mdash; &langle;1,0&rangle;
+    pub const ANGLE_0_RAD: Self = Self { x: 1.0, y: 0.0 };
+    /// &pi;/6 radians: a vector pointing 30&deg; North of East &mdash; &langle;1/2,1/2&rangle;
+    pub const ANGLE_FRAC_PI_6_RAD: Self = Self { x: 0.5 * std::f32::consts::SQRT_3, y: 0.5 };
+    /// &pi;/4 radians: a vector pointing 45&deg; North of East &mdash; &langle;&Sqrt;2/2,&Sqrt;2/2&rangle;
+    pub const ANGLE_FRAC_PI_4_RAD: Self = Self { x: std::f32::consts::FRAC_1_SQRT_2, y: std::f32::consts::FRAC_1_SQRT_2 };
+    /// &pi;/3 radians: a vector pointing 60&deg; North of East &mdash; &langle;1/2,&Sqrt;3/2&rangle;
+    pub const ANGLE_FRAC_PI_3_RAD: Self = Self { x: 0.5, y: 0.5 * std::f32::consts::SQRT_3 };
+    /// &pi;/2 radians: a vector pointing North &mdash; &langle;0,1&rangle;
+    pub const ANGLE_FRAC_PI_2_RAD: Self = Self { x: 0.0, y: 1.0 };
+    /// 2&pi;/3 radians: a vector pointing 60&deg; North of West &mdash; &langle;-1/2,&Sqrt;3/2&rangle;
+    pub const ANGLE_FRAC_2PI_3_RAD: Self = Self { x: -0.5, y: 0.5 * std::f32::consts::SQRT_3 };
+    /// 3&pi;/4 radians: a vector pointing 45&deg; North of West &mdash; &langle;-&Sqrt;/2,&Sqrt;2/2&rangle;
+    pub const ANGLE_FRAC_3PI_4_RAD: Self = Self { x: -std::f32::consts::FRAC_1_SQRT_2, y: std::f32::consts::FRAC_1_SQRT_2 };
+    /// 5&pi;/6 radians: a vector pointing 30&deg; North of West &mdash; &langle;-&Sqrt;3/2,1/2&rangle;
+    pub const ANGLE_FRAC_5PI_6_RAD: Self = Self { x: -0.5 * std::f32::consts::SQRT_3, y: 0.5 };
+    /// &pi; radians: a vector pointing West &mdash; &langle;-1,0&rangle;
+    pub const ANGLE_PI_RAD: Self = Self { x: -1.0, y: 0.0 };
+    /// 7&pi;/6 radians: a vector pointing 30&deg; South of West &mdash; &langle;-&Sqrt;3/2,-1/2&rangle;
+    pub const ANGLE_FRAC_7PI_6_RAD: Self = Self { x: -0.5 * std::f32::consts::SQRT_3, y: -0.5 };
+    /// 5&pi;/4 radians: a vector pointing 45&deg; South of West &mdash; &langle;-&Sqrt;2/2,-&Sqrt;2/2&rangle;
+    pub const ANGLE_FRAC_5PI_4_RAD: Self = Self { x: -std::f32::consts::FRAC_1_SQRT_2, y: -std::f32::consts::FRAC_1_SQRT_2 };
+    /// 4&pi;/3 radians: a vector pointing 60&deg; South of West &mdash; &langle;-1/2,-&Sqrt;3/2&rangle;
+    pub const ANGLE_FRAC_4PI_3_RAD: Self = Self { x: -0.5, y: -0.5 * std::f32::consts::SQRT_3 };
+    /// 3&pi;/2 radians: a vector pointing South &mdash; &langle;0,-1&rangle;
+    pub const ANGLE_FRAC_3PI_2_RAD: Self = Self { x: 0.0, y: -1.0 };
+    /// 5&pi;/3 radians: a vector pointing 60&deg; South of East &mdash; &langle;1/2,-&Sqrt;3/2&rangle;
+    pub const ANGLE_FRAC_5PI_3_RAD: Self = Self { x: 0.5, y: -0.5 * std::f32::consts::SQRT_3 };
+    /// 7&pi;/4 radians: a vector pointing 45&deg; South of East &mdash; &langle;&Sqrt;2/2,-&Sqrt;2/2&rangle;
+    pub const ANGLE_FRAC_7PI_4_RAD: Self = Self { x: std::f32::consts::FRAC_1_SQRT_2, y: -std::f32::consts::FRAC_1_SQRT_2 };
+    /// 11&pi;/6 radians: a vector pointing 30&deg; South of East &mdash; &langle;&Sqrt;3/2,-1/2&rangle;
+    pub const ANGLE_FRAC_11PI_6_RAD: Self = Self { x: 0.5 * std::f32::consts::SQRT_3, y: -0.5 };
 
     #[inline]
     pub const fn new(x: f32, y: f32) -> Self {
@@ -99,29 +165,50 @@ impl Vector2 {
     }
 
     #[inline]
+    pub const fn as_ivec2(self) -> IVector2 {
+        IVector2 {
+            x: self.x as i32,
+            y: self.y as i32,
+        }
+    }
+
+    #[inline]
+    pub const fn as_uvec2(self) -> UVector2 {
+        UVector2 {
+            x: self.x as u32,
+            y: self.y as u32,
+        }
+    }
+
+    /// Returns the greater of the vector components
+    #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn max_element(self) -> f32 {
         self.x.max(self.y)
     }
 
+    /// Returns the lesser of the vector components
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn min_element(self) -> f32 {
         self.x.min(self.y)
     }
 
+    /// Returns the sum of the vector components
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn sum(self) -> f32 {
         self.x + self.y
     }
 
+    /// Returns the product of the vector components
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn prod(self) -> f32 {
         self.x * self.y
     }
 
+    /// Returns the un-normalized direction from `self` to `other`
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn delta(self, other: Self) -> Self {
@@ -131,6 +218,7 @@ impl Vector2 {
         }
     }
 
+    /// Adds `amount` to each vector component equally
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn offset_iso(self, amount: f32) -> Self {
@@ -140,6 +228,7 @@ impl Vector2 {
         }
     }
 
+    /// Elementwise-adds `other` to `self`
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn offset(self, other: Self) -> Self {
@@ -149,6 +238,7 @@ impl Vector2 {
         }
     }
 
+    /// Multiplies each vector component by `amount`
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn scale_iso(self, amount: f32) -> Self {
@@ -158,6 +248,7 @@ impl Vector2 {
         }
     }
 
+    /// Elementwise-multiplies `self` by `amount`
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn scale(self, amount: Self) -> Self {
@@ -167,36 +258,46 @@ impl Vector2 {
         }
     }
 
+    /// Returns the dot product of `self` and `other`
+    /// (elementwise multiply, then sums the resulting elements)
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn dot(self, other: Self) -> f32 {
         self.x * other.x + self.y * other.y
     }
 
+    /// Returns the "cross product" of `self` and `other`
+    /// (determinant of a matrix using `self` and `other` as its basis vectors)
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn cross(self, other: Self) -> f32 {
         self.x * other.y - self.y * other.x
     }
 
+    /// Returns the square of the vector's magnitude (`self` dot `self`) \
+    /// Result will never be negative, due to squaring
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn magnitude_sqr(self) -> f32 {
         self.dot(self)
     }
 
+    /// Tests if the vector's magnitude is approximately 1
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn is_unit(&self) -> bool {
         (self.magnitude_sqr() - 1.0).abs() <= f32::EPSILON
     }
 
+    /// Returns the vector's magnitude
+    /// (prefer [`Self::magnitude_sqr`] if only comparing lengths or if you intend to square this value anyway)
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub fn magnitude(self) -> f32 {
         self.magnitude_sqr().sqrt()
     }
 
+    /// Returns the vector's normalized direction and magnitude simultaneously, because magnitude is used to normalize the vector.
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub fn direction_and_magnitude(self) -> (Self, f32) {
@@ -204,24 +305,45 @@ impl Vector2 {
         (self / mag, mag)
     }
 
+    /// Returns the vector's normalized direction
+    /// (use [`Self::direction_and_magnitude`] if you intend to use the magnitude as well)
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub fn normalized(self) -> Self {
         self.direction_and_magnitude().0
     }
 
+    /// Returns the square of the distance between the vectors \
+    /// Result will never be negative, due to squaring
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn distance_sqr(self, other: Self) -> f32 {
         self.delta(other).magnitude_sqr()
     }
 
+    /// Returns the vector's magnitude
+    /// (prefer [`Self::distance_sqr`] if only comparing distances or if you intend to square this value anyway)
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub fn distance(self, other: Self) -> f32 {
         self.distance_sqr(other).sqrt()
     }
 
+    /// Returns the extent of a grid-aligned square centered on `self` whose edge passes through `other`
+    #[inline]
+    #[must_use = "this returns the result of the operation, without modifying the original"]
+    pub const fn rec_distance_to(&self, other: Self) -> f32 {
+        (self.x - other.x).abs().max((self.y - other.y).abs())
+    }
+
+    /// Returns the extent of a grid-aligned diamond (45&deg; rotated square) centered on `self` whose edge passes through `other`
+    #[inline]
+    #[must_use = "this returns the result of the operation, without modifying the original"]
+    pub const fn dia_distance_to(&self, other: Self) -> f32 {
+        (self.x - other.x).abs() + (self.y - other.y).abs()
+    }
+
+    /// Returns the delta, normalized direction, and distance from `self` to `other` all simultaneously, because distance is used to normalize the delta
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub fn delta_direction_and_distance(self, other: Self) -> (Self, (Self, f32)) {
@@ -229,18 +351,34 @@ impl Vector2 {
         (delta, delta.direction_and_magnitude())
     }
 
+    /// Returns the normalized direction and distance from `self` to `other` simultaneously, because distance is used to normalize the delta
+    /// (use [`Self::delta_direction_and_distance`] if you intend to use the delta as well)
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub fn direction_and_distance(self, other: Self) -> (Self, f32) {
         self.delta_direction_and_distance(other).1
     }
 
+    /// Returns the normalized direction from `self` to `other` (use [`Self::direction_and_distance`] if you intend to use the distance as well)
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub fn direction(self, other: Self) -> Self {
         self.direction_and_distance(other).0
     }
 
+    /// Returns the negation of `self`,
+    /// producing a vector with the same distance from the origin, but pointing the opposite direction
+    #[inline]
+    #[must_use = "this returns the result of the operation, without modifying the original"]
+    pub const fn reflected(self) -> Self {
+        Self {
+            x: -self.x,
+            y: -self.y,
+        }
+    }
+
+    /// Returns `self` mirrored over `across`,
+    /// producing a vector with the same distance from `across`, but pointing the opposite direction
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn reflected_over(self, across: Self) -> Self {
@@ -250,6 +388,8 @@ impl Vector2 {
         }
     }
 
+    /// Returns `self` mirrored and scaled over `across`,
+    /// producing a vector with the same distance from `across` multiplied by `scale`, but pointing the opposite direction
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn reflected_at(self, across: Self, scale: f32) -> Self {
@@ -260,6 +400,8 @@ impl Vector2 {
         }
     }
 
+    /// Returns `self` mirrored and scaled over `across`,
+    /// producing a vector with the specified distance from `across`, pointing the opposite direction
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub fn reflected_to(self, across: Self, mut length: f32) -> Self {
@@ -271,7 +413,8 @@ impl Vector2 {
         }
     }
 
-    /// Linear interpolate
+    /// # Linear interpolate
+    /// Returns a vector `t`% of the way from `p0` to `p1` in a straight line (y=mx+b)
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn lerp(p0: Self, p1: Self, t: f32) -> Self {
@@ -281,14 +424,16 @@ impl Vector2 {
         }
     }
 
-    /// Linear velocity
+    /// # Linear velocity
+    /// Returns the rate of change of the straight line (y=mx+b) from `p0` to `p1`
     #[inline(always)]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn lvel(p0: Self, p1: Self) -> Self {
         p0.delta(p1)
     }
 
-    /// Quadratic interpolate
+    /// # Quadratic interpolate
+    /// Returns a vector `t`% of the way from `p0` to `p1` to `p2` following a quadratic (y=x&sup2;) curve
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn qerp(p0: Self, p1: Self, p2: Self, t: f32) -> Self {
@@ -298,7 +443,9 @@ impl Vector2 {
         }
     }
 
-    /// Quadratic velocity
+    /// # Quadratic velocity
+    /// Returns the rate of change `t`% of the way from `p0` to `p1` to `p2` following a quadratic (y=x&sup2;) curve \
+    /// (the derivative of [`Self::qerp`])
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn qvel(p0: Self, p1: Self, p2: Self, t: f32) -> Self {
@@ -308,7 +455,9 @@ impl Vector2 {
         }
     }
 
-    /// Quadratic acceleration
+    /// # Quadratic acceleration
+    /// Returns the rate of change of the rate of change of the quadratic (y=x&sup2;) curve from `p0` to `p1` to `p2` \
+    /// (the derivative of [`Self::qvel`] and the second derivative of [`Self::qerp`])
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn qacc(p0: Self, p1: Self, p2: Self) -> Self {
@@ -318,7 +467,8 @@ impl Vector2 {
         }
     }
 
-    /// Cubic interpolate
+    /// # Cubic interpolate
+    /// Returns a vector `t`% of the way from `p0` to `p1` to `p2` to `p3` following a cubic (y=x&sup3;) curve
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn cerp(p0: Self, p1: Self, p2: Self, p3: Self, t: f32) -> Self {
@@ -328,7 +478,9 @@ impl Vector2 {
         }
     }
 
-    /// Cubic velocity
+    /// # Cubic velocity
+    /// Returns the rate of change `t`% of the way from `p0` to `p1` to `p2` to `p3` following a cubic (y=x&sup3;) curve \
+    /// (the derivative of [`Self::cerp`])
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn cvel(p0: Self, p1: Self, p2: Self, p3: Self, t: f32) -> Self {
@@ -338,7 +490,9 @@ impl Vector2 {
         }
     }
 
-    /// Cubic acceleration
+    /// # Cubic acceleration
+    /// Returns the rate of change of the rate of change `t`% of the way from `p0` to `p1` to `p2` to `p3` following a cubic (y=x&sup3;) curve \
+    /// (the derivative of [`Self::cvel`] and the second derivative of [`Self::cerp`])
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn cacc(p0: Self, p1: Self, p2: Self, p3: Self, t: f32) -> Self {
@@ -348,7 +502,11 @@ impl Vector2 {
         }
     }
 
-    /// Cubic jerk
+    /// # Cubic jerk
+    /// Returns the rate of change of the rate of change of the rate of change of the cubic (y=x&sup3;) curve from `p0` to `p1` to `p2` to `p3` \
+    /// (the derivative of [`Self::cacc`], the second derivative of [`Self::cvel`], and the third derivative of [`Self::cerp`])
+    ///
+    /// I have no idea what you would need this for
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn cjerk(p0: Self, p1: Self, p2: Self, p3: Self) -> Self {
@@ -428,6 +586,7 @@ impl Vector2 {
         }
     }
 
+    /// Returns the angular distance from `self` to `other` in radians
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub fn angle_to(&self, other: &Self) -> f32 {
@@ -440,6 +599,9 @@ impl Vector2 {
     }
 
     /// Rotate by the specified angle
+    /// - Prefer [`Self::rotate_cc`], [`Self::rotate_cw`], or [`Self::reflected`] if the angle is always exactly 90&deg;, -90&deg;, or 180&deg; respectively
+    /// - Prefer using one of the `Self::ANGLE_..._RAD` constants (optionally scaling with [`Self::scale`]/[`Self::scale_iso`]) with [`Self::add_angle`]
+    ///   if your intent is to rotate by a vector on the unit circle
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub fn rotate(self, angle: f32) -> Self {
@@ -447,7 +609,7 @@ impl Vector2 {
         self.add_angle(Self::new(cos, sin))
     }
 
-    /// Rotate counter clockwise
+    /// Rotate the vector 90&deg; counter-clockwise
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn rotate_cc(self) -> Self {
@@ -457,7 +619,7 @@ impl Vector2 {
         }
     }
 
-    /// Rotate clockwise
+    /// Rotate the vector 90&deg; clockwise
     #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn rotate_cw(self) -> Self {

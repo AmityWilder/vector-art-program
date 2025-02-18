@@ -3,6 +3,20 @@ use raylib::prelude::*;
 #[link(name = "raylib")]
 unsafe extern "C" {
     static texShapes: ffi::Texture2D;
+    static texShapesRec: ffi::Rectangle;
+}
+
+pub fn tex_shapes_ref() -> &'static ffi::Texture2D {
+    unsafe { &texShapes }
+}
+pub fn tex_shapes_size() -> (i32, i32) {
+    unsafe { (texShapes.width, texShapes.height) }
+}
+pub fn tex_shapes_rec_ref() -> &'static ffi::Rectangle {
+    unsafe { &texShapesRec }
+}
+pub fn tex_shapes_rec() -> Rectangle {
+    unsafe { Rectangle::from(texShapesRec) }
 }
 
 pub trait RaylibRlglExt {
@@ -186,10 +200,13 @@ mod tests {
 
                             d.rl_tex_coord2f(0.0, 0.0);
                             d.rl_vertex2f(0.0, 0.0);
+
                             d.rl_tex_coord2f(0.0, 1.0);
                             d.rl_vertex2f(0.0, 32.0);
+
                             d.rl_tex_coord2f(1.0, 1.0);
                             d.rl_vertex2f(32.0, 32.0);
+
                             d.rl_tex_coord2f(1.0, 0.0);
                             d.rl_vertex2f(32.0, 0.0);
                         }

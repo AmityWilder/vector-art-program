@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use amymath::{prelude::IRect2, rec::RaylibIntRect2Ex};
+use amymath::prelude::{*, Vector2};
 use std::num::NonZeroUsize;
 use amygui::{panel::Panel, rec::UIRect};
 use crate::{appearance::{Appearance, StyleItem}, editor::Editor, shaders::ShaderTable, tool::Tool, vector_path::{fill, stroke}};
@@ -96,25 +96,19 @@ impl ToolPanel {
     fn mini_palette_recs(&self, panel_rec: &IRect2, tools_height: i32) -> [IRect2; 2] {
         let base_width = self.mini_palette_width();
         let base_rec = IRect2 {
-            xmin: panel_rec.xmin + Self::ICON_INSET,
-            ymin: panel_rec.ymin + Self::ICON_INSET + tools_height,
-            xmax: panel_rec.xmax - Self::ICON_INSET,
-            ymax: panel_rec.ymin + Self::ICON_INSET + tools_height + base_width,
+            min: panel_rec.min + IVector2 {
+                x: Self::ICON_INSET,
+                y: Self::ICON_INSET + tools_height,
+            },
+            max: IVector2 {
+                x: panel_rec.max.x - Self::ICON_INSET,
+                y: panel_rec.min.y + Self::ICON_INSET + tools_height + base_width,
+            },
         };
-        let offset = base_width / 8;
-        let stroke_rec = IRect2 {
-            xmin: base_rec.xmin + offset,
-            ymin: base_rec.ymin + offset,
-            xmax: base_rec.xmax - offset,
-            ymax: base_rec.ymax - offset,
-        };
-        let offset = base_width / 6;
-        let fill_rec = IRect2 {
-            xmin: stroke_rec.xmin + offset,
-            ymin: stroke_rec.ymin + offset,
-            xmax: stroke_rec.xmax - offset,
-            ymax: stroke_rec.ymax - offset,
-        };
+        let inset = base_width / 8;
+        let stroke_rec = base_rec.grow(-inset);
+        let inset = base_width / 6;
+        let fill_rec = stroke_rec.grow(-inset);
         [fill_rec, stroke_rec]
     }
 
@@ -141,15 +135,12 @@ impl ToolPanel {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             let panel_rec = self.panel.rect();
             let tools_height = self.num_rows() as i32 * Self::SLOT_WIDTH;
-            if mouse_screen_pos.y as i32 <= panel_rec.ymin + Self::ICON_INSET + tools_height {
+            if mouse_screen_pos.y as i32 <= panel_rec.min.y + Self::ICON_INSET + tools_height {
                 // tool icons
-                let (start_x, start_y) = (
-                    panel_rec.xmin + Self::ICON_INSET,
-                    panel_rec.ymin + Self::ICON_INSET,
-                );
+                let start = panel_rec.min + Self::ICON_INSET;
                 let rel = Vector2 {
-                    x: (mouse_screen_pos.x as f32 - start_x as f32) / Self::SLOT_WIDTH as f32,
-                    y: (mouse_screen_pos.y as f32 - start_y as f32) / Self::SLOT_WIDTH as f32,
+                    x: (mouse_screen_pos.x as f32 - start.x as f32) / Self::SLOT_WIDTH as f32,
+                    y: (mouse_screen_pos.y as f32 - start.y as f32) / Self::SLOT_WIDTH as f32,
                 };
                 let col_row = Vector2 {
                     x: rel.x.floor(),
@@ -175,9 +166,9 @@ impl ToolPanel {
                 // palette
                 let [fill_rec, stroke_rec] = self.mini_palette_recs(&panel_rec, tools_height);
                 let mut handle_mini_palette_click = |current_appearance: &mut Appearance| {
-                    if stroke_rec.is_overlapping_v(mouse_screen_pos) {
-                        if fill_rec.is_overlapping_v(mouse_screen_pos) {
-                            let current_fill = if let Some(current_fill) = current_appearance.items.iter_mut()
+                    if stroke_rec.contains_v(&mouse_screen_pos.as_ivec2()) {
+                        if fill_rec.contains_v(&mouse_screen_pos.as_ivec2()) {
+                            let _current_fill = if let Some(current_fill) = current_appearance.items.iter_mut()
                                 .find_map(|item| if let StyleItem::Fill(fill) = item { Some(fill) } else { None }) {
                                     current_fill
                                 } else {
@@ -192,7 +183,7 @@ impl ToolPanel {
                             //     fill::Pattern::Gradient { .. } => todo!(),
                             // }
                         } else {
-                            let current_stroke = if let Some(current_stroke) = current_appearance.items.iter_mut()
+                            let _current_stroke = if let Some(current_stroke) = current_appearance.items.iter_mut()
                                 .find_map(|item| if let StyleItem::Stroke(stroke) = item { Some(stroke) } else { None }) {
                                     current_stroke
                                 } else {
@@ -224,15 +215,14 @@ impl ToolPanel {
         let tools_height = self.num_rows() as i32 * Self::SLOT_WIDTH;
         let mut d = d.begin_scissor_mode_irect2(panel_rec);
         d.draw_rectangle_irect2(panel_rec, self.panel.background);
-        let (start_x, start_y) = (
-            panel_rec.xmin + Self::ICON_INSET,
-            panel_rec.ymin + Self::ICON_INSET,
-        );
+        let start = panel_rec.min + Self::ICON_INSET;
         for (i, &icon) in self.items.iter().enumerate() {
-            let (y, x) = (i / self.num_cols, i % self.num_cols);
+            let grid_pos = IVector2::try_from(UVector2::grid_pos(i, self.num_cols)
+                    .expect("neither `i` nor `num_cols` should ever be larger than u32::MAX"))
+                .expect("neither `i` nor `num_cols` should ever be larger than i32::MAX");
             let (button_x, button_y) = (
-                start_x + x as i32 * (Self::BUTTON_WIDTH + Self::ICON_GAP),
-                start_y + y as i32 * (Self::BUTTON_WIDTH + Self::ICON_GAP),
+                start.x + grid_pos.x * (Self::BUTTON_WIDTH + Self::ICON_GAP),
+                start.y + grid_pos.y * (Self::BUTTON_WIDTH + Self::ICON_GAP),
             );
             let button_rec = Rectangle::new(
                 button_x as f32,

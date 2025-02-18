@@ -1,5 +1,5 @@
 use amylib::{prelude::RoundToInt, rc::prelude::*};
-use amymath::prelude::{DistanceSqr, FlipRectangle, Rect2};
+use amymath::prelude::{*, Vector2};
 use raylib::prelude::*;
 use crate::{appearance::{Appearance, Blending}, document::Document, editor::Editor, shaders::ShaderTable, tool::ToolType};
 use super::Raster;
@@ -56,9 +56,9 @@ impl RasterBrush {
         if let Some(shader) = shader {
             let mut d = d.begin_shader_mode(shader);
             let mut d = d.begin_blend_mode(BlendMode::BLEND_ALPHA_PREMULTIPLY);
-            d.draw_texture_pro(buffer, src_rec, dest_rec, Vector2::zero(), 0.0, Color::WHITE.alpha(stroke.blend.opacity));
+            d.draw_texture_pro(buffer, src_rec, dest_rec, Vector2::ZERO, 0.0, Color::WHITE.alpha(stroke.blend.opacity));
         } else {
-            d.draw_texture_pro(buffer, src_rec, dest_rec, Vector2::zero(), 0.0, Color::WHITE.alpha(stroke.blend.opacity));
+            d.draw_texture_pro(buffer, src_rec, dest_rec, Vector2::ZERO, 0.0, Color::WHITE.alpha(stroke.blend.opacity));
         }
     }
 
@@ -86,7 +86,7 @@ impl RasterBrush {
                     let interval = *interval;
                     assert!(interval.is_normal() && interval > 0.001, "are you insane?");
                     let delta = self.mouse_curr - mouse_prev;
-                    let dist_sqr = delta.length_sqr();
+                    let dist_sqr = delta.magnitude_sqr();
                     let mut pos = mouse_prev;
                     let offset = Vector2::new(-tex.width as f32 * 0.5, -tex.height as f32 * 0.5);
                     if dist_sqr > interval {
@@ -99,7 +99,7 @@ impl RasterBrush {
                             pos += step;
                         }
                     }
-                    debug_assert!(pos.distance_sqr_to(self.mouse_curr) < interval, "should have placed a stamp at every interval");
+                    debug_assert!(pos.distance_sqr(self.mouse_curr) < interval, "should have placed a stamp at every interval");
                     self.mouse_prev = Some(pos);
                 }
             }

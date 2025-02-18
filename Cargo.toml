@@ -8,12 +8,13 @@ edition = "2021"
 build = "build.rs"
 
 [dependencies]
-raylib = "5.0.2"
+raylib = { version = "5.0.2", features = ["nalgebra_interop"] }
 amylib = { path = "amylib" }
 amymath = { path = "amymath" }
 amygui = { path = "amygui" }
 amyvec = { path = "amyvec", features = [] }
 rltest = { path = "rltest" }
+nalgebra = "0.33.2"
 
 [build-dependencies]
 build_rs_macros = { path = "build_rs_macros" }

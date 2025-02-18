@@ -16,6 +16,24 @@ impl IRect2 {
     }
 
     #[inline]
+    pub const fn as_rect2(self) -> Rect2 {
+        Rect2 {
+            min: self.min.as_vec2(),
+            max: self.max.as_vec2(),
+        }
+    }
+
+    #[inline]
+    pub const fn center_and_extent(self) -> (IVector2, IVector2) {
+        let extent = IVector2 {
+            x: (self.max.x - self.min.x) / 2,
+            y: (self.max.y - self.min.y) / 2,
+        };
+        let center = self.min + extent;
+        (center, extent)
+    }
+
+    #[inline]
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub fn x_range(&self) -> Range<i32> {
         self.min.x..self.max.x

@@ -1,3 +1,4 @@
+use amymath::prelude::Vector2;
 use raylib::prelude::*;
 
 const UV_TEX_SIZE: i32 = 2;
@@ -35,7 +36,7 @@ impl ShaderTable {
             extent.x * 2.0,
             extent.y * 2.0,
         );
-        d.draw_texture_pro(&self.uv_tex, SRC_REC, dest_rec, Vector2::zero(), 0.0, tint);
+        d.draw_texture_pro(&self.uv_tex, SRC_REC, dest_rec, Vector2::ZERO, 0.0, tint);
     }
 
     #[inline]

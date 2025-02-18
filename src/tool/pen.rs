@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use amymath::prelude::*;
+use amymath::prelude::{*, Vector2};
 use amylib::{iter::directed::DirectibleDoubleEndedIterator, rc::prelude::*};
 use crate::{appearance::Appearance, document::Document, editor::Editor, layer::{BackToFore, ForeToBack, Layer, LayerType}, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, DrawPathPoint, VectorPath}};
 use super::{point_selection::HOVER_RADIUS_SQR, ToolType};
@@ -33,7 +33,7 @@ impl ActivePen {
                 Ctrl::Out => path.curve.points.front(),
             } {
                 // close path
-                if opp_end.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR {
+                if opp_end.p.distance_sqr(mouse_world_pos) <= HOVER_RADIUS_SQR {
                     path.curve.is_closed = true;
                     drop(path);
                     return Some(InactivePen(Some(self.target.clone_mut())))
@@ -138,7 +138,7 @@ impl Pen {
                     let search_options = [(0, &path.curve.points[0]), (last_idx, &path.curve.points[last_idx])]; // heap allocations are yucky, ew. all my homies use stack arrays
                     let search_in = if last_idx != 0 { &search_options } else { &search_options[..=0] }; // only check last if the first isn't the last
                     for (idx, pp) in search_in {
-                        if pp.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR {
+                        if pp.p.distance_sqr(mouse_world_pos) <= HOVER_RADIUS_SQR {
                             return ActivePen {
                                 target: target.clone_mut(),
                                 is_dragging: true,
@@ -207,17 +207,17 @@ impl ToolType for Pen {
                 if let Layer::Path(path) = layer {
                     let path = path.read();
                     let color = path.settings.color;
-                    // if path.curve.points.iter().any(|pp| pp.p.distance_sqr_to(mouse_world_pos) <= HOVER_RADIUS_SQR) {
+                    // if path.curve.points.iter().any(|pp| pp.p.distance_sqr(mouse_world_pos) <= HOVER_RADIUS_SQR) {
                     //     path.draw_selected(d, px_world_size);
                     // }
                     if let Some(last_idx) = path.curve.points.len().checked_sub(1) {
                         let pp = &path.curve.points[last_idx];
-                        if viewport.is_overlapping_point(pp.p) {
+                        if viewport.contains_v(&pp.p) {
                             d.draw_path_point(pp, px_world_size, color, false, false, false);
                         }
                         if path.curve.points.len() > 1 {
                             let pp = &path.curve.points[0];
-                            if viewport.is_overlapping_point(pp.p) {
+                            if viewport.contains_v(&pp.p) {
                                 d.draw_path_point(pp, px_world_size, color, false, false, false);
                             }
                         }
