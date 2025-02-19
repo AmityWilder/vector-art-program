@@ -121,11 +121,8 @@ fn main() {
             y: rl.get_screen_height(),
         },
     };
-    let mut trim_rtex = {
-        assert!(window_rect.max.x.is_positive() && window_rect.max.y.is_positive());
-        #[allow(clippy::cast_sign_loss, reason = "screen should not have negative width/height")]
-        rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap()
-    };
+    let mut trim_rtex = rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap();
+    let mut scratch_rtex = vec![];
     let mut engine = Engine::new(&mut rl, &thread);
     engine.create_editor(Editor::new(window_rect.max));
 
@@ -134,22 +131,20 @@ fn main() {
         if is_window_resized {
             window_rect.max = IVector2::new(rl.get_screen_width(), rl.get_screen_height());
 
-            trim_rtex = {
-                debug_assert_eq!(window_rect.min, IVector2::ZERO);
-                assert!(window_rect.max.x.is_positive() && window_rect.max.y.is_positive());
-                #[allow(clippy::cast_sign_loss, reason = "guarded by `width.is_positive() && height.is_positive()` assertion")]
-                rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap()
-            };
+            trim_rtex = rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap();
+            for rtex in &mut scratch_rtex {
+                *rtex = rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap();
+            }
         }
 
         let mouse_screen_pos = rl.get_mouse_position();
         let mouse_screen_delta = rl.get_mouse_delta();
 
-        engine.tick(&mut rl, &thread, is_window_resized, &window_rect, Vector2::from(mouse_screen_pos), Vector2::from(mouse_screen_delta));
+        engine.tick(&mut rl, &thread, is_window_resized, &mut scratch_rtex, &window_rect, Vector2::from(mouse_screen_pos), Vector2::from(mouse_screen_delta));
         {
             #[cfg(debug_assertions)]
             let mut d = rl.begin_drawing(&thread);
-            engine.draw(&mut d, &thread, &mut trim_rtex, &window_rect, #[cfg(dev)] mouse_screen_pos);
+            engine.draw(&mut d, &thread, &mut trim_rtex, &mut scratch_rtex[..], &window_rect, #[cfg(dev)] mouse_screen_pos);
 
             // debug
             {

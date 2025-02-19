@@ -129,7 +129,16 @@ impl Engine {
         } else { None }
     }
 
-    pub fn tick(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread, is_window_resized: bool, window_rect: &IRect2, mouse_screen_pos: Vector2, mouse_screen_delta: Vector2) {
+    pub fn tick(
+        &mut self,
+        rl: &mut RaylibHandle,
+        thread: &RaylibThread,
+        is_window_resized: bool,
+        _scratch_rtex: &mut [RenderTexture2D], // todo: push an element when a group is nested past the current greatest nesting depth
+        window_rect: &IRect2,
+        mouse_screen_pos: Vector2,
+        mouse_screen_delta: Vector2,
+    ) {
         if is_window_resized {
             self.layers_panel.panel.update_rec(window_rect);
         }
@@ -163,7 +172,15 @@ impl Engine {
         }
     }
 
-    pub fn draw(&self, d: &mut RaylibDrawHandle<'_>, thread: &RaylibThread, trim_rtex: &mut RenderTexture2D, window_rect: &IRect2, #[cfg(dev)] mouse_screen_pos: Vector2) {
+    pub fn draw(
+        &self,
+        d: &mut RaylibDrawHandle<'_>,
+        thread: &RaylibThread,
+        trim_rtex: &mut RenderTexture2D,
+        scratch_rtex: &mut [RenderTexture2D],
+        window_rect: &IRect2,
+        #[cfg(dev)] mouse_screen_pos: Vector2,
+    ) {
         let editors = &self.editors;
         let shader_table = &self.shader_table;
 
@@ -176,7 +193,10 @@ impl Engine {
 
             editor.draw_background(self, d);
 
-            editor.draw_rendered(&mut d.begin_texture_mode(thread, trim_rtex));
+            {
+                let mut d = d.begin_texture_mode(thread, trim_rtex);
+                editor.draw_rendered(&mut d, scratch_rtex);
+            }
 
             if self.is_trim_view {
                 editor.draw_trimmed(d, trim_rtex, window_rect);
@@ -206,7 +226,7 @@ fn draw_artwork(d: &mut RaylibDrawHandle<'_>, trim_rtex: &RenderTexture2D) {
         (width as f32, height as f32);
 
     {
-        let mut d = d.rl_set_texture(trim_rtex.texture());
+        let mut d = d.rl_set_texture(trim_rtex.texture.id);
         let mut d = d.rl_begin_quads();
 
         d.rl_color4ub(255, 0, 255, 255);

@@ -39,6 +39,16 @@ impl Document {
             if is_supersampled { artboard_width  * SUPERSAMPLE_FACTOR } else { artboard_width  },
             if is_supersampled { artboard_height * SUPERSAMPLE_FACTOR } else { artboard_height },
         ).map_err(io::Error::other)?;
+        let mut scratch_rtex = std::iter::repeat_with(||
+                rl.load_render_texture(
+                    thread,
+                    if is_supersampled { artboard_width  * SUPERSAMPLE_FACTOR } else { artboard_width  },
+                    if is_supersampled { artboard_height * SUPERSAMPLE_FACTOR } else { artboard_height },
+                ).map_err(io::Error::other)
+            )
+            .take(1)
+            .collect::<Result<Box<[RenderTexture2D]>, io::Error>>()?;
+
 
         let camera = Camera2D {
             offset: RlVector2::zero(),
@@ -59,7 +69,7 @@ impl Document {
             {
                 let mut d = d.begin_mode2D(camera);
                 for layer in self.layers.dfs_iter(|g| !g.settings.is_hidden).cdir::<BackToFore>() {
-                    layer.draw_rendered(&mut d);
+                    layer.draw_rendered(&mut d, &mut scratch_rtex[..]);
                 }
             }
         }

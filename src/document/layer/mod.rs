@@ -107,19 +107,19 @@ impl Layer {
 
 pub trait LayerType {
     /// Draw without helper visuals
-    fn draw_rendered(&self, d: &mut impl RaylibDraw);
+    fn draw_rendered(&self, d: &mut impl RaylibDraw, scratch_rtex: &mut [RenderTexture2D]);
 
     /// Draw with helper visuals
     fn draw_selected(&self, d: &mut impl RaylibDraw, px_world_size: f32);
 }
 
 impl LayerType for Layer {
-    fn draw_rendered(&self, d: &mut impl RaylibDraw) {
+    fn draw_rendered(&self, d: &mut impl RaylibDraw, scratch_rtex: &mut [RenderTexture2D]) {
         if !self.settings().is_hidden {
             match self {
-                Layer::Group(group) => group.draw_rendered(d),
-                Layer::Path(path) => path.read().draw_rendered(d),
-                Layer::Raster(raster) => raster.read().draw_rendered(d),
+                Layer::Group(group) => group.draw_rendered(d, scratch_rtex),
+                Layer::Path(path) => path.read().draw_rendered(d, scratch_rtex),
+                Layer::Raster(raster) => raster.read().draw_rendered(d, scratch_rtex),
             }
         }
     }

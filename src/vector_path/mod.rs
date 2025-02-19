@@ -36,27 +36,13 @@ impl VectorPath {
 }
 
 impl LayerType for VectorPath {
-    fn draw_rendered(&self, d: &mut impl RaylibDraw) {
+    fn draw_rendered(&self, d: &mut impl RaylibDraw, _scratch_rtex: &mut [RenderTexture2D]) {
         for item in &self.appearance.items {
             match item {
                 StyleItem::Stroke(stroke) => {
                     match &stroke.pattern {
                         stroke::Pattern::Solid(color) => {
-                            const EXPERIMENTAL_IMPL: bool = true;
-                            if EXPERIMENTAL_IMPL {
-                                self.curve.draw_stroke(d, 20, &stroke.thick, *color);
-                            } else {
-                                // let thickness = stroke.thick.extents_at(0.0);
-                                // let thick = (thickness.0 + thickness.1) * 0.5;
-                                // for bez in self.curve.slices() {
-                                //     d.draw_spline_segment_bezier_cubic(bez.p1.into(), bez.c1_out.into(), bez.c2_in.into(), bez.p2.into(), thick, color);
-                                // }
-                                // // cover up cuts between bezier curves
-                                // let radius = thick * 0.5;
-                                // for pp in &self.curve.points {
-                                //     d.draw_circle_v(pp.p, radius, color);
-                                // }
-                            }
+                            self.curve.draw_stroke(d, 20, &stroke.thick, *color);
                         }
 
                         _ => todo!(),

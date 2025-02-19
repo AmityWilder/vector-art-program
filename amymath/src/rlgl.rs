@@ -111,8 +111,8 @@ pub trait Rlgl: RaylibDraw {
 
     /// Set current texture to use
     #[inline]
-    fn rl_set_texture(&mut self, texture: impl AsRef<ffi::Texture2D>) -> RlglTexture<'_, Self> {
-        unsafe { ffi::rlSetTexture(texture.as_ref().id); }
+    fn rl_set_texture(&mut self, id: u32) -> RlglTexture<'_, Self> {
+        unsafe { ffi::rlSetTexture(id); }
         RlglTexture(self)
     }
 

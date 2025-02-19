@@ -233,8 +233,8 @@ impl Curve {
             let total_strips = self.points.len() * strips_per_slice;
 
             for (t_vel, t, t_full, bez) in [
-                (0.001, 0.0, 0.0, self.slice(0).expect("should have at least 2 points in this branch")),
-                (0.999, 1.0, 1.0, self.slice(self.num_slices() - 1).expect("should have at least 2 points in this branch"))
+                (f32::MIN_POSITIVE, 0.0, 0.0, self.slice(0).expect("should have at least 2 points in this branch")),
+                (const{1.0 - f32::EPSILON}, 1.0, 1.0, self.slice(self.num_slices() - 1).expect("should have at least 2 points in this branch"))
             ] {
                 let extents = thick.extents_at(t_full);
                 let v = bez.velocity_at(t_vel);

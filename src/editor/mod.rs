@@ -1,6 +1,7 @@
 use std::{path::Path, time::Instant};
 use amylib::prelude::DirectibleDoubleEndedIterator;
 use amymath::prelude::{*, Vector2};
+use amyvec::{curve::{Curve, WidthProfile}, path_point::PathPoint};
 use raylib::prelude::{*, Vector2 as RlVector2};
 use undo_redo::{Action, EditHistory, RedoError, UndoError};
 use crate::{appearance::{Appearance, Blending, StyleItem}, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, raster::RasterTex, shaders::ShaderTable, tool::{raster_brush, Tool, ToolType}, vector_path::{fill, stroke}};
@@ -100,6 +101,13 @@ impl Editor {
                     }),
                     StyleItem::Stroke(stroke::Stroke {
                         pattern: stroke::Pattern::Solid(Color::BLACK),
+                        thick: WidthProfile::Variable({
+                            let mut c = Curve::new();
+                            c.points.push_back(PathPoint { p: Vector2::new(1.0, 1.0), c: None });
+                            c.points.push_back(PathPoint { p: Vector2::new(10.0, 10.0), c: None });
+                            c.points.push_back(PathPoint { p: Vector2::new(1.0, 1.0), c: None });
+                            c
+                        }),
                         ..Default::default()
                     }),
                 ]),
@@ -244,7 +252,7 @@ impl Editor {
                 let inv_height = (trim_rtex.height() as f32).recip();
 
                 {
-                    let mut d = d.rl_set_texture(trim_rtex.texture());
+                    let mut d = d.rl_set_texture(trim_rtex.texture.id);
                     let mut d = d.rl_begin_quads();
 
                     d.rl_color4ub(255, 255, 255, 255);
@@ -266,12 +274,12 @@ impl Editor {
         }
     }
 
-    pub fn draw_rendered(&self, d: &mut RaylibTextureMode<'_, RaylibDrawHandle<'_>>) {
+    pub fn draw_rendered<'a: 'b, 'b: 'c, 'c>(&self, d: &'c mut RaylibTextureMode<'b, RaylibDrawHandle<'a>>, scratch_rtex: &mut [RenderTexture2D]) {
         d.clear_background(Color::BLANK);
         {
             let mut d = d.begin_mode2D(self.document.camera);
             for layer in self.document.layers.dfs_iter(|g| !g.settings.is_hidden).cdir::<BackToFore>() {
-                layer.draw_rendered(&mut d);
+                layer.draw_rendered(&mut d, scratch_rtex);
             }
         }
     }
