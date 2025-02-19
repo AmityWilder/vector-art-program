@@ -293,13 +293,12 @@ impl RangeBounds<Vector2> for Rect2 {
 
 pub trait DrawRect2: RaylibDraw {
     #[inline]
-    fn draw_rectangle_rect2(&mut self, rec: &Rect2, color: Color) where Self: RaylibRlglExt {
+    fn draw_rectangle_rect2(&mut self, rec: &Rect2, color: Color) where Self: Rlgl {
         let shapes_rec = Rect2::from(tex_shapes_rec());
         let shapes_size = IVector2::from(tex_shapes_size()).as_vec2();
 
-        let mut d = self.begin_rlgl();
-        d.rl_set_texture_tex_shapes();
-        let mut d = d.rl_begin_quads();
+        self.rl_set_texture_tex_shapes();
+        let mut d = self.rl_begin_quads();
 
         d.rl_normal3f(0.0, 0.0, 1.0);
         d.rl_color4ub(color.r, color.g, color.b, color.a);

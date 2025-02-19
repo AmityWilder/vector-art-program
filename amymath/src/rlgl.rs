@@ -1,5 +1,5 @@
-use raylib::prelude::*;
-use std::{ffi::{c_char, c_void}, num::TryFromIntError, ops::{Deref, DerefMut}, ptr::null_mut};
+use raylib::{prelude::*};
+use std::{ffi::{c_char, c_void, CStr}, num::{NonZeroUsize, TryFromIntError}, ops::{Deref, DerefMut}, ptr::null_mut};
 
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -465,6 +465,7 @@ pub fn rl_set_texture(id: u32) {
 //------------------------------------------------------------------------------------------------------------------------
 
 // Vertex buffers management
+
 /// Load vertex array (vao) if supported
 pub fn rl_load_vertex_array() -> u32 {
     unsafe { ffi::rlLoadVertexArray() }
@@ -473,31 +474,31 @@ pub fn rl_load_vertex_array() -> u32 {
 /// Load a vertex buffer attribute
 pub fn rl_load_vertex_buffer<T>(buffer: &[T], dynamic: bool) -> Result<u32, TryFromIntError> {
     let range = buffer.as_ptr_range();
-    let size = i32::try_from(unsafe { range.end.byte_sub_ptr(range.start) })?;
-    Ok(unsafe { ffi::rlLoadVertexBuffer(range.start, size, dynamic) })
+    let size = i32::try_from(unsafe { range.end.cast::<u8>().offset_from(range.start.cast::<u8>()) })?;
+    Ok(unsafe { ffi::rlLoadVertexBuffer(range.start.cast(), size, dynamic) })
 }
 
 /// Load a new attributes element buffer
-pub fn rl_load_vertex_buffer_element<T>(buffer: &[T], dynamic: bool) -> u32 {
+pub fn rl_load_vertex_buffer_element<T>(buffer: &[T], dynamic: bool) -> Result<u32, TryFromIntError> {
     let range = buffer.as_ptr_range();
-    let size = i32::try_from(unsafe { range.end.byte_sub_ptr(range.start) })?;
-    unsafe { ffi::rlLoadVertexBufferElement(buffer, size, dynamic) }
+    let size = i32::try_from(unsafe { range.end.cast::<u8>().offset_from(range.start.cast::<u8>()) })?;
+    Ok(unsafe { ffi::rlLoadVertexBufferElement(range.start.cast(), size, dynamic) })
 }
 
 /// Update GPU buffer with new data
-pub fn rl_update_vertex_buffer<T>(buffer_id: u32, data: &[T], offset: usize) {
+pub fn rl_update_vertex_buffer<T>(buffer_id: u32, data: &[T], offset: usize) -> Result<(), TryFromIntError> {
     let offset = i32::try_from(offset)?;
     let range = data.as_ptr_range();
-    let data_size = i32::try_from(unsafe { range.end.byte_sub_ptr(range.start) })?;
-    unsafe { ffi::rlUpdateVertexBuffer(buffer_id, data, data_size, offset); }
+    let size = i32::try_from(unsafe { range.end.cast::<u8>().offset_from(range.start.cast::<u8>()) })?;
+    Ok(unsafe { ffi::rlUpdateVertexBuffer(buffer_id, range.start.cast(), size, offset); })
 }
 
 /// Update vertex buffer elements with new data
 pub fn rl_update_vertex_buffer_elements<T>(id: u32, data: &[T], offset: usize) -> Result<(), TryFromIntError> {
     let offset = i32::try_from(offset)?;
     let range = data.as_ptr_range();
-    let data_size = i32::try_from(unsafe { range.end.byte_sub_ptr(range.start) })?;
-    Ok(unsafe { ffi::rlUpdateVertexBufferElements(id, range.start, data_size, offset); })
+    let size = i32::try_from(unsafe { range.end.cast::<u8>().offset_from(range.start.cast::<u8>()) })?;
+    Ok(unsafe { ffi::rlUpdateVertexBufferElements(id, range.start.cast(), size, offset); })
 }
 
 /// Unload vertex array object (VAO)
@@ -529,12 +530,6 @@ pub enum VertexAttributeType {
 }
 
 /// Set vertex attribute
-/// * `index` - Specifies the index of the generic vertex attribute to be modified.
-/// * `comp_size` - Specifies the number of components per generic vertex attribute. Must be 1, 2, 3, 4. Additionally, the symbolic constant `GL_BGRA` is accepted by `glVertexAttribPointer`. The initial value is 4.
-/// * `kind` - Specifies the data type of each component in the array. The symbolic constants `GL_BYTE`, `GL_UNSIGNED_BYTE`, `GL_SHORT`, `GL_UNSIGNED_SHORT`, `GL_INT`, and `GL_UNSIGNED_INT` are accepted by `glVertexAttribPointer` and `glVertexAttribIPointer`. Additionally `GL_HALF_FLOAT`, `GL_FLOAT`, `GL_DOUBLE`, `GL_FIXED`, `GL_INT_2_10_10_10_REV`, `GL_UNSIGNED_INT_2_10_10_10_REV` and `GL_UNSIGNED_INT_10F_11F_11F_REV` are accepted by `glVertexAttribPointer`. `GL_DOUBLE` is also accepted by `glVertexAttribLPointer` and is the only token accepted by the type parameter for that function. The initial value is `GL_FLOAT`.
-/// * `normalized` - For `glVertexAttribPointer`, specifies whether fixed-point data values should be normalized (`GL_TRUE`) or converted directly as fixed-point values (`GL_FALSE`) when they are accessed.
-/// * `stride` - Specifies the byte offset between consecutive generic vertex attributes. If stride is 0, the generic vertex attributes are understood to be tightly packed in the array. The initial value is 0.
-/// * `pointer` - Specifies a offset of the first component of the first generic vertex attribute in the array in the data store of the buffer currently bound to the `GL_ARRAY_BUFFER` target. The initial value is 0.
 pub fn rl_set_vertex_attribute<T>(
     index: u32,
     comp_size: CompSize,
@@ -543,126 +538,350 @@ pub fn rl_set_vertex_attribute<T>(
     stride: u32,
     pointer: usize,
 ) {
-    unsafe { ffi::rlSetVertexAttribute(index, comp_size as i32, kind as i32, normalized, stride as i32, (pointer as *const u8).cast()); }
+    unsafe { ffi::rlSetVertexAttribute(index, comp_size as i32, kind as i32, normalized, stride as i32, pointer as *const c_void); }
 }
 
+/// Set vertex attribute divisor
 pub fn rl_set_vertex_attribute_divisor(index: u32, divisor: i32) {
     unsafe { ffi::rlSetVertexAttributeDivisor(index, divisor); }
 }
+
 /// Set vertex attribute default value
 pub fn rl_set_vertex_attribute_default(loc_index: i32, value: *const c_void, attrib_type: i32, count: i32) {
-    unsafe { ffi::rlSetVertexAttributeDefault(loc_index, value, attrib_type, count);}
+    unsafe { ffi::rlSetVertexAttributeDefault(loc_index, value, attrib_type, count); }
 }
-pub fn rl_draw_vertex_array(offset: i32, count: i32);
-pub fn rl_draw_vertex_array_elements(offset: i32, count: i32, buffer: *const c_void);
-pub fn rl_draw_vertex_array_instanced(offset: i32, count: i32, instances: i32);
-pub fn rl_draw_vertex_array_elements_instanced(offset: i32, count: i32, buffer: *const c_void, instances: i32);
+
+/// Draw vertex array
+pub fn rl_draw_vertex_array(offset: i32, count: i32) {
+    unsafe { ffi::rlDrawVertexArray(offset, count); }
+}
+
+/// Draw vertex array elements
+pub fn rl_draw_vertex_array_elements(offset: i32, count: i32, buffer: *const c_void) {
+    // NOTE: Added pointer math separately from function to avoid UBSAN complaining
+    unsafe { ffi::rlDrawVertexArrayElements(offset, count, buffer); }
+}
+
+/// Draw vertex array instanced
+pub fn rl_draw_vertex_array_instanced(offset: i32, count: i32, instances: i32) {
+    unsafe { ffi::rlDrawVertexArrayInstanced(offset, count, instances); }
+}
+
+/// Draw vertex array elements instanced
+pub fn rl_draw_vertex_array_elements_instanced(offset: i32, count: i32, buffer: *const c_void, instances: i32) {
+    // NOTE: Added pointer math separately from function to avoid UBSAN complaining
+    unsafe { ffi::rlDrawVertexArrayElementsInstanced(offset, count, buffer, instances); }
+}
 
 // Textures management
+
 /// Load texture in GPU
-pub fn rl_load_texture(data: *const c_void, width: i32, height: i32, format: i32, mipmap_count: i32) -> u32;
+pub fn rl_load_texture(data: *const c_void, width: i32, height: i32, format: i32, mipmap_count: i32) -> u32 {
+    unsafe { ffi::rlLoadTexture(data, width, height, format, mipmap_count) }
+}
+
 /// Load depth texture/renderbuffer (to be attached to fbo)
-pub fn rl_load_texture_depth(width: i32, height: i32, use_render_buffer: bool) -> u32;
+pub fn rl_load_texture_depth(width: i32, height: i32, use_render_buffer: bool) -> u32 {
+    unsafe { ffi::rlLoadTextureDepth(width, height, use_render_buffer) }
+}
+
 /// Load texture cubemap
-pub fn rl_load_texture_cubemap(data: *const c_void, size: i32, format: i32) -> u32;
+pub fn rl_load_texture_cubemap(data: *const c_void, size: i32, format: i32) -> u32 {
+    unsafe { ffi::rlLoadTextureCubemap(data, size, format) }
+}
+
 /// Update GPU texture with new data
-pub fn rl_update_texture(id: u32, offset_x: i32, offset_y: i32, width: i32, height: i32, format: i32, data: *const c_void);
+pub fn rl_update_texture(id: u32, offset_x: i32, offset_y: i32, width: i32, height: i32, format: i32, data: *const c_void) {
+    unsafe { ffi::rlUpdateTexture(id, offset_x, offset_y, width, height, format, data); }
+}
+
 /// Get OpenGL internal formats
-pub fn rl_get_gl_texture_formats(format: i32, gl_internal_format: *mut u32, gl_format: *mut u32, gl_type: *mut u32);
+pub fn rl_get_gl_texture_formats(format: i32, gl_internal_format: *mut u32, gl_format: *mut u32, gl_type: *mut u32) {
+    unsafe { ffi::rlGetGlTextureFormats(format, gl_internal_format, gl_format, gl_type); }
+}
+
 /// Get name string for pixel format
-pub fn rl_get_pixel_format_name(format: u32) -> *const c_char; // is `char` `i8` or `u8`?
+pub fn rl_get_pixel_format_name(format: ffi::rlPixelFormat) -> &'static str {
+    // I just copied and pasted this in from the ffi version to prove to Rust that it's safe.
+    match format {
+        ffi::rlPixelFormat::RL_PIXELFORMAT_UNCOMPRESSED_GRAYSCALE => "GRAYSCALE",         // 8 bit per pixel (no alpha)
+        ffi::rlPixelFormat::RL_PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA => "GRAY_ALPHA",       // 8*2 bpp (2 channels)
+        ffi::rlPixelFormat::RL_PIXELFORMAT_UNCOMPRESSED_R5G6B5 => "R5G6B5",               // 16 bpp
+        ffi::rlPixelFormat::RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8 => "R8G8B8",               // 24 bpp
+        ffi::rlPixelFormat::RL_PIXELFORMAT_UNCOMPRESSED_R5G5B5A1 => "R5G5B5A1",           // 16 bpp (1 bit alpha)
+        ffi::rlPixelFormat::RL_PIXELFORMAT_UNCOMPRESSED_R4G4B4A4 => "R4G4B4A4",           // 16 bpp (4 bit alpha)
+        ffi::rlPixelFormat::RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 => "R8G8B8A8",           // 32 bpp
+        ffi::rlPixelFormat::RL_PIXELFORMAT_UNCOMPRESSED_R32 => "R32",                     // 32 bpp (1 channel - float)
+        ffi::rlPixelFormat::RL_PIXELFORMAT_UNCOMPRESSED_R32G32B32 => "R32G32B32",         // 32*3 bpp (3 channels - float)
+        ffi::rlPixelFormat::RL_PIXELFORMAT_UNCOMPRESSED_R32G32B32A32 => "R32G32B32A32",   // 32*4 bpp (4 channels - float)
+        ffi::rlPixelFormat::RL_PIXELFORMAT_UNCOMPRESSED_R16 => "R16",                     // 16 bpp (1 channel - half float)
+        ffi::rlPixelFormat::RL_PIXELFORMAT_UNCOMPRESSED_R16G16B16 => "R16G16B16",         // 16*3 bpp (3 channels - half float)
+        ffi::rlPixelFormat::RL_PIXELFORMAT_UNCOMPRESSED_R16G16B16A16 => "R16G16B16A16",   // 16*4 bpp (4 channels - half float)
+        ffi::rlPixelFormat::RL_PIXELFORMAT_COMPRESSED_DXT1_RGB => "DXT1_RGB",             // 4 bpp (no alpha)
+        ffi::rlPixelFormat::RL_PIXELFORMAT_COMPRESSED_DXT1_RGBA => "DXT1_RGBA",           // 4 bpp (1 bit alpha)
+        ffi::rlPixelFormat::RL_PIXELFORMAT_COMPRESSED_DXT3_RGBA => "DXT3_RGBA",           // 8 bpp
+        ffi::rlPixelFormat::RL_PIXELFORMAT_COMPRESSED_DXT5_RGBA => "DXT5_RGBA",           // 8 bpp
+        ffi::rlPixelFormat::RL_PIXELFORMAT_COMPRESSED_ETC1_RGB => "ETC1_RGB",             // 4 bpp
+        ffi::rlPixelFormat::RL_PIXELFORMAT_COMPRESSED_ETC2_RGB => "ETC2_RGB",             // 4 bpp
+        ffi::rlPixelFormat::RL_PIXELFORMAT_COMPRESSED_ETC2_EAC_RGBA => "ETC2_RGBA",       // 8 bpp
+        ffi::rlPixelFormat::RL_PIXELFORMAT_COMPRESSED_PVRT_RGB => "PVRT_RGB",             // 4 bpp
+        ffi::rlPixelFormat::RL_PIXELFORMAT_COMPRESSED_PVRT_RGBA => "PVRT_RGBA",           // 4 bpp
+        ffi::rlPixelFormat::RL_PIXELFORMAT_COMPRESSED_ASTC_4x4_RGBA => "ASTC_4x4_RGBA",   // 8 bpp
+        ffi::rlPixelFormat::RL_PIXELFORMAT_COMPRESSED_ASTC_8x8_RGBA => "ASTC_8x8_RGBA",   // 2 bpp
+        _ => "UNKNOWN",
+    }
+}
+
 /// Unload texture from GPU memory
-pub fn rl_unload_texture(id: u32);
+pub fn rl_unload_texture(id: u32) {
+    unsafe { ffi::rlUnloadTexture(id); }
+}
+
 /// Generate mipmap data for selected texture
-pub fn rl_gen_texture_mipmaps(id: u32, width: i32, height: i32, format: i32, mipmaps: *mut i32);
+/// NOTE: Only supports GPU mipmap generation
+pub fn rl_gen_texture_mipmaps(id: u32, width: i32, height: i32, format: ffi::rlPixelFormat) -> Option<NonZeroUsize> {
+    let mut mipmaps: i32 = 0;
+    unsafe { ffi::rlGenTextureMipmaps(id, width, height, format as i32, (&mut mipmaps) as *mut i32); }
+    NonZeroUsize::new(usize::try_from(mipmaps).expect("rlGenTextureMipmaps should not return a negative"))
+}
+
 /// Read texture pixel data
-pub fn rl_read_texture_pixels(id: u32, width: i32, height: i32, format: i32) -> *mut c_void;
+pub fn rl_read_texture_pixels(id: u32, width: i32, height: i32, format: i32) -> *mut c_void {
+    // NOTE: Using texture id, we can retrieve some texture info (but not on OpenGL ES 2.0)
+    // Possible texture info: GL_TEXTURE_RED_SIZE, GL_TEXTURE_GREEN_SIZE, GL_TEXTURE_BLUE_SIZE, GL_TEXTURE_ALPHA_SIZE
+    //int width, height, format;
+    //glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
+    //glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height);
+    //glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &format);
+
+    // NOTE: Each row written to or read from by OpenGL pixel operations like glGetTexImage are aligned to a 4 byte boundary by default, which may add some padding.
+    // Use glPixelStorei to modify padding with the GL_[UN]PACK_ALIGNMENT setting.
+    // GL_PACK_ALIGNMENT affects operations that read from OpenGL memory (glReadPixels, glGetTexImage, etc.)
+    // GL_UNPACK_ALIGNMENT affects operations that write to OpenGL memory (glTexImage, etc.)
+
+
+    // glGetTexImage() is not available on OpenGL ES 2.0
+    // Texture width and height are required on OpenGL ES 2.0. There is no way to get it from texture id.
+    // Two possible Options:
+    // 1 - Bind texture to color fbo attachment and glReadPixels()
+    // 2 - Create an fbo, activate it, render quad with texture, glReadPixels()
+    // We are using Option 1, just need to care for texture format on retrieval
+    // NOTE: This behaviour could be conditioned by graphic driver...
+
+    unsafe { ffi::rlReadTexturePixels(id, width, height, format) }
+}
+
 /// Read screen pixel data (color buffer)
-pub fn rl_read_screen_pixels(width: i32, height: i32) -> *mut u8;
+pub fn rl_read_screen_pixels(width: i32, height: i32) -> *mut u8 {
+    unsafe { ffi::rlReadScreenPixels(width, height) }
+}
 
 // Framebuffer management (fbo)
 /// Load an empty framebuffer
-pub fn rl_load_framebuffer(width: i32, height: i32) -> u32;
+pub fn rl_load_framebuffer(width: i32, height: i32) -> u32 {
+    unsafe { ffi::rlLoadFramebuffer(width, height) }
+}
+
 /// Attach texture/renderbuffer to a framebuffer
-pub fn rl_framebuffer_attach(fbo_id: u32, tex_id: u32, attach_type: i32, tex_type: i32, mip_level: i32);
+pub fn rl_framebuffer_attach(fbo_id: u32, tex_id: u32, attach_type: i32, tex_type: i32, mip_level: i32) {
+    unsafe { ffi::rlFramebufferAttach(fbo_id, tex_id, attach_type, tex_type, mip_level);}
+}
+
 /// Verify framebuffer is complete
-pub fn rlFramebufferComplete(id: u32) -> bool;
+pub fn rl_framebuffer_complete(id: u32) -> bool {
+    unsafe { ffi::rlFramebufferComplete(id) }
+}
+
 /// Delete framebuffer from GPU
-pub fn rl_unload_framebuffer(id: u32);
+pub fn rl_unload_framebuffer(id: u32) {
+    unsafe { ffi::rlUnloadFramebuffer(id); }
+}
 
 // Shaders management
+
 /// Load shader from code strings
-pub fn rl_load_shader_code(vs_code: *const c_char, fs_code: *const c_char) -> u32;
-/// Compile custom shader and return shader id (type: RL_VERTEX_SHADER, RL_FRAGMENT_SHADER, RL_COMPUTE_SHADER)
-pub fn rl_compile_shader(shader_code: *const c_char, r#type: i32) -> u32;
+pub fn rl_load_shader_code(vs_code: &CStr, fs_code: &CStr) -> u32 {
+    unsafe { ffi::rlLoadShaderCode(vs_code.as_ptr(), fs_code.as_ptr()) }
+}
+
+#[repr(i32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ShaderType {
+    Vertex   = ffi::RL_VERTEX_SHADER as i32,
+    Fragment = ffi::RL_FRAGMENT_SHADER as i32,
+    Compute  = ffi::RL_COMPUTE_SHADER as i32,
+}
+
+/// Compile custom shader and return shader id (type: `RL_VERTEX_SHADER`, `RL_FRAGMENT_SHADER`, `RL_COMPUTE_SHADER`)
+pub fn rl_compile_shader(shader_code: &CStr, kind: ShaderType) -> u32 {
+    unsafe { ffi::rlCompileShader(shader_code.as_ptr(), kind as i32) }
+}
+
 /// Load custom shader program
-pub fn rl_load_shader_program(v_shader_id: u32, f_shader_id: u32) -> u32;
+pub fn rl_load_shader_program(v_shader_id: u32, f_shader_id: u32) -> u32 {
+    unsafe { ffi::rlLoadShaderProgram(v_shader_id, f_shader_id) }
+}
+
 /// Unload shader program
-pub fn rl_unload_shader_program(id: u32);
+pub fn rl_unload_shader_program(id: u32) {
+    unsafe { ffi::rlUnloadShaderProgram(id); }
+}
+
 /// Get shader location uniform
-pub fn rl_get_location_uniform(shader_id: u32, uniform_name: *const c_char) -> i32;
+pub fn rl_get_location_uniform(shader_id: u32, uniform_name: &CStr) -> i32 {
+    unsafe { ffi::rlGetLocationUniform(shader_id, uniform_name.as_ptr()) }
+}
+
 /// Get shader location attribute
-pub fn rl_get_location_attrib(shader_id: u32, attrib_name: *const c_char) -> i32;
+pub fn rl_get_location_attrib(shader_id: u32, attrib_name: &CStr) -> i32 {
+    unsafe { ffi::rlGetLocationAttrib(shader_id, attrib_name.as_ptr()) }
+}
+
+pub enum ShaderUniformData {
+    RlShaderUniformFloat(f32),
+    RlShaderUniformVec2([f32; 2]),
+    RlShaderUniformVec3([f32; 3]),
+    RlShaderUniformVec4([f32; 4]),
+    RlShaderUniformInt(i32),
+    RlShaderUniformIVec2([i32; 2]),
+    RlShaderUniformIVec3([i32; 3]),
+    RlShaderUniformIVec4([i32; 4]),
+    RlShaderUniformSampler2d(),
+}
+
 /// Set shader value uniform
-pub fn rl_set_uniform(loc_index: i32, value: *const c_void, uniform_type: i32, count: i32);
+pub fn rl_set_uniform<T>(loc_index: i32, value: &[ShaderUniformData], uniform_type: i32) -> Result<(), TryFromIntError> {
+    Ok(unsafe { ffi::rlSetUniform(loc_index, value.as_ptr().cast(), uniform_type, i32::try_from(value.len())?); })
+}
+
 /// Set shader value matrix
-pub fn rl_set_uniform_matrix(loc_index: i32, mat: ffi::Matrix);
+pub fn rl_set_uniform_matrix(loc_index: i32, mat: ffi::Matrix) {
+    unsafe { ffi::rlSetUniformMatrix(loc_index, mat); }
+}
+
 /// Set shader value sampler
-pub fn rl_set_uniform_sampler(loc_index: i32, texture_id: u32);
+pub fn rl_set_uniform_sampler(loc_index: i32, texture_id: u32) {
+    unsafe { ffi::rlSetUniformSampler(loc_index, texture_id); }
+}
+
 /// Set shader currently active (id and locations)
-pub fn rl_set_shader(id: u32, locs: *mut i32);
+pub fn rl_set_shader(id: u32, locs: *mut i32) {
+    unsafe { ffi::rlSetShader(id, locs); }
+}
 
 // Compute shader management
+
 /// Load compute shader program
-pub fn rl_load_compute_shader_program(shader_id: u32) -> u32;
+pub fn rl_load_compute_shader_program(shader_id: u32) -> u32 {
+    unsafe { ffi::rlLoadComputeShaderProgram(shader_id) }
+}
+
 /// Dispatch compute shader (equivalent to *draw* for graphics pipeline)
-pub fn rl_compute_shader_dispatch(group_x: u32, group_y: u32, group_z: u32);
+pub fn rl_compute_shader_dispatch(group_x: u32, group_y: u32, group_z: u32) {
+    unsafe { ffi::rlComputeShaderDispatch(group_x, group_y, group_z); }
+}
 
 // Shader buffer storage object management (ssbo)
+
 /// Load shader storage buffer object (SSBO)
-pub fn rlLoadShaderBuffer(size: u32, data: *const c_void, usage_hint: i32) -> u32;
+pub fn rl_load_shader_buffer(size: u32, data: *const c_void, usage_hint: i32) -> u32 {
+    unsafe { ffi::rlLoadShaderBuffer(size, data, usage_hint) }
+}
+
 /// Unload shader storage buffer object (SSBO)
-pub fn rl_unload_shader_buffer(ssboId: u32);
+pub fn rl_unload_shader_buffer(ssbo_id: u32) {
+    unsafe { ffi::rlUnloadShaderBuffer(ssbo_id); }
+}
+
 /// Update SSBO buffer data
-pub fn rl_update_shader_buffer(id: u32, data: *const c_void, data_size: u32, offset: u32);
+pub fn rl_update_shader_buffer(id: u32, data: *const c_void, data_size: u32, offset: u32) {
+    unsafe { ffi::rlUpdateShaderBuffer(id, data, data_size, offset); }
+}
+
 /// Bind SSBO buffer
-pub fn rl_bind_shader_buffer(id: u32, index: u32);
+pub fn rl_bind_shader_buffer(id: u32, index: u32) {
+    unsafe { ffi::rlBindShaderBuffer(id, index); }
+}
+
 /// Read SSBO buffer data (GPU->CPU)
-pub fn rl_read_shader_buffer(id: u32, dest: *mut c_void, count: u32, offset: u32);
+pub fn rl_read_shader_buffer(id: u32, dest: *mut c_void, count: u32, offset: u32) {
+    unsafe { ffi::rlReadShaderBuffer(id, dest, count, offset); }
+}
+
 /// Copy SSBO data between buffers
-pub fn rl_copy_shader_buffer(destId: u32, srcId: u32, dest_offset: u32, src_offset: u32, count: u32);
+pub fn rl_copy_shader_buffer(dest_id: u32, src_id: u32, dest_offset: u32, src_offset: u32, count: u32) {
+    unsafe { ffi::rlCopyShaderBuffer(dest_id, src_id, dest_offset, src_offset, count); }
+}
+
 /// Get SSBO buffer size
-pub fn rlGetShaderBufferSize(id: u32) -> u32;
+pub fn rl_get_shader_buffer_size(id: u32) -> u32 {
+    unsafe { ffi::rlGetShaderBufferSize(id) }
+}
 
 // Buffer management
+
 /// Bind image texture
-pub fn rl_bind_image_texture(id: u32, index: u32, format: i32, readonly: bool);
+pub fn rl_bind_image_texture(id: u32, index: u32, format: i32, readonly: bool) {
+    unsafe { ffi::rlBindImageTexture(id, index, format, readonly); }
+}
 
 // Matrix state management
 /// Get internal modelview matrix
-pub fn rl_get_matrix_modelview() -> ffi::Matrix;
+pub fn rl_get_matrix_modelview() -> ffi::Matrix {
+    unsafe { ffi::rlGetMatrixModelview() }
+}
+
 /// Get internal projection matrix
-pub fn rl_get_matrix_projection() -> ffi::Matrix;
+pub fn rl_get_matrix_projection() -> ffi::Matrix {
+    unsafe { ffi::rlGetMatrixProjection() }
+}
+
 /// Get internal accumulated transform matrix
-pub fn rl_get_matrix_transform() -> ffi::Matrix;
+pub fn rl_get_matrix_transform() -> ffi::Matrix {
+    unsafe { ffi::rlGetMatrixTransform() }
+}
+
 /// Get internal projection matrix for stereo render (selected eye)
-pub fn rl_get_matrix_projection_stereo(eye: i32) -> ffi::Matrix;
+pub fn rl_get_matrix_projection_stereo(eye: i32) -> ffi::Matrix {
+    unsafe { ffi::rlGetMatrixProjectionStereo(eye) }
+}
+
 /// Get internal view offset matrix for stereo render (selected eye)
-pub fn rl_get_matrix_view_offset_stereo(eye: i32) -> ffi::Matrix;
+pub fn rl_get_matrix_view_offset_stereo(eye: i32) -> ffi::Matrix {
+    unsafe { ffi::rlGetMatrixViewOffsetStereo(eye) }
+}
+
 /// Set a custom projection matrix (replaces internal projection matrix)
-pub fn rl_set_matrix_projection(proj: ffi::Matrix);
+pub fn rl_set_matrix_projection(proj: ffi::Matrix) {
+    unsafe { ffi::rlSetMatrixProjection(proj); }
+}
+
 /// Set a custom modelview matrix (replaces internal modelview matrix)
-pub fn rl_set_matrix_modelview(view: ffi::Matrix);
+pub fn rl_set_matrix_modelview(view: ffi::Matrix) {
+    unsafe { ffi::rlSetMatrixModelview(view); }
+}
+
 /// Set eyes projection matrices for stereo rendering
-pub fn rl_set_matrix_projection_stereo(right: ffi::Matrix, left: ffi::Matrix);
+pub fn rl_set_matrix_projection_stereo(right: ffi::Matrix, left: ffi::Matrix) {
+    unsafe { ffi::rlSetMatrixProjectionStereo(right, left); }
+}
+
 /// Set eyes view offsets matrices for stereo rendering
-pub fn rl_set_matrix_view_offset_stereo(right: ffi::Matrix, left: ffi::Matrix);
+pub fn rl_set_matrix_view_offset_stereo(right: ffi::Matrix, left: ffi::Matrix) {
+    unsafe { ffi::rlSetMatrixViewOffsetStereo(right, left); }
+}
 
 // Quick and dirty cube/quad buffers load->draw->unload
+
 /// Load and draw a cube
-pub fn rl_load_draw_cube();
+pub fn rl_load_draw_cube() {
+    unsafe { ffi::rlLoadDrawCube(); }
+}
+
 /// Load and draw a quad
-pub fn rl_load_draw_quad();
+pub fn rl_load_draw_quad() {
+    unsafe { ffi::rlLoadDrawQuad(); }
+}
 
 
 #[link(name = "raylib")]
