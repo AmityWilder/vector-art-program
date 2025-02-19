@@ -202,7 +202,6 @@ impl Curve {
 impl Curve {
     pub fn draw_lines(&self, d: &mut impl RaylibDraw, strips_per_bez: usize, color: Color) {
         if self.points.len() >= 2 {
-            let mut d = d.begin_rlgl();
             let mut d = d.rl_begin_lines();
             d.rl_color4ub(color.r, color.g, color.b, color.a);
 
@@ -251,7 +250,6 @@ impl Curve {
                 }
             }
 
-            #[cfg(not(feature = "debug_stroke"))] let mut d = d.begin_rlgl();
             #[cfg(not(feature = "debug_stroke"))] let mut d = d.rl_begin_triangles();
             #[cfg(not(feature = "debug_stroke"))] d.rl_color4ub(color.r, color.g, color.b, color.a);
 
@@ -280,8 +278,8 @@ impl Curve {
                             d.rl_vertex2f(p1.x, p1.y);
                             d.rl_vertex2f(p4.x, p4.y);
                         } #[cfg(feature = "debug_stroke")] {
-                            d.draw_line_strip(&[p1, p3, p4], Color::RED);
-                            d.draw_line_strip(&[p2, p1, p4], Color::BLUE);
+                            d.draw_line_strip(&[p1.into(), p3.into(), p4.into()], Color::RED);
+                            d.draw_line_strip(&[p2.into(), p1.into(), p4.into()], Color::BLUE);
                         }
 
                         past_points[0] = p1;
@@ -299,7 +297,6 @@ impl Curve {
         let num_points = segments_per_slice * self.points.len();
         if num_points < 3 { return; }
 
-        #[cfg(not(feature = "debug_fill"))] let mut d = d.begin_rlgl();
         #[cfg(not(feature = "debug_fill"))] let mut d = d.rl_begin_triangles();
         #[cfg(not(feature = "debug_fill"))] d.rl_color4ub(color.r, color.g, color.b, color.a);
 
@@ -315,7 +312,7 @@ impl Curve {
                         d.rl_vertex2f(prev_point.x, prev_point.y);
                         d.rl_vertex2f(p.x, p.y);
                     } #[cfg(feature = "debug_fill")] {
-                        d.draw_line_strip(&[*first_point, *prev_point, p], color);
+                        d.draw_line_strip(&[first_point.into(), prev_point.into(), p.into()], color);
                     }
                 } else if prev_point.is_none() {
                     first_point = Some(p);

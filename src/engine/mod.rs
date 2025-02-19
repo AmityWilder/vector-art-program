@@ -206,7 +206,6 @@ fn draw_artwork(d: &mut RaylibDrawHandle<'_>, trim_rtex: &RenderTexture2D) {
         (width as f32, height as f32);
 
     {
-        let mut d = d.begin_rlgl();
         let mut d = d.rl_set_texture(trim_rtex.texture());
         let mut d = d.rl_begin_quads();
 

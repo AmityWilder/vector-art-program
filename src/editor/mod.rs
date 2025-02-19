@@ -244,7 +244,6 @@ impl Editor {
                 let inv_height = (trim_rtex.height() as f32).recip();
 
                 {
-                    let mut d = d.begin_rlgl();
                     let mut d = d.rl_set_texture(trim_rtex.texture());
                     let mut d = d.rl_begin_quads();
 

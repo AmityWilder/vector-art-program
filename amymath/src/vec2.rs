@@ -614,8 +614,8 @@ impl Vector2 {
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn rotate_cc(self) -> Self {
         Self {
-            x: -self.y,
-            y:  self.x,
+            x:  self.y,
+            y: -self.x,
         }
     }
 
@@ -624,8 +624,8 @@ impl Vector2 {
     #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn rotate_cw(self) -> Self {
         Self {
-            x:  self.y,
-            y: -self.x,
+            x: -self.y,
+            y:  self.x,
         }
     }
 

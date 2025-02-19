@@ -1,5 +1,5 @@
-use raylib::{prelude::*};
-use std::{ffi::{c_char, c_void, CStr}, num::{NonZeroUsize, TryFromIntError}, ops::{Deref, DerefMut}, ptr::null_mut};
+use raylib::prelude::*;
+use std::{ffi::{c_void, CStr}, num::{NonZeroUsize, TryFromIntError}, ops::{Deref, DerefMut}, ptr::null_mut};
 
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -1069,7 +1069,6 @@ mod tests {
                     success!()
                 }
                 rl.begin_drawing(Color::BLACK, |d| {
-                    let mut d = d.begin_rlgl();
                     let mut d = d.rl_set_texture(&texture);
                     let mut d = d.rl_begin_quads();
 
