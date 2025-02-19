@@ -1,5 +1,5 @@
 use raylib::prelude::*;
-use std::{ffi::{c_char, c_void}, ops::{Deref, DerefMut}, ptr::null_mut};
+use std::{ffi::{c_char, c_void}, num::TryFromIntError, ops::{Deref, DerefMut}, ptr::null_mut};
 
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -293,46 +293,24 @@ pub fn rl_blit_framebuffer(
 
 // General render state
 
-pub struct ColorBlendHandle<'a, T: ?Sized>(&'a mut T);
-
-impl<'a, T> Deref for ColorBlendHandle<'a, T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl<'a, T> DerefMut for ColorBlendHandle<'a, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 /// Enable color blending
-pub fn rl_enable_color_blend<D: RaylibDraw>(d: &mut D) -> ColorBlendHandle<'_, D> {
+pub fn rl_enable_color_blend() {
     unsafe { ffi::rlEnableColorBlend(); }
-    ColorBlendHandle(d)
 }
 
-impl Drop for ColorBlendHandle {
-    /// Disable color blending
-    fn drop(&mut self) {
-        unsafe { ffi::rlDisableColorBlend(); }
-    }
+/// Disable color blending
+pub fn rl_disable_color_blend() {
+    unsafe { ffi::rlDisableColorBlend(); }
 }
-
-pub struct DepthTestHandle(());
 
 /// Enable depth test
-pub fn rl_enable_depth_test() -> DepthTestHandle {
+pub fn rl_enable_depth_test() {
     unsafe { ffi::rlEnableDepthTest(); }
-    DepthTestHandle(())
 }
 
-impl Drop for DepthTestHandle {
-    /// Disable depth test
-    fn drop(&mut self) {
-        unsafe { ffi::rlDisableDepthTest(); }
-    }
+/// Disable depth test
+pub fn rl_disable_depth_test() {
+    unsafe { ffi::rlDisableDepthTest(); }
 }
 
 /// Enable depth write
@@ -491,22 +469,90 @@ pub fn rl_set_texture(id: u32) {
 pub fn rl_load_vertex_array() -> u32 {
     unsafe { ffi::rlLoadVertexArray() }
 }
+
 /// Load a vertex buffer attribute
-pub fn rl_load_vertex_buffer<T>(buffer: &mut [T], dynamic: bool) -> u32 {
-    unsafe { ffi::rlLoadVertexBuffer(buffer, std::mem::size_of::<T>() * buffer.len(), dynamic) }
+pub fn rl_load_vertex_buffer<T>(buffer: &[T], dynamic: bool) -> Result<u32, TryFromIntError> {
+    let range = buffer.as_ptr_range();
+    let size = i32::try_from(unsafe { range.end.byte_sub_ptr(range.start) })?;
+    Ok(unsafe { ffi::rlLoadVertexBuffer(range.start, size, dynamic) })
 }
+
 /// Load a new attributes element buffer
-pub fn rl_load_vertex_buffer_element(buffer: *const c_void, size: i32, dynamic: bool) -> u32;
+pub fn rl_load_vertex_buffer_element<T>(buffer: &[T], dynamic: bool) -> u32 {
+    let range = buffer.as_ptr_range();
+    let size = i32::try_from(unsafe { range.end.byte_sub_ptr(range.start) })?;
+    unsafe { ffi::rlLoadVertexBufferElement(buffer, size, dynamic) }
+}
+
 /// Update GPU buffer with new data
-pub fn rl_update_vertex_buffer(buffer_id: u32, data: *const c_void, data_size: i32, offset: i32);
+pub fn rl_update_vertex_buffer<T>(buffer_id: u32, data: &[T], offset: usize) {
+    let offset = i32::try_from(offset)?;
+    let range = data.as_ptr_range();
+    let data_size = i32::try_from(unsafe { range.end.byte_sub_ptr(range.start) })?;
+    unsafe { ffi::rlUpdateVertexBuffer(buffer_id, data, data_size, offset); }
+}
+
 /// Update vertex buffer elements with new data
-pub fn rl_update_vertex_buffer_elements(id: u32, data: *const c_void, data_size: i32, offset: i32);
-pub fn rl_unload_vertex_array(vao_id: u32);
-pub fn rl_unload_vertex_buffer(vbo_id: u32);
-pub fn rl_set_vertex_attribute(index: u32, comp_size: i32, r#type: i32, normalized: bool, stride: i32, pointer: *const c_void);
-pub fn rl_set_vertex_attribute_divisor(index: u32, divisor: i32);
+pub fn rl_update_vertex_buffer_elements<T>(id: u32, data: &[T], offset: usize) -> Result<(), TryFromIntError> {
+    let offset = i32::try_from(offset)?;
+    let range = data.as_ptr_range();
+    let data_size = i32::try_from(unsafe { range.end.byte_sub_ptr(range.start) })?;
+    Ok(unsafe { ffi::rlUpdateVertexBufferElements(id, range.start, data_size, offset); })
+}
+
+/// Unload vertex array object (VAO)
+pub fn rl_unload_vertex_array(vao_id: u32) {
+    unsafe { ffi::rlUnloadVertexArray(vao_id); }
+}
+
+// Unload vertex buffer (VBO)
+pub fn rl_unload_vertex_buffer(vbo_id: u32) {
+    unsafe { ffi::rlUnloadVertexBuffer(vbo_id); }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CompSize {
+    One   = 1,
+    Two   = 2,
+    Three = 3,
+    Four  = 4,
+}
+
+/// GL equivalent data types
+#[repr(i32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum VertexAttributeType {
+    /// GL_UNSIGNED_BYTE
+    UnsignedByte = ffi::RL_UNSIGNED_BYTE as i32,
+    /// GL_FLOAT
+    Float = ffi::RL_FLOAT as i32,
+}
+
+/// Set vertex attribute
+/// * `index` - Specifies the index of the generic vertex attribute to be modified.
+/// * `comp_size` - Specifies the number of components per generic vertex attribute. Must be 1, 2, 3, 4. Additionally, the symbolic constant `GL_BGRA` is accepted by `glVertexAttribPointer`. The initial value is 4.
+/// * `kind` - Specifies the data type of each component in the array. The symbolic constants `GL_BYTE`, `GL_UNSIGNED_BYTE`, `GL_SHORT`, `GL_UNSIGNED_SHORT`, `GL_INT`, and `GL_UNSIGNED_INT` are accepted by `glVertexAttribPointer` and `glVertexAttribIPointer`. Additionally `GL_HALF_FLOAT`, `GL_FLOAT`, `GL_DOUBLE`, `GL_FIXED`, `GL_INT_2_10_10_10_REV`, `GL_UNSIGNED_INT_2_10_10_10_REV` and `GL_UNSIGNED_INT_10F_11F_11F_REV` are accepted by `glVertexAttribPointer`. `GL_DOUBLE` is also accepted by `glVertexAttribLPointer` and is the only token accepted by the type parameter for that function. The initial value is `GL_FLOAT`.
+/// * `normalized` - For `glVertexAttribPointer`, specifies whether fixed-point data values should be normalized (`GL_TRUE`) or converted directly as fixed-point values (`GL_FALSE`) when they are accessed.
+/// * `stride` - Specifies the byte offset between consecutive generic vertex attributes. If stride is 0, the generic vertex attributes are understood to be tightly packed in the array. The initial value is 0.
+/// * `pointer` - Specifies a offset of the first component of the first generic vertex attribute in the array in the data store of the buffer currently bound to the `GL_ARRAY_BUFFER` target. The initial value is 0.
+pub fn rl_set_vertex_attribute<T>(
+    index: u32,
+    comp_size: CompSize,
+    kind: VertexAttributeType,
+    normalized: bool,
+    stride: u32,
+    pointer: usize,
+) {
+    unsafe { ffi::rlSetVertexAttribute(index, comp_size as i32, kind as i32, normalized, stride as i32, (pointer as *const u8).cast()); }
+}
+
+pub fn rl_set_vertex_attribute_divisor(index: u32, divisor: i32) {
+    unsafe { ffi::rlSetVertexAttributeDivisor(index, divisor); }
+}
 /// Set vertex attribute default value
-pub fn rl_set_vertex_attribute_default(loc_index: i32, value: *const c_void, attrib_type: i32, count: i32);
+pub fn rl_set_vertex_attribute_default(loc_index: i32, value: *const c_void, attrib_type: i32, count: i32) {
+    unsafe { ffi::rlSetVertexAttributeDefault(loc_index, value, attrib_type, count);}
+}
 pub fn rl_draw_vertex_array(offset: i32, count: i32);
 pub fn rl_draw_vertex_array_elements(offset: i32, count: i32, buffer: *const c_void);
 pub fn rl_draw_vertex_array_instanced(offset: i32, count: i32, instances: i32);
