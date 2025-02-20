@@ -211,10 +211,6 @@ fn save_layer_settings(writer: &mut impl Write, layer: &mut Layer) -> io::Result
         is_hidden,
         is_locked,
         is_group,
-        blend: Blending {
-            opacity,
-            mode: blend_mode,
-        },
     } = match layer {
         Layer::Group(group) => &mut group.settings,
         Layer::Path(path) => &mut path.write().settings,
@@ -229,13 +225,10 @@ fn save_layer_settings(writer: &mut impl Write, layer: &mut Layer) -> io::Result
         | (u8::from(*is_hidden) << 5)
         | (u8::from(*is_locked) << 4)
         | (u8::from(*is_group) << 3)
-        | blend_mode_to_byte(*blend_mode)
     ])?;
 
     write_color_rgb(writer, *color)?;
 
-    let opacity_byte = opacity_byte(opacity);
-    writer.write_all(&[opacity_byte])?;
     Ok(())
 }
 
@@ -246,10 +239,7 @@ fn read_layer_settings(reader: &mut impl Read) -> io::Result<(LayerSettings, boo
     let is_hidden   = ((flags >> 5) & 1) != 0;
     let is_locked   = ((flags >> 4) & 1) != 0;
     let is_group    = ((flags >> 3) & 1) != 0;
-    let blend_mode = extract_blend_mode(flags);
     let color = read_color_rgb(reader)?;
-    let opacity_byte: u8 = reader.read_le()?;
-    let opacity = opacity_from_byte(opacity_byte);
 
     Ok((LayerSettings {
         name,
@@ -257,10 +247,6 @@ fn read_layer_settings(reader: &mut impl Read) -> io::Result<(LayerSettings, boo
         is_hidden,
         is_locked,
         is_group,
-        blend: Blending {
-            opacity,
-            mode: blend_mode,
-        },
     }, is_expanded))
 }
 
@@ -270,6 +256,7 @@ fn save_group(
         settings: _, // already handled
         items,
         is_expanded: _, // already handled
+        blend: _, // TODO
     }: &mut Group
 ) -> io::Result<()> {
     writer.write_le(b'g')?;
@@ -283,6 +270,7 @@ fn read_group(reader: &mut impl Read, settings: LayerSettings, is_expanded: bool
         settings,
         is_expanded,
         items: read_layer_tree(reader)?,
+        blend: Blending::default(), // TODO
     })
 }
 
@@ -421,6 +409,7 @@ fn read_fill_style(reader: &mut impl Read) -> io::Result<fill::Fill> {
 }
 
 fn save_appearance(writer: &mut impl Write, appearance: &mut Appearance) -> io::Result<()> {
+    // TODO: WRITE BLENDING DATA
     writer.write_le(appearance.items.len())?;
     for style_item in &mut appearance.items {
         match style_item {
@@ -432,6 +421,7 @@ fn save_appearance(writer: &mut impl Write, appearance: &mut Appearance) -> io::
 }
 
 fn read_appearance(reader: &mut impl Read) -> io::Result<Appearance> {
+    // TODO: READ BLENDING DATA
     let num_style_items = reader.read_le()?;
     let mut style_items = Vec::with_capacity(num_style_items);
     for _ in 0..num_style_items {
@@ -442,7 +432,12 @@ fn read_appearance(reader: &mut impl Read) -> io::Result<Appearance> {
             x => Err(io::Error::other(format!("unknown style type: {x:?}")))?,
         });
     }
-    Ok(Appearance { items: style_items })
+    Ok(Appearance {
+        blend: Blending {
+            ..Default::default() // TODO
+        },
+        items: style_items,
+    })
 }
 
 fn save_path_points(writer: &mut impl Write, curve: &mut Curve) -> io::Result<()> {

@@ -16,6 +16,12 @@ impl Default for Blending {
     }
 }
 
+impl Blending {
+    pub fn is_non_default(&self) -> bool {
+        (self.opacity - 1.0).abs() > f32::EPSILON || self.mode != BlendMode::BLEND_ALPHA
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum StyleItem {
     Stroke(Stroke),
@@ -24,12 +30,14 @@ pub enum StyleItem {
 
 #[derive(Default, Clone)]
 pub struct Appearance {
+    pub blend: Blending,
     pub items: Vec<StyleItem>,
 }
 
 impl Appearance {
-    pub fn new(items: Vec<StyleItem>) -> Self {
+    pub fn new(blend: Blending, items: Vec<StyleItem>) -> Self {
         Self {
+            blend,
             items,
         }
     }

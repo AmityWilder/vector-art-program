@@ -1,6 +1,6 @@
 use amylib::{collections::tree::{Recursive, Tree}, iter::directed::{CForward, CReverse}, rc::StrongMut};
 use raylib::prelude::*;
-use crate::{appearance::Blending, raster::Raster, vector_path::VectorPath};
+use crate::{raster::Raster, vector_path::VectorPath};
 
 pub mod ui_iter;
 pub mod group;
@@ -11,7 +11,7 @@ use group::Group;
 pub struct LayerSettings {
     /// Name of the layer in the layers panel
     pub name: String,
-    /// Color of paths
+    /// Color of paths when selected
     pub color: Color,
     /// Skip in rendering
     pub is_hidden: bool,
@@ -19,7 +19,6 @@ pub struct LayerSettings {
     pub is_locked: bool,
     /// Items move with layer
     pub is_group: bool,
-    pub blend: Blending,
 }
 
 impl LayerSettings {
@@ -30,7 +29,6 @@ impl LayerSettings {
             is_hidden: false,
             is_locked: false,
             is_group: false,
-            blend: Blending::default(),
         }
     }
 }
@@ -107,19 +105,19 @@ impl Layer {
 
 pub trait LayerType {
     /// Draw without helper visuals
-    fn draw_rendered(&self, d: &mut impl RaylibDraw, scratch_rtex: &mut [RenderTexture2D]);
+    fn draw_rendered(&self, d: &mut impl RaylibDraw, camera: &Camera2D, scratch_rtex: &mut [RenderTexture2D]);
 
     /// Draw with helper visuals
     fn draw_selected(&self, d: &mut impl RaylibDraw, px_world_size: f32);
 }
 
 impl LayerType for Layer {
-    fn draw_rendered(&self, d: &mut impl RaylibDraw, scratch_rtex: &mut [RenderTexture2D]) {
+    fn draw_rendered(&self, d: &mut impl RaylibDraw, camera: &Camera2D, scratch_rtex: &mut [RenderTexture2D]) {
         if !self.settings().is_hidden {
             match self {
-                Layer::Group(group) => group.draw_rendered(d, scratch_rtex),
-                Layer::Path(path) => path.read().draw_rendered(d, scratch_rtex),
-                Layer::Raster(raster) => raster.read().draw_rendered(d, scratch_rtex),
+                Layer::Group(group) => group.draw_rendered(d, camera, scratch_rtex),
+                Layer::Path(path) => path.read().draw_rendered(d, camera, scratch_rtex),
+                Layer::Raster(raster) => raster.read().draw_rendered(d, camera, scratch_rtex),
             }
         }
     }

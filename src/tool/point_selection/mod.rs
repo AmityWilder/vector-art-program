@@ -222,7 +222,16 @@ impl PointSelection {
 }
 
 impl ToolType for PointSelection {
-    fn tick(&mut self, rl: &mut RaylibHandle, _thread: &RaylibThread, _current_appearance: &mut Appearance, document: &mut Document, mouse_world_pos: Vector2, px_world_size: f32) {
+    fn tick(
+        &mut self,
+        rl: &mut RaylibHandle,
+        _thread: &RaylibThread,
+        _current_appearance: &mut Appearance,
+        document: &mut Document,
+        _scratch_rtex: &mut Vec<RenderTexture2D>,
+        mouse_world_pos: Vector2,
+        px_world_size: f32,
+    ) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             self.begin_dragging(rl, document, mouse_world_pos, px_world_size);
         }

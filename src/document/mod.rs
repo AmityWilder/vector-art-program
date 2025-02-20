@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use amygui::panel::Panel;
 use amymath::prelude::{*, Vector2};
 use layer::{Layer, LayerTree};
-use crate::{appearance::Appearance, raster::{Raster, RasterTex}, vector_path::VectorPath};
+use crate::{appearance::{Appearance, Blending}, raster::{Raster, RasterTex}, vector_path::VectorPath};
 use amylib::rc::prelude::*;
 use raylib::prelude::{*, Vector2 as RlVector2};
 
@@ -120,7 +120,7 @@ impl Document {
 
     pub fn create_group(&mut self, name: Option<String>, color: Option<Color>) -> &mut Group {
         let settings = self.gen_layer_settings(name, color);
-        self.layers.push(Layer::Group(Group::new(settings)));
+        self.layers.push(Layer::Group(Group::new(settings, Blending::default())));
         match self.layers.last_mut() {
             Some(Layer::Group(group)) => group,
             _ => unreachable!("group layer should exist when one is pushed"),

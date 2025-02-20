@@ -22,6 +22,7 @@ pub trait ToolType {
         thread: &RaylibThread,
         current_appearance: &mut Appearance,
         document: &mut Document,
+        scratch_rtex: &mut Vec<RenderTexture2D>,
         mouse_world_pos: Vector2,
         px_world_size: f32,
     );
@@ -128,14 +129,15 @@ impl ToolType for Tool {
         thread: &RaylibThread,
         current_appearance: &mut Appearance,
         document: &mut Document,
+        scratch_rtex: &mut Vec<RenderTexture2D>,
         mouse_world_pos: Vector2,
         px_world_size: f32,
     ) {
         match self {
-            Tool::PointSelection(tool) => tool.tick(rl, thread, current_appearance, document, mouse_world_pos, px_world_size),
-            Tool::Pen           (tool) => tool.tick(rl, thread, current_appearance, document, mouse_world_pos, px_world_size),
-            Tool::VectorBrush   (tool) => tool.tick(rl, thread, current_appearance, document, mouse_world_pos, px_world_size),
-            Tool::RasterBrush   (tool) => tool.tick(rl, thread, current_appearance, document, mouse_world_pos, px_world_size),
+            Tool::PointSelection(tool) => tool.tick(rl, thread, current_appearance, document, scratch_rtex, mouse_world_pos, px_world_size),
+            Tool::Pen           (tool) => tool.tick(rl, thread, current_appearance, document, scratch_rtex, mouse_world_pos, px_world_size),
+            Tool::VectorBrush   (tool) => tool.tick(rl, thread, current_appearance, document, scratch_rtex, mouse_world_pos, px_world_size),
+            Tool::RasterBrush   (tool) => tool.tick(rl, thread, current_appearance, document, scratch_rtex, mouse_world_pos, px_world_size),
         }
     }
 

@@ -69,7 +69,7 @@ impl Raster {
 }
 
 impl LayerType for Raster {
-    fn draw_rendered(&self, d: &mut impl RaylibDraw, _scratch_rtex: &mut [RenderTexture2D]) {
+    fn draw_rendered(&self, d: &mut impl RaylibDraw, _camera: &Camera2D, _scratch_rtex: &mut [RenderTexture2D]) {
         self.texture.draw(d);
     }
 

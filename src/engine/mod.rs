@@ -134,7 +134,7 @@ impl Engine {
         rl: &mut RaylibHandle,
         thread: &RaylibThread,
         is_window_resized: bool,
-        _scratch_rtex: &mut [RenderTexture2D], // todo: push an element when a group is nested past the current greatest nesting depth
+        scratch_rtex: &mut Vec<RenderTexture2D>, // todo: push an element when a group is nested past the current greatest nesting depth
         window_rect: &IRect2,
         mouse_screen_pos: Vector2,
         mouse_screen_delta: Vector2,
@@ -159,7 +159,7 @@ impl Engine {
         if let Some(active_editor_idx) = self.active_editor {
             assert!(active_editor_idx < self.editors.len(), "`engine.active_editor` should be a valid editor index in `engine.editors`");
             let editor = &mut self.editors[active_editor_idx];
-            editor.tick(&self.config, rl, thread, hover_region != HoverRegion::Editor, mouse_screen_pos, mouse_screen_delta);
+            editor.tick(&self.config, rl, thread, scratch_rtex, hover_region != HoverRegion::Editor, mouse_screen_pos, mouse_screen_delta);
             match hover_region {
                 HoverRegion::ToolPanel => {
                     self.tool_panel.tick(rl, editor, mouse_screen_pos);
@@ -232,13 +232,9 @@ fn draw_artwork(d: &mut RaylibDrawHandle<'_>, trim_rtex: &RenderTexture2D) {
         d.rl_color4ub(255, 0, 255, 255);
         d.rl_normal3f(0.0, 0.0, 1.0);
 
-        d.rl_tex_coord2f(0.0, 1.0);
-        d.rl_vertex2f(0.0, 0.0);
-        d.rl_tex_coord2f(0.0, 0.0);
-        d.rl_vertex2f(0.0, height);
-        d.rl_tex_coord2f(1.0, 0.0);
-        d.rl_vertex2f(width, height);
-        d.rl_tex_coord2f(1.0, 1.0);
-        d.rl_vertex2f(width, 0.0);
+        d.rl_tex_coord2f(0.0, 1.0); d.rl_vertex2f(0.0, 0.0);
+        d.rl_tex_coord2f(0.0, 0.0); d.rl_vertex2f(0.0, height);
+        d.rl_tex_coord2f(1.0, 0.0); d.rl_vertex2f(width, height);
+        d.rl_tex_coord2f(1.0, 1.0); d.rl_vertex2f(width, 0.0);
     }
 }

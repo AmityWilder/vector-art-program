@@ -122,7 +122,7 @@ fn main() {
         },
     };
     let mut trim_rtex = rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap();
-    let mut scratch_rtex = vec![];
+    let mut scratch_rtex = vec![rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap()];
     let mut engine = Engine::new(&mut rl, &thread);
     engine.create_editor(Editor::new(window_rect.max));
 

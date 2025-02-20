@@ -94,6 +94,10 @@ impl Editor {
             history: EditHistory::with_capacity(128),
             current_tool: Tool::default(),
             current_appearance: Appearance {
+                blend: Blending {
+                    opacity: 0.5,
+                    mode: BlendMode::BLEND_MULTIPLIED,
+                },
                 items: Vec::from([
                     StyleItem::Fill(fill::Fill {
                         pattern: fill::Pattern::Solid(Color::SLATEBLUE),
@@ -140,6 +144,7 @@ impl Editor {
         engine_config: &Config,
         rl: &mut RaylibHandle,
         thread: &RaylibThread,
+        scratch_rtex: &mut Vec<RenderTexture2D>,
         is_mouse_event_handled: bool,
         mouse_screen_pos: Vector2,
         mouse_screen_delta: Vector2,
@@ -207,7 +212,7 @@ impl Editor {
 
         if !is_mouse_event_handled {
             let px_world_size = self.document.camera.zoom.recip();
-            self.current_tool.tick(rl, thread, &mut self.current_appearance, &mut self.document, mouse_world_pos, px_world_size);
+            self.current_tool.tick(rl, thread, &mut self.current_appearance, &mut self.document, scratch_rtex, mouse_world_pos, px_world_size);
         }
 
         // if (is_ctrl_down) && rl.is_key_pressed(KEY_Z) {
@@ -258,17 +263,10 @@ impl Editor {
                     d.rl_color4ub(255, 255, 255, 255);
                     d.rl_normal3f(0.0, 0.0, 1.0);
 
-                    d.rl_tex_coord2f(left*inv_width, -top*inv_height);
-                    d.rl_vertex2f(left, top);
-
-                    d.rl_tex_coord2f(left*inv_width, -bottom*inv_height);
-                    d.rl_vertex2f(left, bottom);
-
-                    d.rl_tex_coord2f(right*inv_width, -bottom*inv_height);
-                    d.rl_vertex2f(right, bottom);
-
-                    d.rl_tex_coord2f(right*inv_width, -top*inv_height);
-                    d.rl_vertex2f(right, top);
+                    d.rl_tex_coord2f( left*inv_width, -   top*inv_height); d.rl_vertex2f( left,    top);
+                    d.rl_tex_coord2f( left*inv_width, -bottom*inv_height); d.rl_vertex2f( left, bottom);
+                    d.rl_tex_coord2f(right*inv_width, -bottom*inv_height); d.rl_vertex2f(right, bottom);
+                    d.rl_tex_coord2f(right*inv_width, -   top*inv_height); d.rl_vertex2f(right,    top);
                 }
             }
         }
@@ -279,7 +277,7 @@ impl Editor {
         {
             let mut d = d.begin_mode2D(self.document.camera);
             for layer in self.document.layers.dfs_iter(|g| !g.settings.is_hidden).cdir::<BackToFore>() {
-                layer.draw_rendered(&mut d, scratch_rtex);
+                layer.draw_rendered(&mut d, &self.document.camera, scratch_rtex);
             }
         }
     }

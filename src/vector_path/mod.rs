@@ -1,4 +1,5 @@
 use amyvec::path_point::{Ctrl, Ctrl1, Ctrl2};
+use amymath::rlgl::*;
 use raylib::prelude::*;
 use crate::{
     appearance::{Appearance, StyleItem},
@@ -36,29 +37,59 @@ impl VectorPath {
 }
 
 impl LayerType for VectorPath {
-    fn draw_rendered(&self, d: &mut impl RaylibDraw, _scratch_rtex: &mut [RenderTexture2D]) {
-        for item in &self.appearance.items {
-            match item {
-                StyleItem::Stroke(stroke) => {
-                    match &stroke.pattern {
-                        stroke::Pattern::Solid(color) => {
-                            self.curve.draw_stroke(d, 20, &stroke.thick, *color);
-                        }
+    fn draw_rendered(&self, d: &mut impl RaylibDraw, camera: &Camera2D, scratch_rtex: &mut [RenderTexture2D]) {
+        fn draw_inner(path: &VectorPath, d: &mut impl RaylibDraw) {
+            for item in &path.appearance.items {
+                match item {
+                    StyleItem::Stroke(stroke) => {
+                        match &stroke.pattern {
+                            stroke::Pattern::Solid(color) => {
+                                path.curve.draw_stroke(d, 20, &stroke.thick, *color);
+                            }
 
-                        _ => todo!(),
+                            _ => todo!(),
+                        }
                     }
-                }
 
-                StyleItem::Fill(fill) => {
-                    match &fill.pattern {
-                        fill::Pattern::Solid(color) => {
-                            self.curve.draw_fill(d, 20, *color);
+                    StyleItem::Fill(fill) => {
+                        match &fill.pattern {
+                            fill::Pattern::Solid(color) => {
+                                path.curve.draw_fill(d, 20, *color);
+                            }
+
+                            _ => todo!(),
                         }
-
-                        _ => todo!(),
                     }
                 }
             }
+        }
+
+        if self.appearance.blend.is_non_default() {
+            let [scratch_rtex, ..] = scratch_rtex else { panic!("insufficient scratch textures") };
+            // Safety: the texture mode ends before the method returns, at the same depth it was opened.
+            unsafe { ffi::BeginTextureMode(**scratch_rtex); } d.clear_background(Color::BLANK);
+            {
+                let mut d = d.begin_mode2D(camera);
+                draw_inner(self, &mut d);
+            }
+            unsafe { ffi::EndTextureMode(); }
+            let mut d = d.begin_blend_mode(self.appearance.blend.mode);
+            {
+                let mut d = d.rl_set_texture(scratch_rtex.texture.id);
+                {
+                    let mut d = d.rl_begin_quads();
+
+                    d.rl_normal3f(0.0, 0.0, 1.0);
+                    d.rl_color4f(1.0, 1.0, 1.0, self.appearance.blend.opacity);
+
+                    d.rl_tex_coord2f(0.0,  0.0); d.rl_vertex2i(0, 0);
+                    d.rl_tex_coord2f(0.0, -1.0); d.rl_vertex2i(0, scratch_rtex.height());
+                    d.rl_tex_coord2f(1.0, -1.0); d.rl_vertex2i(scratch_rtex.width(), scratch_rtex.height());
+                    d.rl_tex_coord2f(1.0,  0.0); d.rl_vertex2i(scratch_rtex.width(), 0);
+                }
+            }
+        } else {
+            draw_inner(self, d);
         }
     }
 
