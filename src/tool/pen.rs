@@ -1,7 +1,8 @@
+use amyvec::curve::WidthProfile;
 use raylib::prelude::*;
 use amymath::prelude::{*, Vector2};
 use amylib::{iter::directed::DirectibleDoubleEndedIterator, rc::prelude::*};
-use crate::{appearance::Appearance, document::Document, editor::Editor, layer::{BackToFore, ForeToBack, Layer, LayerType}, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, DrawPathPoint, VectorPath}};
+use crate::{appearance::{Appearance, StyleItem}, document::Document, editor::Editor, layer::{BackToFore, ForeToBack, Layer, LayerType}, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, stroke, DrawPathPoint, VectorPath}};
 use super::{point_selection::HOVER_RADIUS_SQR, ToolType};
 
 pub struct InactivePen(pub(super) Option<StrongMut<VectorPath>>);
@@ -33,8 +34,13 @@ impl ActivePen {
                 Ctrl::Out => path.curve.points.front(),
             } {
                 // close path
-                if opp_end.p.distance_sqr(mouse_world_pos) <= HOVER_RADIUS_SQR {
+                if path.curve.points.len() > 1 && opp_end.p.distance_sqr(mouse_world_pos) <= HOVER_RADIUS_SQR {
                     path.curve.is_closed = true;
+                    for profile in path.appearance.items.iter_mut().filter_map(|item|
+                        if let StyleItem::Stroke(stroke::Stroke { thick: WidthProfile::Variable(profile), .. }) = item { Some(profile) } else { None }
+                    ) {
+                        profile.is_closed = true;
+                    }
                     drop(path);
                     return Some(InactivePen(Some(self.target.clone_mut())))
                 }

@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{vec_deque, VecDeque};
 use raylib::prelude::*;
 use amymath::prelude::{*, Vector2};
 use crate::{
@@ -106,6 +106,7 @@ impl PartialOrd for PathPointIdx {
 #[derive(Debug, Clone)]
 pub struct Curve {
     pub points: VecDeque<PathPoint>,
+    /// Cannot be closed with fewer than 2 points
     pub is_closed: bool,
 }
 
@@ -126,13 +127,20 @@ impl Curve {
 
     #[inline]
     pub fn num_slices(&self) -> usize {
-        self.points.len().saturating_sub(1)
+        self.manifold_len().saturating_sub(1)
+    }
+
+    /// points.len (+1 if `is_closed` is true)
+    #[inline]
+    pub fn manifold_len(&self) -> usize {
+        let len = self.points.len();
+        if len > 1 && self.is_closed { len + 1 } else { len }
     }
 
     #[inline]
     pub fn slice(&self, start_index: usize) -> Option<Cubic> {
         if let Some((pp2, pp1)) = start_index.checked_add(1)
-            .and_then(|end_index| self.points.get(end_index))
+            .and_then(|end_index| self.points.get(if self.is_closed && end_index == self.points.len() { 0 } else { end_index }))
             .map(|pp2| (pp2, self.points.get(start_index).expect("existence of [i+1] should guarantee existence of [i]")))
         {
             let ((_, p1, c1_out), (c2_in, p2, _)) = (pp1.calculate(), pp2.calculate());
@@ -143,8 +151,9 @@ impl Curve {
 
     #[inline]
     pub fn position_at(&self, t: f32) -> Option<Vector2> {
-        if self.points.is_empty() || t < 0.0 || 1.0 < t { return None; }
-        if self.points.len() == 1 {
+        if self.points.is_empty() || t < 0.0 || 1.0 < t {
+            None
+        } else if self.points.len() == 1 {
             Some(self.points[0].p)
         } else {
             let (slice_idx, t) = {
@@ -159,8 +168,9 @@ impl Curve {
 
     #[inline]
     pub fn velocity_at(&self, t: f32) -> Option<Vector2> {
-        if self.points.is_empty() || t < 0.0 || 1.0 < t { return None; }
-        if self.points.len() == 1 {
+        if self.points.is_empty() || t < 0.0 || 1.0 < t {
+            None
+        } else if self.points.len() == 1 {
             Some(self.points[0].p)
         } else {
             let (slice_idx, t) = {
@@ -175,9 +185,14 @@ impl Curve {
 
     #[inline]
     pub fn max_bounds(&self) -> Option<Rect2> {
-        self.slices()
-            .map(|bez| bez.max_bounds())
-            .reduce(|rec, b| rec.union(b))
+        if self.points.len() == 1 {
+            let p = self.points[0].p;
+            Some(Rect2::new(p, p))
+        } else {
+            self.slices()
+                .map(|bez| bez.max_bounds())
+                .reduce(|rec, b| rec.union(b))
+        }
     }
 
     /// Calculate the bounding box of the entire curve
@@ -189,32 +204,38 @@ impl Curve {
     /// and [`Cubic::bounds`] (which solves the quadratic equation) on each.
     #[inline]
     pub fn bounds(&self) -> Option<Rect2> {
-        let mut bez_iter = self.slices();
-        if let Some(bez) = bez_iter.next() {
-            let mut rec = bez.bounds();
-            for bez in bez_iter {
-                if !rec.contains(&bez.max_bounds()) {
-                    rec = rec.union(bez.bounds());
+        if self.points.len() == 1 {
+            let p = self.points[0].p;
+            return Some(Rect2::new(p, p));
+        } else {
+            let mut bez_iter = self.slices();
+            if let Some(bez) = bez_iter.next() {
+                let mut rec = bez.bounds();
+                for bez in bez_iter {
+                    if !rec.contains(&bez.max_bounds()) {
+                        rec = rec.union(bez.bounds());
+                    }
                 }
+                return Some(rec);
             }
-            Some(rec)
-        } else { None }
+        }
+        None
     }
 
     #[inline]
-    pub fn calculate(&self) -> Calculate<impl Iterator<Item = &'_ PathPoint>> {
+    pub fn calculate(&self) -> Calculate<'_> {
         Calculate::new(self.points.iter(), self.is_closed)
     }
 
     #[inline]
-    pub fn slices(&self) -> Slices<impl Iterator<Item = &'_ PathPoint>> {
+    pub fn slices(&self) -> Slices<'_> {
         Slices::new(self.calculate())
     }
 }
 
 impl Curve {
     pub fn draw_lines(&self, d: &mut impl RaylibDraw, strips_per_bez: usize, color: Color) {
-        if self.points.len() >= 2 {
+        if self.manifold_len() >= 2 {
             let mut d = d.rl_begin_lines();
             d.rl_color4ub(color.r, color.g, color.b, color.a);
 
@@ -237,9 +258,9 @@ impl Curve {
 
     pub fn draw_stroke(&self, d: &mut impl RaylibDraw, strips_per_slice: usize, thick: &WidthProfile, color: Color) {
         if self.points.is_empty() { return; }
-        let num_points = strips_per_slice * 2 * self.points.len();
+        let num_points = strips_per_slice * 2 * self.num_slices();
         if num_points < 3 { return; }
-        let total_strips = self.points.len() * strips_per_slice;
+        let total_strips = self.num_slices() * strips_per_slice;
 
         // let mut first_points: Option<[Vector2; 2]> = None;
         let mut past_points: Option<[Vector2; 2]> = None;
@@ -280,27 +301,29 @@ impl Curve {
             }
         }
 
-        for (t, bez) in [
-            (0.0, self.slice(0)),
-            (1.0, self.slice(self.num_slices().saturating_sub(1))),
-        ] {
-            if let Some(bez) = bez {
-                let extents = thick.extents_at(t);
-                let v = bez.velocity_at(t);
-                let p = bez.position_at(t);
-                if v.magnitude_sqr() < f32::EPSILON { continue; }
-                let tangent = v.normalized();
-                let (normal_cw, normal_cc) = (tangent.rotate_cw(), tangent.rotate_cc());
-                let p1 = p + normal_cc * extents.0;
-                let p2 = p + normal_cw * extents.1;
-                d.draw_circle_v(p1.midpoint_v(p2), (extents.0 + extents.1) * 0.5, color);
+        if !self.is_closed {
+            for (t, bez) in [
+                (0.0, self.slice(0)),
+                (1.0, self.slice(self.num_slices().saturating_sub(1))),
+            ] {
+                if let Some(bez) = bez {
+                    let extents = thick.extents_at(t);
+                    let v = bez.velocity_at(t);
+                    let p = bez.position_at(t);
+                    if v.magnitude_sqr() < f32::EPSILON { continue; }
+                    let tangent = v.normalized();
+                    let (normal_cw, normal_cc) = (tangent.rotate_cw(), tangent.rotate_cc());
+                    let p1 = p + normal_cc * extents.0;
+                    let p2 = p + normal_cw * extents.1;
+                    d.draw_circle_v(p1.midpoint_v(p2), (extents.0 + extents.1) * 0.5, color);
+                }
             }
         }
     }
 
     pub fn draw_fill(&self, d: &mut impl RaylibDraw, segments_per_slice: usize, color: Color) {
         if self.points.is_empty() { return; }
-        let num_points = segments_per_slice * self.points.len();
+        let num_points = segments_per_slice * self.manifold_len();
         if num_points < 3 { return; }
 
         #[cfg(not(feature = "debug_fill"))] let mut d = d.rl_begin_triangles();
@@ -329,13 +352,13 @@ impl Curve {
     }
 }
 
-pub struct Calculate<I> {
-    iter: I,
+pub struct Calculate<'a> {
+    iter: vec_deque::Iter<'a, PathPoint>,
     wrapped: Option<Option<(Vector2, Vector2, Vector2)>>,
 }
 
-impl<I> Calculate<I> {
-    const fn new(iter: I, is_closed: bool) -> Self {
+impl<'a> Calculate<'a> {
+    const fn new(iter: vec_deque::Iter<'a, PathPoint>, is_closed: bool) -> Self {
         Self {
             iter,
             wrapped: if is_closed { Some(None) } else { None }, // fun fact: `then_some()` isn't const :/
@@ -343,7 +366,14 @@ impl<I> Calculate<I> {
     }
 }
 
-impl<'a, I: Iterator<Item = &'a PathPoint>> Iterator for Calculate<I> {
+impl<'a> ExactSizeIterator for Calculate<'a> {
+    fn len(&self) -> usize {
+        let base_len = self.iter.len();
+        base_len + if self.wrapped.is_none_or(|wrapped| base_len == 0 && wrapped.is_none()) { 0 } else { 1 }
+    }
+}
+
+impl<'a> Iterator for Calculate<'a> {
     type Item = (Vector2, Vector2, Vector2);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -359,20 +389,62 @@ impl<'a, I: Iterator<Item = &'a PathPoint>> Iterator for Calculate<I> {
             None
         }
     }
+
+    fn last(self) -> Option<Self::Item>
+        where
+            Self: Sized,
+    {
+        if let Some(inner) = self.wrapped {
+            inner
+        } else {
+            self.iter.last().map(|x| x.calculate())
+        }
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let len = self.len();
+        if let Some(next) = self.iter.nth(n) {
+            let calculated = next.calculate();
+            if let Some(inner @ None) = self.wrapped.as_mut() {
+                *inner = Some(calculated);
+            }
+            return Some(calculated);
+        } else if n == len - 1 {
+            if let Some(inner) = self.wrapped.as_mut() {
+                if inner.is_some() {
+                    return inner.take();
+                } else if len != 0 { // jump straight to the end of a new iterator
+                    panic!("unsure what wrapped element is")
+                }
+            }
+        }
+        None
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let n = self.len();
+        (n, Some(n))
+    }
 }
 
-pub struct Slices<I> {
+pub struct Slices<'a> {
     prev: Option<(Vector2, Vector2, Vector2)>,
-    iter: Calculate<I>,
+    iter: Calculate<'a>,
 }
 
-impl<I> Slices<I> {
-    const fn new(iter: Calculate<I>) -> Self {
+impl<'a> Slices<'a> {
+    const fn new(iter: Calculate<'a>) -> Self {
         Self { prev: None, iter }
     }
 }
 
-impl<'a, I: Iterator<Item = &'a PathPoint>> Iterator for Slices<I> {
+impl<'a> ExactSizeIterator for Slices<'a> {
+    fn len(&self) -> usize {
+        self.iter.len().saturating_sub(1) // 1 point does not a slice make
+    }
+}
+
+impl<'a> Iterator for Slices<'a> {
     type Item = Cubic;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -388,5 +460,10 @@ impl<'a, I: Iterator<Item = &'a PathPoint>> Iterator for Slices<I> {
         } else {
             None
         }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
     }
 }

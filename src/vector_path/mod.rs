@@ -1,4 +1,4 @@
-use amyvec::path_point::{Ctrl, Ctrl1, Ctrl2};
+use amyvec::{curve::WidthProfile, path_point::{Ctrl, Ctrl1, Ctrl2}};
 use amymath::rlgl::*;
 use raylib::prelude::*;
 use crate::{
@@ -44,7 +44,7 @@ impl LayerType for VectorPath {
                     StyleItem::Stroke(stroke) => {
                         match &stroke.pattern {
                             stroke::Pattern::Solid(color) => {
-                                path.curve.draw_stroke(d, 40, &stroke.thick, *color);
+                                path.curve.draw_stroke(d, 80, &stroke.thick, *color);
                             }
 
                             _ => todo!(),
@@ -96,6 +96,25 @@ impl LayerType for VectorPath {
     fn draw_selected(&self, d: &mut impl RaylibDraw, _px_world_size: f32) {
         let color = self.settings.color;
         self.curve.draw_lines(d, 32, color);
+        for (width_profile, width_curve) in self.appearance.items.iter().filter_map(|item|
+            if let StyleItem::Stroke(stroke::Stroke { thick: profile @ WidthProfile::Variable(profile_curve), .. }) = item {
+                Some((profile, profile_curve))
+            } else { None }
+        ) {
+            let num_width_ctrls = width_curve.points.len();
+            for i in 0..num_width_ctrls {
+                let t = i as f32 / (num_width_ctrls - 1) as f32;
+                let v = self.curve.velocity_at(t).expect("t should be 0-1");
+                if v.magnitude_sqr() < f32::EPSILON { continue; }
+                let tangent = v.normalized();
+                let (normal_cw, normal_cc) = (tangent.rotate_cw(), tangent.rotate_cc());
+                let p = self.curve.position_at(t).expect("t should be 0-1");
+                let extents = width_profile.extents_at(t);
+                let p1 = p + normal_cc * extents.0;
+                let p2 = p + normal_cw * extents.1;
+                d.draw_line_v(p1, p2, color);
+            }
+        }
     }
 }
 

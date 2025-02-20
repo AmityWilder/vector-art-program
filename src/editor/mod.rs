@@ -85,6 +85,34 @@ pub struct Editor {
 }
 
 impl Editor {
+    #[inline(always)]
+    fn default_appearance() -> Appearance {
+        Appearance {
+            blend: Blending {
+                opacity: 0.9,
+                mode: BlendMode::BLEND_ALPHA,
+            },
+            items: vec![
+                StyleItem::Fill(fill::Fill {
+                    pattern: fill::Pattern::Solid(Color::SLATEBLUE),
+                    ..Default::default()
+                }),
+                StyleItem::Stroke(stroke::Stroke {
+                    pattern: stroke::Pattern::Solid(Color::BLACK),
+                    thick: WidthProfile::Variable({
+                        let mut c = Curve::new();
+                        c.points.push_back(PathPoint { p: Vector2::new( 1.0,  5.0), c: None });
+                        c.points.push_back(PathPoint { p: Vector2::new(10.0, 12.0), c: None });
+                        c.points.push_back(PathPoint { p: Vector2::new( 5.0,  1.0), c: None });
+                        c.points.push_back(PathPoint { p: Vector2::new( 0.0, 10.0), c: None });
+                        c
+                    }),
+                    ..Default::default()
+                }),
+            ],
+        }
+    }
+
     pub fn new(screen_size: IVector2) -> Self {
         let mut document = Document::new();
         document.create_artboard(None, None, IVector2::new(512, 512));
@@ -93,29 +121,7 @@ impl Editor {
             document,
             history: EditHistory::with_capacity(128),
             current_tool: Tool::default(),
-            current_appearance: Appearance {
-                blend: Blending {
-                    opacity: 0.5,
-                    mode: BlendMode::BLEND_MULTIPLIED,
-                },
-                items: Vec::from([
-                    StyleItem::Fill(fill::Fill {
-                        pattern: fill::Pattern::Solid(Color::SLATEBLUE),
-                        ..Default::default()
-                    }),
-                    StyleItem::Stroke(stroke::Stroke {
-                        pattern: stroke::Pattern::Solid(Color::BLACK),
-                        thick: WidthProfile::Variable({
-                            let mut c = Curve::new();
-                            c.points.push_back(PathPoint { p: Vector2::new(1.0, 1.0), c: None });
-                            c.points.push_back(PathPoint { p: Vector2::new(10.0, 10.0), c: None });
-                            c.points.push_back(PathPoint { p: Vector2::new(1.0, 1.0), c: None });
-                            c
-                        }),
-                        ..Default::default()
-                    }),
-                ]),
-            },
+            current_appearance: Self::default_appearance(),
         }
     }
 

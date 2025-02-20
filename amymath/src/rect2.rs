@@ -1,6 +1,6 @@
 use std::ops::*;
 use raylib::prelude::{*, Vector2 as RlVector2};
-use crate::prelude::{IRect2, IVector2, Vector2};
+use crate::prelude::{IRect2, Vector2};
 use crate::rlgl::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -295,7 +295,7 @@ pub trait DrawRect2: RaylibDraw {
     #[inline]
     fn draw_rectangle_rect2(&mut self, rec: &Rect2, color: Color) where Self: Rlgl {
         let shapes_rec = Rect2::from(tex_shapes_rec());
-        let shapes_size = IVector2::from(tex_shapes_size()).as_vec2();
+        let shapes_size = Vector2::new(tex_shapes().width as f32, tex_shapes().height as f32);
 
         self.rl_set_texture_tex_shapes();
         let mut d = self.rl_begin_quads();

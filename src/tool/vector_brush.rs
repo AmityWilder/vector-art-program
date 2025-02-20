@@ -144,15 +144,35 @@ impl ActiveVectorBrush {
 
         if let Some(idx) = path.curve.points.len().checked_sub(3) {
             let (prev, curr, next) = (path.curve.points[idx].p, path.curve.points[idx + 1].p, path.curve.points[idx + 2].p);
-            let speed_in  = (curr - prev).magnitude();
-            let speed_out = (next - curr).magnitude();
-            let t_hat = (next - prev).normalized();
+            let speed_in  = prev.distance(curr);
+            let speed_out = curr.distance(next);
+            let t_hat = prev.delta(next).normalized();
             let c_out = curr + t_hat * speed_out / 3.0;
             {
-                let curr = &mut path.curve.points[idx + 1].c;
-                *curr = Some(Ctrl1 {
+                let curr_c = &mut path.curve.points[idx + 1].c;
+                *curr_c = Some(Ctrl1 {
                     c1: (Ctrl::Out, c_out),
                     c2: Some(Ctrl2::Mirror(speed_in / 3.0)),
+                });
+            }
+        } else if let Some(idx) = path.curve.points.len().checked_sub(2) {
+            let (prev, curr) = (path.curve.points[idx].p, path.curve.points[idx + 1].p);
+            let speed = prev.distance(curr);
+            let t_hat = prev.delta(curr).normalized();
+            {
+                let c_out = prev + t_hat * speed / 3.0;
+                let prev_c = &mut path.curve.points[idx].c;
+                *prev_c = Some(Ctrl1 {
+                    c1: (Ctrl::Out, c_out),
+                    c2: Some(Ctrl2::Reflect),
+                });
+            }
+            {
+                let c_out = curr + t_hat * speed / 3.0;
+                let curr_c = &mut path.curve.points[idx + 1].c;
+                *curr_c = Some(Ctrl1 {
+                    c1: (Ctrl::Out, c_out),
+                    c2: Some(Ctrl2::Reflect),
                 });
             }
         }
