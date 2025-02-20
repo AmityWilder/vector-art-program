@@ -12,7 +12,7 @@ raylib = { version = "5.0.2", features = ["nalgebra_interop"] }
 amylib = { path = "amylib" }
 amymath = { path = "amymath" }
 amygui = { path = "amygui" }
-amyvec = { path = "amyvec", features = [] }
+amyvec = { path = "amyvec", features = ["debug_curvature"] }
 rltest = { path = "rltest" }
 nalgebra = "0.33.2"
 

@@ -54,7 +54,7 @@ impl LayerType for VectorPath {
                     StyleItem::Fill(fill) => {
                         match &fill.pattern {
                             fill::Pattern::Solid(color) => {
-                                path.curve.draw_fill(d, 20, *color);
+                                path.curve.draw_fill(d, 40, *color);
                             }
 
                             _ => todo!(),

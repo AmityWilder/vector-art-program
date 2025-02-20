@@ -13,3 +13,4 @@ num = "0.4.3"
 [features]
 debug_stroke = []
 debug_fill = []
+debug_curvature = []

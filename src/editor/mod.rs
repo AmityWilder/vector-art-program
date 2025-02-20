@@ -97,18 +97,18 @@ impl Editor {
                     pattern: fill::Pattern::Solid(Color::SLATEBLUE),
                     ..Default::default()
                 }),
-                StyleItem::Stroke(stroke::Stroke {
-                    pattern: stroke::Pattern::Solid(Color::BLACK),
-                    thick: WidthProfile::Variable({
-                        let mut c = Curve::new();
-                        c.points.push_back(PathPoint { p: Vector2::new( 1.0,  5.0), c: None });
-                        c.points.push_back(PathPoint { p: Vector2::new(10.0, 12.0), c: None });
-                        c.points.push_back(PathPoint { p: Vector2::new( 5.0,  1.0), c: None });
-                        c.points.push_back(PathPoint { p: Vector2::new( 0.0, 10.0), c: None });
-                        c
-                    }),
-                    ..Default::default()
-                }),
+                // StyleItem::Stroke(stroke::Stroke {
+                //     pattern: stroke::Pattern::Solid(Color::BLACK),
+                //     thick: WidthProfile::Variable({
+                //         let mut c = Curve::new();
+                //         c.points.push_back(PathPoint { p: Vector2::new( 1.0,  5.0), c: None });
+                //         c.points.push_back(PathPoint { p: Vector2::new(10.0, 12.0), c: None });
+                //         c.points.push_back(PathPoint { p: Vector2::new( 5.0,  1.0), c: None });
+                //         c.points.push_back(PathPoint { p: Vector2::new( 0.0, 10.0), c: None });
+                //         c
+                //     }),
+                //     ..Default::default()
+                // }),
             ],
         }
     }

@@ -149,12 +149,11 @@ impl Curve {
         None
     }
 
-    #[inline]
-    pub fn position_at(&self, t: f32) -> Option<Vector2> {
+    pub fn fn_at<T, F: Fn(Cubic, f32) -> T, G: Fn(&PathPoint) -> T>(&self, t: f32, f: F, if_orphan: G) -> Option<T> {
         if self.points.is_empty() || t < 0.0 || 1.0 < t {
             None
         } else if self.points.len() == 1 {
-            Some(self.points[0].p)
+            Some(if_orphan(&self.points[0]))
         } else {
             let (slice_idx, t) = {
                 let t_major = t * self.num_slices() as f32;
@@ -162,25 +161,28 @@ impl Curve {
                 let t_minor = t_major - t_index as f32;
                 (t_index, t_minor)
             };
-            Some(self.slice(slice_idx).unwrap().position_at(t))
+            Some(f(self.slice(slice_idx).unwrap(), t))
         }
     }
 
     #[inline]
+    pub fn position_at(&self, t: f32) -> Option<Vector2> {
+        self.fn_at(t, |bez, t| bez.position_at(t), |pp| pp.p)
+    }
+
+    #[inline]
     pub fn velocity_at(&self, t: f32) -> Option<Vector2> {
-        if self.points.is_empty() || t < 0.0 || 1.0 < t {
-            None
-        } else if self.points.len() == 1 {
-            Some(self.points[0].p)
-        } else {
-            let (slice_idx, t) = {
-                let t_major = t * self.num_slices() as f32;
-                let t_index = (t_major as usize).min(self.num_slices() - 1);
-                let t_minor = t_major - t_index as f32;
-                (t_index, t_minor)
-            };
-            Some(self.slice(slice_idx).unwrap().velocity_at(t))
-        }
+        self.fn_at(t, |bez, t| bez.velocity_at(t), |_| Vector2::ZERO)
+    }
+
+    #[inline]
+    pub fn acceleration_at(&self, t: f32) -> Option<Vector2> {
+        self.fn_at(t, |bez, t| bez.acceleration_at(t), |_| Vector2::ZERO)
+    }
+
+    #[inline]
+    pub fn curvature_at(&self, t: f32) -> Option<f32> {
+        self.fn_at(t, |bez, t| bez.curvature_at(t), |_| 0.0)
     }
 
     #[inline]
@@ -273,11 +275,11 @@ impl Curve {
                 let v = self.velocity_at(t).expect("t should be 0-1");
                 if v.magnitude_sqr() < f32::EPSILON { continue; }
                 let tangent = v.normalized();
-                let (normal_cw, normal_cc) = (tangent.rotate_cw(), tangent.rotate_cc());
+                let normal = tangent.rotate_cc();
                 let p = self.position_at(t).expect("t should be 0-1");
                 let extents = thick.extents_at(t);
-                let p1 = p + normal_cc * extents.0;
-                let p2 = p + normal_cw * extents.1;
+                let p1 = p + normal * extents.0;
+                let p2 = p - normal * extents.1;
                 if let Some(past_points) = &mut past_points {
                     let [p3, p4] = *past_points;
                     #[cfg(not(feature = "debug_stroke"))] {
@@ -312,9 +314,9 @@ impl Curve {
                     let p = bez.position_at(t);
                     if v.magnitude_sqr() < f32::EPSILON { continue; }
                     let tangent = v.normalized();
-                    let (normal_cw, normal_cc) = (tangent.rotate_cw(), tangent.rotate_cc());
-                    let p1 = p + normal_cc * extents.0;
-                    let p2 = p + normal_cw * extents.1;
+                    let normal = tangent.rotate_cc();
+                    let p1 = p + normal * extents.0;
+                    let p2 = p - normal * extents.1;
                     d.draw_circle_v(p1.midpoint_v(p2), (extents.0 + extents.1) * 0.5, color);
                 }
             }
@@ -323,31 +325,39 @@ impl Curve {
 
     pub fn draw_fill(&self, d: &mut impl RaylibDraw, segments_per_slice: usize, color: Color) {
         if self.points.is_empty() { return; }
-        let num_points = segments_per_slice * self.manifold_len();
+        let num_points = segments_per_slice * self.num_slices();
         if num_points < 3 { return; }
+        let total_segments = self.num_slices() * segments_per_slice;
 
-        #[cfg(not(feature = "debug_fill"))] let mut d = d.rl_begin_triangles();
-        #[cfg(not(feature = "debug_fill"))] d.rl_color4ub(color.r, color.g, color.b, color.a);
+        #[cfg(not(any(feature = "debug_fill", feature = "debug_curvature")))] let mut d = d.rl_begin_triangles();
+        #[cfg(not(any(feature = "debug_fill", feature = "debug_curvature")))] d.rl_color4ub(color.r, color.g, color.b, color.a);
 
         let mut first_point: Option<Vector2> = None;
-        let mut prev_point: Option<Vector2> = None;
-        for bez in self.slices() {
-            for i in 0..segments_per_slice {
-                let t = i as f32 / (segments_per_slice - 1) as f32;
-                let p = bez.position_at(t);
-                if let Some((first_point, prev_point)) = first_point.as_ref().zip(prev_point.as_mut()) {
-                    #[cfg(not(feature = "debug_fill"))] {
-                        d.rl_vertex2f(first_point.x, first_point.y);
-                        d.rl_vertex2f(prev_point.x, prev_point.y);
-                        d.rl_vertex2f(p.x, p.y);
-                    } #[cfg(feature = "debug_fill")] {
-                        d.draw_line_strip(&[first_point.into(), prev_point.into(), p.into()], color);
-                    }
-                } else if prev_point.is_none() {
-                    first_point = Some(p);
+        let mut prev_point: Option<(Vector2, f32)> = None;
+        for i in 0..total_segments {
+            let t = i as f32 / (total_segments - 1) as f32;
+            let p = self.position_at(t).expect("t should be 0-1");
+            let curvature = self.curvature_at(t).expect("t should be 0-1");
+            if let Some((first_point, (prev_point, prev_curvature))) = first_point.as_mut().zip(prev_point.as_mut()) {
+                #[cfg(not(any(feature = "debug_fill", feature = "debug_curvature")))] {
+                    d.rl_vertex2f(first_point.x, first_point.y);
+                    d.rl_vertex2f(prev_point.x, prev_point.y);
+                    d.rl_vertex2f(p.x, p.y);
+                } #[cfg(feature = "debug_fill")] {
+                    d.draw_line_strip(&[first_point.into(), prev_point.into(), p.into()], color);
+                } #[cfg(feature = "debug_curvature")] {
+                    let tangent = self.velocity_at(t).expect("t should be 0-1");
+                    let normal = tangent.rotate_cc();
+                    d.draw_line_v(p, p - normal * curvature, Color::BLUE);
+                    d.draw_circle_v(*first_point, 3.0, Color::RED);
                 }
-                prev_point = Some(p);
+                if prev_curvature.is_sign_negative() != curvature.is_sign_negative() { // inflection
+                    *first_point = p;
+                }
+            } else if prev_point.is_none() {
+                first_point = Some(p);
             }
+            prev_point = Some((p, curvature));
         }
     }
 }
