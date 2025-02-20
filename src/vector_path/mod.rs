@@ -44,7 +44,7 @@ impl LayerType for VectorPath {
                     StyleItem::Stroke(stroke) => {
                         match &stroke.pattern {
                             stroke::Pattern::Solid(color) => {
-                                path.curve.draw_stroke(d, 20, &stroke.thick, *color);
+                                path.curve.draw_stroke(d, 40, &stroke.thick, *color);
                             }
 
                             _ => todo!(),

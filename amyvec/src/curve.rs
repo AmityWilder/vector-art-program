@@ -146,17 +146,30 @@ impl Curve {
         if self.points.is_empty() || t < 0.0 || 1.0 < t { return None; }
         if self.points.len() == 1 {
             Some(self.points[0].p)
-        } else if t == 0.0 {
-            Some(self.slice(0).expect("should have at least one point in this branch").position_at(0.0))
-        } else if t == 1.0 {
-            Some(self.slice(self.num_slices() - 1).expect("should have at least one point in this branch").position_at(1.0))
         } else {
             let (slice_idx, t) = {
                 let t_major = t * self.num_slices() as f32;
-                let trunc = (t_major).floor();
-                (trunc as usize, t_major - trunc)
+                let t_index = (t_major as usize).min(self.num_slices() - 1);
+                let t_minor = t_major - t_index as f32;
+                (t_index, t_minor)
             };
             Some(self.slice(slice_idx).unwrap().position_at(t))
+        }
+    }
+
+    #[inline]
+    pub fn velocity_at(&self, t: f32) -> Option<Vector2> {
+        if self.points.is_empty() || t < 0.0 || 1.0 < t { return None; }
+        if self.points.len() == 1 {
+            Some(self.points[0].p)
+        } else {
+            let (slice_idx, t) = {
+                let t_major = t * self.num_slices() as f32;
+                let t_index = (t_major as usize).min(self.num_slices() - 1);
+                let t_minor = t_major - t_index as f32;
+                (t_index, t_minor)
+            };
+            Some(self.slice(slice_idx).unwrap().velocity_at(t))
         }
     }
 
@@ -223,71 +236,64 @@ impl Curve {
     }
 
     pub fn draw_stroke(&self, d: &mut impl RaylibDraw, strips_per_slice: usize, thick: &WidthProfile, color: Color) {
-        if self.points.is_empty() {
-        } else if self.points.len() == 1 {
-            let extents = thick.extents_max(); // largest thickness would overtake smaller thicknesses
-            d.draw_circle_v(self.points[0].p, (extents.0 + extents.1) * 0.5, color);
-        } else {
-            let num_points = strips_per_slice * 2 * self.points.len();
-            if num_points < 3 { return; }
-            let total_strips = self.points.len() * strips_per_slice;
+        if self.points.is_empty() { return; }
+        let num_points = strips_per_slice * 2 * self.points.len();
+        if num_points < 3 { return; }
+        let total_strips = self.points.len() * strips_per_slice;
 
-            for (t_vel, t, t_full, bez) in [
-                (f32::MIN_POSITIVE, 0.0, 0.0, self.slice(0).expect("should have at least 2 points in this branch")),
-                (const{1.0 - f32::EPSILON}, 1.0, 1.0, self.slice(self.num_slices() - 1).expect("should have at least 2 points in this branch"))
-            ] {
-                let extents = thick.extents_at(t_full);
-                let v = bez.velocity_at(t_vel);
-                let p = bez.position_at(t);
-                if v.magnitude_sqr() >= f32::EPSILON {
-                    let tangent = v.normalized();
-                    let (normal_cw, normal_cc) = (tangent.rotate_cw(), tangent.rotate_cc());
-                    let p1 = p + normal_cc * extents.0;
-                    let p2 = p + normal_cw * extents.1;
-                    d.draw_circle_v(p1.midpoint_v(p2), (extents.0 + extents.1) * 0.5, color);
-                } else {
-                    d.draw_circle_v(p, (extents.0 + extents.1) * 0.5, color);
-                }
-            }
-
+        // let mut first_points: Option<[Vector2; 2]> = None;
+        let mut past_points: Option<[Vector2; 2]> = None;
+        {
             #[cfg(not(feature = "debug_stroke"))] let mut d = d.rl_begin_triangles();
             #[cfg(not(feature = "debug_stroke"))] d.rl_color4ub(color.r, color.g, color.b, color.a);
 
-            let mut past_points: Option<[Vector2; 2]> = None;
-            for (n, bez) in self.slices().enumerate() {
-                let row = n * strips_per_slice;
-                for i in 0..strips_per_slice {
-                    let t = i as f32 / (strips_per_slice - 1) as f32;
-                    let v = bez.velocity_at(t);
-                    if v.magnitude_sqr() < f32::EPSILON { continue; }
-                    let tangent = v.normalized();
-                    let (normal_cw, normal_cc) = (tangent.rotate_cw(), tangent.rotate_cc());
-                    let p = bez.position_at(t);
-                    let t_full = (row + i) as f32 / total_strips as f32;
-                    let extents = thick.extents_at(t_full);
-                    let p1 = p + normal_cc * extents.0;
-                    let p2 = p + normal_cw * extents.1;
-                    if let Some(past_points) = &mut past_points {
-                        let [p3, p4] = *past_points;
-                        #[cfg(not(feature = "debug_stroke"))] {
-                            d.rl_vertex2f(p1.x, p1.y);
-                            d.rl_vertex2f(p3.x, p3.y);
-                            d.rl_vertex2f(p4.x, p4.y);
+            for i in 0..total_strips {
+                let t = i as f32 / (total_strips - 1) as f32;
+                let v = self.velocity_at(t).expect("t should be 0-1");
+                if v.magnitude_sqr() < f32::EPSILON { continue; }
+                let tangent = v.normalized();
+                let (normal_cw, normal_cc) = (tangent.rotate_cw(), tangent.rotate_cc());
+                let p = self.position_at(t).expect("t should be 0-1");
+                let extents = thick.extents_at(t);
+                let p1 = p + normal_cc * extents.0;
+                let p2 = p + normal_cw * extents.1;
+                if let Some(past_points) = &mut past_points {
+                    let [p3, p4] = *past_points;
+                    #[cfg(not(feature = "debug_stroke"))] {
+                        d.rl_vertex2f(p1.x, p1.y);
+                        d.rl_vertex2f(p3.x, p3.y);
+                        d.rl_vertex2f(p4.x, p4.y);
 
-                            d.rl_vertex2f(p2.x, p2.y);
-                            d.rl_vertex2f(p1.x, p1.y);
-                            d.rl_vertex2f(p4.x, p4.y);
-                        } #[cfg(feature = "debug_stroke")] {
-                            d.draw_line_strip(&[p1.into(), p3.into(), p4.into()], Color::RED);
-                            d.draw_line_strip(&[p2.into(), p1.into(), p4.into()], Color::BLUE);
-                        }
-
-                        past_points[0] = p1;
-                        past_points[1] = p2;
-                    } else {
-                        past_points = Some([p1, p2]);
+                        d.rl_vertex2f(p2.x, p2.y);
+                        d.rl_vertex2f(p1.x, p1.y);
+                        d.rl_vertex2f(p4.x, p4.y);
+                    } #[cfg(feature = "debug_stroke")] {
+                        d.draw_line_strip(&[p1.into(), p3.into(), p4.into()], Color::RED);
+                        d.draw_line_strip(&[p2.into(), p1.into(), p4.into()], Color::BLUE);
                     }
+
+                    past_points[0] = p1;
+                    past_points[1] = p2;
+                } else {
+                    past_points = Some([p1, p2]);
                 }
+            }
+        }
+
+        for (t, bez) in [
+            (0.0, self.slice(0)),
+            (1.0, self.slice(self.num_slices().saturating_sub(1))),
+        ] {
+            if let Some(bez) = bez {
+                let extents = thick.extents_at(t);
+                let v = bez.velocity_at(t);
+                let p = bez.position_at(t);
+                if v.magnitude_sqr() < f32::EPSILON { continue; }
+                let tangent = v.normalized();
+                let (normal_cw, normal_cc) = (tangent.rotate_cw(), tangent.rotate_cc());
+                let p1 = p + normal_cc * extents.0;
+                let p2 = p + normal_cw * extents.1;
+                d.draw_circle_v(p1.midpoint_v(p2), (extents.0 + extents.1) * 0.5, color);
             }
         }
     }

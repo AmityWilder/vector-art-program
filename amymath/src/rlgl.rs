@@ -1069,7 +1069,7 @@ mod tests {
                     success!()
                 }
                 rl.begin_drawing(Color::BLACK, |d| {
-                    let mut d = d.rl_set_texture(&texture);
+                    let mut d = d.rl_set_texture(texture.id);
                     let mut d = d.rl_begin_quads();
 
                     d.rl_color4ub(255, 255, 255, 255);
