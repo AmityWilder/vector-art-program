@@ -329,6 +329,35 @@ impl Curve {
         if num_points < 3 { return; }
         let total_segments = self.num_slices() * segments_per_slice;
 
+        let mut points: Box<[_]> = (0..total_segments).map(|i| {
+            let t = i as f32 / (total_segments - 1) as f32;
+            (self.position_at(t).zip(self.curvature_at(t))).expect("t should be 0-1")
+        }).collect();
+
+        let chunks = points.chunk_by_mut(|(_, a), (_, b)| a.is_sign_negative() == b.is_sign_negative());
+        for chunk in chunks {
+            if chunk[0].1.is_sign_negative() {
+                chunk.reverse();
+            }
+        }
+
+        let midpoint = points.len() / 2;
+        let points: Box<[_]> = points[..midpoint].into_iter().zip(points[..midpoint].into_iter())
+            .flat_map(|((a, _), (b, _))| std::iter::once(a).chain(std::iter::once(b)))
+            .map(|p| p.into())
+            .collect();
+
+        d.draw_triangle_strip(&points[..], color);
+        d.draw_line_strip(&points[..], Color::MAGENTA);
+    }
+
+    /// bad
+    pub fn draw_fill_curvature(&self, d: &mut impl RaylibDraw, segments_per_slice: usize, color: Color) {
+        if self.points.is_empty() { return; }
+        let num_points = segments_per_slice * self.num_slices();
+        if num_points < 3 { return; }
+        let total_segments = self.num_slices() * segments_per_slice;
+
         #[cfg(not(any(feature = "debug_fill", feature = "debug_curvature")))] let mut d = d.rl_begin_triangles();
         #[cfg(not(any(feature = "debug_fill", feature = "debug_curvature")))] d.rl_color4ub(color.r, color.g, color.b, color.a);
 
