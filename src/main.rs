@@ -99,7 +99,9 @@ mod tool;
 
 fn main() {
     #[cfg(feature = "use-sdl")] {
-        todo!()
+        let err_buf = sdl3_amity::sdl_thread();
+        let sdl = sdl3_amity::init();
+
     } #[cfg(not(feature = "use-sdl"))] {
         let (mut rl, thread) = init()
             .title("Amity Vector Art")

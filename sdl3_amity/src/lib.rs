@@ -1,78 +1,82 @@
-use std::{borrow::Cow, ffi::CStr, marker::PhantomData};
+#![feature(negative_impls)]
+use std::ffi::CStr;
+use error::*;
+use sdl3_sys::{self, init::{SDL_Init, SDL_InitFlags, SDL_Quit}, video::{SDL_CreateWindow, SDL_DestroyWindow, SDL_Window, SDL_WindowFlags}};
 
-use sdl3_sys;
+pub mod error;
 
-/// Cannot be passed between threads
-pub struct ErrorBuffer(PhantomData<*mut ()>);
+pub struct SdlHandle(());
 
-/// Returns [`None`] if called multiple times from the same thread
-pub fn sdl_thread() -> Option<ErrorBuffer> {
-    use std::cell::RefCell;
-    thread_local! { static IS_NEW_THREAD: RefCell<bool> = const{RefCell::new(true)}; }
-    IS_NEW_THREAD.with(|is_new_thread| {
-        let mut borrow = is_new_thread.borrow_mut();
-        let old_value = *borrow;
-        *borrow = false;
-        old_value.then_some(ErrorBuffer(PhantomData))
-    })
+impl Drop for SdlHandle {
+    fn drop(&mut self) {
+        unsafe { SDL_Quit(); }
+    }
 }
 
-pub struct SdlError<'a> {
-    msg: Cow<'a, str>,
-    /// Forbid storing lazy error that lives long enough for the error buffer to be overwritten
-    _unique: PhantomData<&'a mut ErrorBuffer>,
+pub fn init(err_buf: &mut ErrorBuffer, flags: SDL_InitFlags) -> Result<SdlHandle, SdlError<'_>> {
+    if unsafe { SDL_Init(flags) } {
+        Ok(SdlHandle(()))
+    } else {
+        Err(err_buf.get())
+    }
 }
 
-impl<'a> SdlError<'a> {
-    pub fn get(_: &'a mut ErrorBuffer) -> Self {
-        Self {
-            msg: unsafe { CStr::from_ptr(sdl3_sys::error::SDL_GetError()) }.to_string_lossy(),
-            _unique: PhantomData,
+impl SdlHandle {
+    pub fn create_window<'a, 'b>(
+        &'a self, err_buf:
+        &'b mut ErrorBuffer,
+        title: &CStr,
+        w: u32,
+        h: u32,
+        flags: SDL_WindowFlags,
+    ) -> Result<SdlWindow<'a>, SdlOrIntError<'b>> {
+        let window = unsafe {
+            SDL_CreateWindow(
+                title.as_ptr(),
+                w.try_into()?,
+                h.try_into()?,
+                flags,
+            ).as_mut()
+        };
+        if let Some(window) = window {
+            Ok(SdlWindow(window))
+        } else {
+            Err(err_buf.get().into())
         }
     }
 }
 
-impl std::fmt::Debug for SdlError<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SdlError")
-            .field("msg", &self.msg)
-            .finish()
-    }
-}
+pub struct SdlWindow<'a>(&'a mut SDL_Window);
 
-impl std::fmt::Display for SdlError<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.msg.fmt(f)
-    }
-}
+impl !Send for SdlWindow<'_> {}
+impl !Sync for SdlWindow<'_> {}
 
-impl std::error::Error for SdlError<'_> {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-}
-
-pub struct SdlHandle(());
-
-pub fn init(err_buf: &mut ErrorBuffer) -> Result<SdlHandle, SdlError<'_>> {
-    if unsafe { sdl3_sys::init::SDL_Init(0) } {
-        Ok(SdlHandle(()))
-    } else {
-        Err(SdlError::get(err_buf))
+impl Drop for SdlWindow<'_> {
+    fn drop(&mut self) {
+        unsafe { SDL_DestroyWindow(self.0); }
     }
 }
 
 #[cfg(test)]
 mod test {
+    use std::time::Duration;
     use super::*;
 
     #[test]
     fn test0() {
         let mut err_buf = sdl_thread().unwrap();
-        let err1 = SdlError::get(&mut err_buf);
+        let err1 = err_buf.get();
         println!("error: {err1}");
-        let err2 = SdlError::get(&mut err_buf);
+        let err2 = err_buf.get();
         println!("error: {err2}");
         // err1;
+    }
+
+    #[test]
+    fn test1() {
+        let mut err_buf = sdl_thread().unwrap();
+        let sdl = init(&mut err_buf, 0).unwrap();
+        let window = sdl.create_window(&mut err_buf, c"test", 1280, 720, 0).unwrap();
+        std::thread::sleep(Duration::from_secs(2));
     }
 }
