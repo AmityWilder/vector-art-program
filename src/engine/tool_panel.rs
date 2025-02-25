@@ -3,7 +3,6 @@ use amymath::prelude::{*, Vector2};
 use std::num::NonZeroUsize;
 use amygui::{panel::Panel, rec::UIRect};
 use crate::{appearance::{Appearance, StyleItem}, editor::Editor, shaders::ShaderTable, tool::Tool, vector_path::{fill, stroke}};
-
 use super::color_wheel::ColorWheel;
 
 struct ToolIconTextures {
@@ -120,7 +119,7 @@ impl ToolPanel {
     ) -> Self {
         Self {
             panel,
-            num_cols: unsafe { NonZeroUsize::new_unchecked(2) },
+            num_cols: NonZeroUsize::new(2).unwrap(),
             items: items.into_iter().collect(),
             color_wheel: None,
             textures: ToolIconTextures::load(rl, thread),

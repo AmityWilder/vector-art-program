@@ -8,6 +8,7 @@ raylib = "5.0.2"
 amylib = { path = "../amylib" }
 amymath = { path = "../amymath" }
 rltest = { path = "../rltest" }
+raylib_rs = { path = "../raylib_rs" }
 num = "0.4.3"
 
 [features]

@@ -1,5 +1,5 @@
 [workspace]
-members = ["amygui", "amylib", "amymath", "amyvec", "rltest", "build_rs_macros"]
+members = ["amygui", "amylib", "amymath", "amyvec", "rltest", "build_rs_macros", "raylib_rs", "sdl3_amity"]
 
 [package]
 name = "vector-art-program"
@@ -9,6 +9,8 @@ build = "build.rs"
 
 [dependencies]
 raylib = { version = "5.0.2", features = ["nalgebra_interop"] }
+raylib_rs = { path = "raylib_rs" }
+sdl3_amity = { path = "sdl3_amity", optional = true }
 amylib = { path = "amylib" }
 amymath = { path = "amymath" }
 amygui = { path = "amygui" }
@@ -20,3 +22,7 @@ nalgebra = "0.33.2"
 build_rs_macros = { path = "build_rs_macros" }
 copy_to_output = "2.2.0"
 glob = "0.3"
+
+[features]
+default = ["use-sdl"]
+use-sdl = ["dep:sdl3_amity"]

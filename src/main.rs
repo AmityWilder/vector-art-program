@@ -1,7 +1,8 @@
-#![warn(clippy::all)]
+#![warn(clippy::all, clippy::unwrap_used)]
 #![warn(clippy::pedantic)]
 #![allow(dead_code, reason = "many features are still stubs waiting to be implemented later")]
 #![allow(incomplete_features)]
+#![warn(unsafe_code)]
 
 #![feature(
     stmt_expr_attributes,
@@ -84,6 +85,7 @@ use document::layer::Layer;
 use raylib::prelude::*;
 use editor::Editor;
 use engine::Engine;
+use raylib_rs::*;
 use self::document::{Document, layer};
 
 mod editor;
@@ -96,80 +98,84 @@ mod document;
 mod tool;
 
 fn main() {
-    let (mut rl, thread) = init()
-        .title("Amity Vector Art")
-        .size(1280, 720)
-        .resizable()
-        .build();
+    #[cfg(feature = "use-sdl")] {
+        todo!()
+    } #[cfg(not(feature = "use-sdl"))] {
+        let (mut rl, thread) = init()
+            .title("Amity Vector Art")
+            .size(1280, 720)
+            .resizable()
+            .build();
 
-    {
-        let icon_img = Image::gen_image_color(32, 32, Color::BLUEVIOLET);
-        rl.set_window_icon(&icon_img);
-    }
-
-    // maximize window
-    rl.set_window_state(WindowState::set_window_maximized(rl.get_window_state(), true));
-    rl.set_target_fps(60);
-
-    let mut window_rect = IRect2 {
-        min: IVector2 {
-            x: 0,
-            y: 0,
-        },
-        max: IVector2 {
-            x: rl.get_screen_width(),
-            y: rl.get_screen_height(),
-        },
-    };
-    let mut trim_rtex = rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap();
-    let mut scratch_rtex = vec![
-        // at least one is needed in case a top-level layer has a blend mode
-        rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap(),
-    ];
-    let mut engine = Engine::new(&mut rl, &thread);
-    engine.create_editor(Editor::new(window_rect.max));
-
-    while !rl.window_should_close() {
-        let is_window_resized = rl.is_window_resized();
-        if is_window_resized {
-            window_rect.max = IVector2::new(rl.get_screen_width(), rl.get_screen_height());
-
-            trim_rtex = rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap();
-            for rtex in &mut scratch_rtex {
-                *rtex = rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap();
-            }
+        {
+            let icon_img = Image::gen_image_color(32, 32, Color::BLUEVIOLET);
+            rl.set_window_icon(&icon_img);
         }
 
-        let mouse_screen_pos = rl.get_mouse_position();
-        let mouse_screen_delta = rl.get_mouse_delta();
+        // maximize window
+        rl.set_window_state(WindowState::set_window_maximized(rl.get_window_state(), true));
+        rl.set_target_fps(60);
 
-        engine.tick(&mut rl, &thread, is_window_resized, &mut scratch_rtex, &window_rect, Vector2::from(mouse_screen_pos), Vector2::from(mouse_screen_delta));
-        {
-            #[cfg(debug_assertions)]
-            let mut d = rl.begin_drawing(&thread);
-            engine.draw(&mut d, &thread, &mut trim_rtex, &mut scratch_rtex[..], &window_rect, #[cfg(dev)] mouse_screen_pos);
+        let mut window_rect = IRect2 {
+            min: IVector2 {
+                x: 0,
+                y: 0,
+            },
+            max: IVector2 {
+                x: rl.get_screen_width(),
+                y: rl.get_screen_height(),
+            },
+        };
+        let mut trim_rtex = rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap();
+        let mut scratch_rtex = vec![
+            // at least one is needed in case a top-level layer has a blend mode
+            rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap(),
+        ];
+        let mut engine = Engine::new(&mut rl, &thread);
+        engine.create_editor(Editor::new(window_rect.max));
 
-            // debug
+        while !rl.window_should_close() {
+            let is_window_resized = rl.is_window_resized();
+            if is_window_resized {
+                window_rect.max = IVector2::new(rl.get_screen_width(), rl.get_screen_height());
+
+                trim_rtex = rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap();
+                for rtex in &mut scratch_rtex {
+                    *rtex = rl.load_render_texture(&thread, window_rect.max.x as u32, window_rect.max.y as u32).unwrap();
+                }
+            }
+
+            let mouse_screen_pos = rl.get_mouse_position();
+            let mouse_screen_delta = rl.get_mouse_delta();
+
+            engine.tick(&mut rl, &thread, is_window_resized, &mut scratch_rtex, &window_rect, Vector2::from(mouse_screen_pos), Vector2::from(mouse_screen_delta));
             {
-                const DRAW_DEBUG: bool = false;
+                #[cfg(debug_assertions)]
+                let mut d = rl.begin_drawing(&thread);
+                engine.draw(&mut d, &thread, &mut trim_rtex, &mut scratch_rtex[..], &window_rect, #[cfg(dev)] mouse_screen_pos);
 
-                if DRAW_DEBUG {
-                    if let Some(editor) = engine.get_active_editor() {
-                        let mut d = d.begin_mode2D(editor.document.camera);
-                        for layer in editor.document.layers.dfs_iter(|_| true) {
-                            if let Layer::Path(path) = layer {
-                                let path = path.read();
-                                if let Some(bounds) = path.curve.bounds() {
-                                    d.draw_rectangle_lines_rect2(&bounds, Color::MAGENTA);
-                                }
-                                for bounds in path.curve.slices().map(|bez| bez.bounds()) {
-                                    d.draw_rectangle_lines_rect2(&bounds, Color::BLUE);
+                // debug
+                {
+                    const DRAW_DEBUG: bool = false;
+
+                    if DRAW_DEBUG {
+                        if let Some(editor) = engine.get_active_editor() {
+                            let mut d = d.begin_mode2D(editor.document.camera);
+                            for layer in editor.document.layers.dfs_iter(|_| true) {
+                                if let Layer::Path(path) = layer {
+                                    let path = path.read();
+                                    if let Some(bounds) = path.curve.bounds() {
+                                        d.draw_rectangle_lines_rect2(&bounds, Color::MAGENTA);
+                                    }
+                                    for bounds in path.curve.slices().map(|bez| bez.bounds()) {
+                                        d.draw_rectangle_lines_rect2(&bounds, Color::BLUE);
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    d.draw_fps(0, 0);
+                        d.draw_fps(0, 0);
+                    }
                 }
             }
         }

@@ -1,7 +1,7 @@
 use std::ops::*;
 use raylib::prelude::{*, Vector2 as RlVector2};
 use crate::prelude::{IRect2, Vector2};
-use crate::rlgl::*;
+use raylib_rs::rlgl::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[must_use]
@@ -20,7 +20,30 @@ impl From<Rectangle> for Rect2 {
     }
 }
 
+impl From<ffi::Rectangle> for Rect2 {
+    #[inline]
+    fn from(value: ffi::Rectangle) -> Self {
+        Self {
+            min: Vector2::new(value.x, value.y),
+            max: Vector2::new(value.x + value.width, value.y + value.height),
+        }
+    }
+}
+
 impl From<Rect2> for Rectangle {
+    #[inline]
+    fn from(value: Rect2) -> Self {
+        let size = value.size();
+        Self {
+            x: value.min.x,
+            y: value.min.y,
+            width:  size.x,
+            height: size.y,
+        }
+    }
+}
+
+impl From<Rect2> for ffi::Rectangle {
     #[inline]
     fn from(value: Rect2) -> Self {
         let size = value.size();

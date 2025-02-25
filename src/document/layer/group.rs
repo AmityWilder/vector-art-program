@@ -1,7 +1,6 @@
-use amymath::rlgl::*;
 use raylib::prelude::*;
+use raylib_rs::rlgl::*;
 use crate::appearance::Blending;
-
 use super::{LayerSettings, LayerTree, LayerType};
 
 pub struct Group {
@@ -38,7 +37,7 @@ impl LayerType for Group {
             unsafe { ffi::EndTextureMode(); }
             let mut d = d.begin_blend_mode(self.blend.mode);
             {
-                let mut d = d.rl_set_texture(scratch_rtex.texture.id);
+                let mut d = d.rl_set_texture(scratch_rtex.texture.id());
                 {
                     let mut d = d.rl_begin_quads();
 

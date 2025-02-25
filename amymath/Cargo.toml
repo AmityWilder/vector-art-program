@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 raylib = "5.0.2"
 rltest = { path = "../rltest" }
+raylib_rs = { path = "../raylib_rs" }

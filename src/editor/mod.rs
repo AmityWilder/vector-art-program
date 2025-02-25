@@ -1,10 +1,10 @@
 use std::{path::Path, time::Instant};
 use amylib::prelude::DirectibleDoubleEndedIterator;
 use amymath::prelude::{*, Vector2};
-use amyvec::{curve::{Curve, WidthProfile}, path_point::PathPoint};
 use raylib::prelude::{*, Vector2 as RlVector2};
+use raylib_rs::rlgl::*;
 use undo_redo::{Action, EditHistory, RedoError, UndoError};
-use crate::{appearance::{Appearance, Blending, StyleItem}, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, raster::RasterTex, shaders::ShaderTable, tool::{raster_brush, Tool, ToolType}, vector_path::{fill, stroke}};
+use crate::{appearance::{Appearance, Blending, StyleItem}, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, raster::RasterTex, shaders::ShaderTable, tool::{raster_brush, Tool, ToolType}, vector_path::fill};
 
 #[allow(clippy::enum_glob_use, reason = "every frickin one of these is prefixed with its type name >:T")]
 use {KeyboardKey::*, MouseButton::*};
@@ -263,7 +263,7 @@ impl Editor {
                 let inv_height = (trim_rtex.height() as f32).recip();
 
                 {
-                    let mut d = d.rl_set_texture(trim_rtex.texture.id);
+                    let mut d = d.rl_set_texture(trim_rtex.texture.id());
                     let mut d = d.rl_begin_quads();
 
                     d.rl_color4ub(255, 255, 255, 255);

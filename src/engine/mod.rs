@@ -1,6 +1,7 @@
 use amygui::{panel::Panel, rec::UIRect};
 use amymath::prelude::{*, Vector2};
 use raylib::prelude::*;
+use raylib_rs::rlgl::{RaylibRlglDraw, Rlgl, RlglID};
 use crate::{editor::Editor, shaders::ShaderTable, engine::{layers_panel::LayersPanel, tool_panel::{ToolIcon, ToolPanel}}};
 
 #[allow(clippy::enum_glob_use, reason = "every frickin one of these is prefixed with its type name >:T")]
@@ -226,7 +227,7 @@ fn draw_artwork(d: &mut RaylibDrawHandle<'_>, trim_rtex: &RenderTexture2D) {
         (width as f32, height as f32);
 
     {
-        let mut d = d.rl_set_texture(trim_rtex.texture.id);
+        let mut d = d.rl_set_texture(trim_rtex.texture.id());
         let mut d = d.rl_begin_quads();
 
         d.rl_color4ub(255, 0, 255, 255);

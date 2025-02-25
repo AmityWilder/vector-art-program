@@ -1,10 +1,10 @@
 #![allow(dead_code)]
-use raylib::prelude::*;
+use raylib::{ffi, prelude::RaylibDraw};
 use std::{ffi::CStr, num::{NonZeroUsize, TryFromIntError}, os::raw::{c_uchar, c_uint, c_void}, ptr::{null, null_mut}};
 
 pub mod tracking {
     use std::{os::raw::{c_int, c_uint}, marker::PhantomData};
-    use raylib::prelude::*;
+    use raylib::ffi;
 
     macro_rules! define_gl_id_types {
         ($(
@@ -23,7 +23,8 @@ pub mod tracking {
             impl $TypeID<'_> {
                 /// Designate the type of ID this is
                 ///
-                /// Safety: Programmer must ensure ID is of the stated type and survives the correct lifetime
+                /// # Safety
+                /// Programmer must ensure ID is of the stated type and survives the correct lifetime
                 #[inline]
                 pub const unsafe fn new(id: c_uint) -> Self {
                     Self(id, PhantomData)
@@ -31,7 +32,8 @@ pub mod tracking {
 
                 /// Get the ID as an unsigned int for communicating with OpenGL
                 ///
-                /// Safety: Programmer must ensure ID is of the stated type and is still alive
+                /// # Safety
+                /// Programmer must ensure ID is of the stated type and is still alive
                 #[inline]
                 pub const unsafe fn get(&self) -> c_uint {
                     self.0
@@ -54,10 +56,11 @@ pub mod tracking {
             impl $TypeHandle {
                 /// Get the ID of the signifier
                 ///
-                /// Safety: A signifier can only be created from the actual creation of the referred object,
+                /// # Safety
+                /// A signifier can only be created from the actual creation of the referred object,
                 /// and should only be destroyed by the actual destruction of the referred object.
                 #[inline]
-                pub const fn id<'a>(&'a self) -> $TypeID<'a> {
+                pub const fn id(&self) -> $TypeID<'_> {
                     unsafe { $TypeID::new(self.0) }
                 }
 
@@ -123,7 +126,8 @@ pub mod tracking {
     impl ShaderPrgmID<'_, '_> {
         /// Designate the type of ID this is
         ///
-        /// Safety: Programmer must ensure ID is of the stated type and survives the correct lifetime
+        /// # Safety
+        /// Programmer must ensure ID is of the stated type and survives the correct lifetime
         #[inline]
         pub const unsafe fn new(id: c_uint) -> Self {
             Self(id, PhantomData)
@@ -131,7 +135,8 @@ pub mod tracking {
 
         /// Get the ID as an unsigned int for communicating with OpenGL
         ///
-        /// Safety: Programmer must ensure ID is of the stated type and is still alive
+        /// # Safety
+        /// Programmer must ensure ID is of the stated type and is still alive
         #[inline]
         pub const unsafe fn get(&self) -> c_uint {
             self.0
@@ -154,7 +159,8 @@ pub mod tracking {
     impl<'a> ShaderPrgmHandle<'a> {
         /// Get the ID of the signifier
         ///
-        /// Safety: A signifier can only be created from the actual creation of the referred object,
+        /// # Safety
+        /// A signifier can only be created from the actual creation of the referred object,
         /// and should only be destroyed by the actual destruction of the referred object.
         #[inline]
         pub const fn id(&self) -> ShaderPrgmID<'_, 'a> {
@@ -192,7 +198,8 @@ pub mod tracking {
 
         /// Get the ID as an int for communicating with OpenGL
         ///
-        /// Safety: Programmer must ensure ID is of the stated type
+        /// # Safety
+        /// Programmer must ensure ID is of the stated type
         #[inline]
         pub const unsafe fn get(&self) -> c_int {
             self.0
@@ -207,12 +214,13 @@ pub mod tracking {
     impl<'a> ShaderAttribLoc<'a> {
         #[inline]
         pub(super) const fn make(_: ShaderID<'a>, loc: c_int) -> Option<Self> {
-            if loc != -1 { Some(unsafe { std::mem::transmute(loc) }) } else { None }
+            if loc != -1 { Some(Self(loc, PhantomData)) } else { None }
         }
 
         /// Get the ID as an int for communicating with OpenGL
         ///
-        /// Safety: Programmer must ensure ID is of the stated type
+        /// # Safety
+        /// Programmer must ensure ID is of the stated type
         #[inline]
         pub const unsafe fn get(&self) -> c_int {
             self.0
@@ -223,14 +231,6 @@ pub mod tracking {
         type TypeID<'a> where Self: 'a;
         /// Get a safe wrapper for the ID of this type to communicate with RLGL
         fn id(&self) -> Self::TypeID<'_>;
-    }
-
-    impl RlglID for Texture2D {
-        type TypeID<'a> = TextureID<'a> where Self: 'a;
-        #[inline]
-        fn id(&self) -> Self::TypeID<'_> {
-            unsafe { TextureID::new(self.id) }
-        }
     }
 
     impl RlglID for ffi::Texture2D {
@@ -248,10 +248,10 @@ pub mod tracking {
         /// Get a safe wrapper for the ID of this type to communicate with RLGL
         fn id(&self) -> ShaderPrgmID<'_, '_>;
         fn locs(&self) -> &[ShaderUniformLoc<'_>];
-        fn locs_mut(&self) -> &mut [ShaderUniformLoc<'_>];
+        fn locs_mut(&mut self) -> &mut [ShaderUniformLoc<'_>];
     }
 
-    impl RlglShaderID for Shader {
+    impl RlglShaderID for ffi::Shader {
         #[inline]
         fn id(&self) -> ShaderPrgmID<'_, '_> {
             unsafe { ShaderPrgmID::new(self.id) }
@@ -263,7 +263,7 @@ pub mod tracking {
         }
 
         #[inline]
-        fn locs_mut(&self) -> &mut [ShaderUniformLoc<'_>] {
+        fn locs_mut(&mut self) -> &mut [ShaderUniformLoc<'_>] {
             unsafe { std::slice::from_raw_parts_mut(self.locs.cast(), NUM_SHADER_LOCS) }
         }
     }
@@ -427,6 +427,26 @@ pub enum VertexAttributeType {
     Float = ffi::RL_FLOAT as i32,
 }
 
+/// # Safety
+///
+/// All copies of [`ffi::rlRenderBatch`] sharing an ID will be invalidated when the render batch
+/// with that ID is unloaded. This structure will unload the ID of its argument when it drops,
+/// unless [`RenderBatch::into_raw`] is called on it.
+///
+/// Users of [`RenderBatch`] must ensure that any given render batch ID is unloaded *exactly once*,
+/// and that no [`ffi::rlRenderBatch`] copy referring to an unloaded render batch is used after the
+/// related ID is unloaded.
+///
+/// Any call to [`RenderBatch::from_raw`] for a [`ffi::rlRenderBatch`] argument that is expected to
+/// outlive the [`RenderBatch`]--i.e. the [`RenderBatch`] is merely borrowing it--must be paired with
+/// a corresponding [`RenderBatch::into_raw`] to prevent premature unloading.
+///
+/// **Render batch IDs are sometimes reused.** Callers must ensure a distinction is made between copies
+/// of [`ffi::rlRenderBatch`]es created in reference to different render batches that coincidentally
+/// share an ID, of which only one can possibly be valid.
+///
+/// A [`RenderBatch`] is safe to be cloned, so long as [`RenderBatch::into_raw`] is called on each
+/// instance that is not the designated unloader.
 #[derive(Debug, Clone)]
 pub struct RenderBatch(ffi::rlRenderBatch);
 
@@ -439,6 +459,8 @@ impl Drop for RenderBatch {
 }
 
 impl RenderBatch {
+    /// # Safety
+    /// See structure documentation
     #[inline]
     pub unsafe fn into_raw(self) -> ffi::rlRenderBatch {
         let batch = self.0;
@@ -446,6 +468,8 @@ impl RenderBatch {
         batch
     }
 
+    /// # Safety
+    /// See structure documentation
     #[inline]
     pub unsafe fn from_raw(value: ffi::rlRenderBatch) -> Self {
         Self(value)
@@ -466,8 +490,8 @@ pub enum ShaderUniformData<'a, 'b: 'a> {
 
 impl<'a, 'b: 'a> ShaderUniformData<'a, 'b> {
     #[inline]
-    const fn into_raw_parts(&self) -> (i32, *const std::os::raw::c_void, usize) {
-        match *self {
+    const fn into_raw_parts(self) -> (i32, *const std::os::raw::c_void, usize) {
+        match self {
             ShaderUniformData::Float    (items) => (ffi::rlShaderUniformDataType::RL_SHADER_UNIFORM_FLOAT     as i32, items.as_ptr().cast(), items.len()),
             ShaderUniformData::Vec2     (items) => (ffi::rlShaderUniformDataType::RL_SHADER_UNIFORM_VEC2      as i32, items.as_ptr().cast(), items.len()),
             ShaderUniformData::Vec3     (items) => (ffi::rlShaderUniformDataType::RL_SHADER_UNIFORM_VEC3      as i32, items.as_ptr().cast(), items.len()),
@@ -513,7 +537,9 @@ pub enum ShaderType {
     Compute  = ffi::RL_COMPUTE_SHADER as i32,
 }
 
-pub trait Rlgl: RaylibDraw {
+impl<D: RaylibDraw> Rlgl for D {}
+
+pub trait Rlgl {
     // Matrix state
 
     /// Choose the current matrix to be transformed
@@ -754,7 +780,8 @@ pub trait Rlgl: RaylibDraw {
     #[inline]
     fn rl_active_draw_buffers(&mut self, count: usize) -> Result<(), TryFromIntError> {
         let count = i32::try_from(count)?;
-        Ok(unsafe { ffi::rlActiveDrawBuffers(count); })
+        unsafe { ffi::rlActiveDrawBuffers(count); }
+        Ok(())
     }
 
     /// Blit active framebuffer to main framebuffer
@@ -927,7 +954,7 @@ pub trait Rlgl: RaylibDraw {
 
     /// Set blending mode
     #[inline]
-    fn rl_set_blend_mode(&mut self, mode: BlendMode) {
+    fn rl_set_blend_mode(&mut self, mode: ffi::BlendMode) {
         unsafe { ffi::rlSetBlendMode(mode as i32); }
     }
 
@@ -1027,7 +1054,8 @@ pub trait Rlgl: RaylibDraw {
         let offset = i32::try_from(offset)?;
         let range = data.as_ptr_range();
         let size = i32::try_from(unsafe { range.end.cast::<u8>().offset_from(range.start.cast::<u8>()) })?;
-        Ok(unsafe { ffi::rlUpdateVertexBuffer(buffer_id.get(), range.start.cast(), size, offset); })
+        unsafe { ffi::rlUpdateVertexBuffer(buffer_id.get(), range.start.cast(), size, offset); }
+        Ok(())
     }
 
     /// Update vertex buffer elements with new data
@@ -1037,7 +1065,8 @@ pub trait Rlgl: RaylibDraw {
         let offset = i32::try_from(offset)?;
         let range = data.as_ptr_range();
         let size = i32::try_from(unsafe { range.end.cast::<u8>().offset_from(range.start.cast::<u8>()) })?;
-        Ok(unsafe { ffi::rlUpdateVertexBufferElements(id.get(), range.start.cast(), size, offset); })
+        unsafe { ffi::rlUpdateVertexBufferElements(id.get(), range.start.cast(), size, offset); }
+        Ok(())
     }
 
     /// Unload vertex array object (VAO)
@@ -1053,8 +1082,14 @@ pub trait Rlgl: RaylibDraw {
     }
 
     /// Set vertex attribute
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `pointer` is a valid vertex attribute index.
+    /// It will be added to a `void*` which will be dereferenced.
     #[inline]
-    fn rl_set_vertex_attribute<T>(&mut self,
+    unsafe fn rl_set_vertex_attribute<T>(
+        &mut self,
         index: u32,
         comp_size: CompSize,
         kind: VertexAttributeType,
@@ -1072,9 +1107,13 @@ pub trait Rlgl: RaylibDraw {
     }
 
     /// Set vertex attribute default value
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `value` is valid and accurately described by `attrib_type` and `count`
     #[inline]
     unsafe fn rl_set_vertex_attribute_default(loc_index: i32, value: *const c_void, attrib_type: i32, count: i32) {
-        ffi::rlSetVertexAttributeDefault(loc_index, value, attrib_type, count);
+        unsafe { ffi::rlSetVertexAttributeDefault(loc_index, value, attrib_type, count); }
     }
 
     /// Draw vertex array
@@ -1084,10 +1123,14 @@ pub trait Rlgl: RaylibDraw {
     }
 
     /// Draw vertex array elements
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `buffer` is valid and accurately described by `count`
     #[inline]
     unsafe fn rl_draw_vertex_array_elements(offset: i32, count: i32, buffer: *const c_void) {
         // NOTE: Added pointer math separately from function to avoid UBSAN complaining
-        ffi::rlDrawVertexArrayElements(offset, count, buffer);
+        unsafe { ffi::rlDrawVertexArrayElements(offset, count, buffer); }
     }
 
     /// Draw vertex array instanced
@@ -1097,18 +1140,26 @@ pub trait Rlgl: RaylibDraw {
     }
 
     /// Draw vertex array elements instanced
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `buffer` is valid and accurately described by `count`
     #[inline]
     unsafe fn rl_draw_vertex_array_elements_instanced(offset: i32, count: i32, buffer: *const c_void, instances: i32) {
         // NOTE: Added pointer math separately from function to avoid UBSAN complaining
-        ffi::rlDrawVertexArrayElementsInstanced(offset, count, buffer, instances);
+        unsafe { ffi::rlDrawVertexArrayElementsInstanced(offset, count, buffer, instances); }
     }
 
     // Textures management
 
     /// Load texture in GPU
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `data` is valid and accurately described by `width`, `height`, and `format`
     #[inline]
     unsafe fn rl_load_texture(data: *const c_void, width: i32, height: i32, format: i32, mipmap_count: i32) -> TextureHandle {
-        TextureHandle::fuse(ffi::rlLoadTexture(data, width, height, format, mipmap_count))
+        TextureHandle::fuse(unsafe { ffi::rlLoadTexture(data, width, height, format, mipmap_count) })
     }
 
     /// Load depth texture/renderbuffer (to be attached to fbo)
@@ -1121,16 +1172,24 @@ pub trait Rlgl: RaylibDraw {
     /// Load texture cubemap
     /// NOTE: Cubemap data is expected to be 6 images in a single data array (one after the other),
     /// expected the following convention: +X, -X, +Y, -Y, +Z, -Z
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `data` is valid and accurately described by `size` and `format`
     #[inline]
     unsafe fn rl_load_texture_cubemap(data: *const c_void, size: i32, format: i32) -> u32 {
-        ffi::rlLoadTextureCubemap(data, size, format)
+        unsafe { ffi::rlLoadTextureCubemap(data, size, format) }
     }
 
     /// Update GPU texture with new data
     /// NOTE: We don't know safely if internal texture format is the expected one...
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `data` is valid and accurately described by `width`, `height`, and `format`
     #[inline]
     unsafe fn rl_update_texture(id: TextureID<'_>, offset_x: i32, offset_y: i32, width: i32, height: i32, format: i32, data: *const c_void) {
-        ffi::rlUpdateTexture(id.get(), offset_x, offset_y, width, height, format, data);
+        unsafe { ffi::rlUpdateTexture(id.get(), offset_x, offset_y, width, height, format, data); }
     }
 
     /// Get OpenGL internal formats \
@@ -1146,33 +1205,33 @@ pub trait Rlgl: RaylibDraw {
 
     /// Get name string for pixel format
     #[inline]
-    fn rl_get_pixel_format_name(&mut self, format: PixelFormat) -> &'static CStr {
+    fn rl_get_pixel_format_name(&mut self, format: ffi::PixelFormat) -> &'static CStr {
         // I just copied and pasted this in from the ffi version to prove to Rust that it's safe.
         match format {
-            PixelFormat::PIXELFORMAT_UNCOMPRESSED_GRAYSCALE    => c"GRAYSCALE",     // 8 bit per pixel (no alpha)
-            PixelFormat::PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA   => c"GRAY_ALPHA",    // 8*2 bpp (2 channels)
-            PixelFormat::PIXELFORMAT_UNCOMPRESSED_R5G6B5       => c"R5G6B5",        // 16 bpp
-            PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8       => c"R8G8B8",        // 24 bpp
-            PixelFormat::PIXELFORMAT_UNCOMPRESSED_R5G5B5A1     => c"R5G5B5A1",      // 16 bpp (1 bit alpha)
-            PixelFormat::PIXELFORMAT_UNCOMPRESSED_R4G4B4A4     => c"R4G4B4A4",      // 16 bpp (4 bit alpha)
-            PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8     => c"R8G8B8A8",      // 32 bpp
-            PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32          => c"R32",           // 32 bpp (1 channel - float)
-            PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32G32B32    => c"R32G32B32",     // 32*3 bpp (3 channels - float)
-            PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32G32B32A32 => c"R32G32B32A32",  // 32*4 bpp (4 channels - float)
-            PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16          => c"R16",           // 16 bpp (1 channel - half float)
-            PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16G16B16    => c"R16G16B16",     // 16*3 bpp (3 channels - half float)
-            PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16G16B16A16 => c"R16G16B16A16",  // 16*4 bpp (4 channels - half float)
-            PixelFormat::PIXELFORMAT_COMPRESSED_DXT1_RGB       => c"DXT1_RGB",      // 4 bpp (no alpha)
-            PixelFormat::PIXELFORMAT_COMPRESSED_DXT1_RGBA      => c"DXT1_RGBA",     // 4 bpp (1 bit alpha)
-            PixelFormat::PIXELFORMAT_COMPRESSED_DXT3_RGBA      => c"DXT3_RGBA",     // 8 bpp
-            PixelFormat::PIXELFORMAT_COMPRESSED_DXT5_RGBA      => c"DXT5_RGBA",     // 8 bpp
-            PixelFormat::PIXELFORMAT_COMPRESSED_ETC1_RGB       => c"ETC1_RGB",      // 4 bpp
-            PixelFormat::PIXELFORMAT_COMPRESSED_ETC2_RGB       => c"ETC2_RGB",      // 4 bpp
-            PixelFormat::PIXELFORMAT_COMPRESSED_ETC2_EAC_RGBA  => c"ETC2_RGBA",     // 8 bpp
-            PixelFormat::PIXELFORMAT_COMPRESSED_PVRT_RGB       => c"PVRT_RGB",      // 4 bpp
-            PixelFormat::PIXELFORMAT_COMPRESSED_PVRT_RGBA      => c"PVRT_RGBA",     // 4 bpp
-            PixelFormat::PIXELFORMAT_COMPRESSED_ASTC_4x4_RGBA  => c"ASTC_4x4_RGBA", // 8 bpp
-            PixelFormat::PIXELFORMAT_COMPRESSED_ASTC_8x8_RGBA  => c"ASTC_8x8_RGBA", // 2 bpp
+            ffi::PixelFormat::PIXELFORMAT_UNCOMPRESSED_GRAYSCALE    => c"GRAYSCALE",     // 8 bit per pixel (no alpha)
+            ffi::PixelFormat::PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA   => c"GRAY_ALPHA",    // 8*2 bpp (2 channels)
+            ffi::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R5G6B5       => c"R5G6B5",        // 16 bpp
+            ffi::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8       => c"R8G8B8",        // 24 bpp
+            ffi::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R5G5B5A1     => c"R5G5B5A1",      // 16 bpp (1 bit alpha)
+            ffi::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R4G4B4A4     => c"R4G4B4A4",      // 16 bpp (4 bit alpha)
+            ffi::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8     => c"R8G8B8A8",      // 32 bpp
+            ffi::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32          => c"R32",           // 32 bpp (1 channel - float)
+            ffi::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32G32B32    => c"R32G32B32",     // 32*3 bpp (3 channels - float)
+            ffi::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32G32B32A32 => c"R32G32B32A32",  // 32*4 bpp (4 channels - float)
+            ffi::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16          => c"R16",           // 16 bpp (1 channel - half float)
+            ffi::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16G16B16    => c"R16G16B16",     // 16*3 bpp (3 channels - half float)
+            ffi::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16G16B16A16 => c"R16G16B16A16",  // 16*4 bpp (4 channels - half float)
+            ffi::PixelFormat::PIXELFORMAT_COMPRESSED_DXT1_RGB       => c"DXT1_RGB",      // 4 bpp (no alpha)
+            ffi::PixelFormat::PIXELFORMAT_COMPRESSED_DXT1_RGBA      => c"DXT1_RGBA",     // 4 bpp (1 bit alpha)
+            ffi::PixelFormat::PIXELFORMAT_COMPRESSED_DXT3_RGBA      => c"DXT3_RGBA",     // 8 bpp
+            ffi::PixelFormat::PIXELFORMAT_COMPRESSED_DXT5_RGBA      => c"DXT5_RGBA",     // 8 bpp
+            ffi::PixelFormat::PIXELFORMAT_COMPRESSED_ETC1_RGB       => c"ETC1_RGB",      // 4 bpp
+            ffi::PixelFormat::PIXELFORMAT_COMPRESSED_ETC2_RGB       => c"ETC2_RGB",      // 4 bpp
+            ffi::PixelFormat::PIXELFORMAT_COMPRESSED_ETC2_EAC_RGBA  => c"ETC2_RGBA",     // 8 bpp
+            ffi::PixelFormat::PIXELFORMAT_COMPRESSED_PVRT_RGB       => c"PVRT_RGB",      // 4 bpp
+            ffi::PixelFormat::PIXELFORMAT_COMPRESSED_PVRT_RGBA      => c"PVRT_RGBA",     // 4 bpp
+            ffi::PixelFormat::PIXELFORMAT_COMPRESSED_ASTC_4x4_RGBA  => c"ASTC_4x4_RGBA", // 8 bpp
+            ffi::PixelFormat::PIXELFORMAT_COMPRESSED_ASTC_8x8_RGBA  => c"ASTC_8x8_RGBA", // 2 bpp
             // _ => c"UNKNOWN",
         }
     }
@@ -1317,7 +1376,8 @@ pub trait Rlgl: RaylibDraw {
     #[inline]
     fn rl_set_uniform<'a, 'b: 'a>(&mut self, loc_index: ShaderUniformLoc<'a>, data: ShaderUniformData<'_, 'b>) -> Result<(), TryFromIntError> {
         let (uniform_type, value, count) = data.into_raw_parts();
-        Ok(unsafe { ffi::rlSetUniform(loc_index.get(), value, uniform_type, i32::try_from(count)?); })
+        unsafe { ffi::rlSetUniform(loc_index.get(), value, uniform_type, i32::try_from(count)?); }
+        Ok(())
     }
 
     /// Set shader value matrix
@@ -1355,9 +1415,13 @@ pub trait Rlgl: RaylibDraw {
     // Shader buffer storage object management (ssbo)
 
     /// Load shader storage buffer object (SSBO)
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure `data` can be loaded to an SSBO and is accurately described by `size`
     #[inline]
     unsafe fn rl_load_shader_buffer(size: u32, data: *const c_void, usage_hint: BufferUsageHint) -> SsboHandle {
-        SsboHandle::fuse(ffi::rlLoadShaderBuffer(size, data, usage_hint as i32))
+        SsboHandle::fuse(unsafe { ffi::rlLoadShaderBuffer(size, data, usage_hint as i32) })
     }
 
     /// Unload shader storage buffer object (SSBO)
@@ -1367,9 +1431,13 @@ pub trait Rlgl: RaylibDraw {
     }
 
     /// Update SSBO buffer data
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `data` is valid and accurately described by `data_size`
     #[inline]
     unsafe fn rl_update_shader_buffer(id: SsboID<'_>, data: *const c_void, data_size: u32, offset: u32) {
-        ffi::rlUpdateShaderBuffer(id.get(), data, data_size, offset);
+        unsafe { ffi::rlUpdateShaderBuffer(id.get(), data, data_size, offset); }
     }
 
     /// Bind SSBO buffer
@@ -1379,9 +1447,13 @@ pub trait Rlgl: RaylibDraw {
     }
 
     /// Read SSBO buffer data (GPU->CPU)
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `dest` points to a valid buffer which can contain `count` of something?
     #[inline]
     unsafe fn rl_read_shader_buffer(id: SsboID<'_>, dest: *mut c_void, count: u32, offset: u32) {
-        ffi::rlReadShaderBuffer(id.get(), dest, count, offset);
+        unsafe { ffi::rlReadShaderBuffer(id.get(), dest, count, offset); }
     }
 
     /// Copy SSBO data between buffers
@@ -1475,8 +1547,6 @@ pub trait Rlgl: RaylibDraw {
     }
 }
 
-impl<D: RaylibDraw> Rlgl for D {}
-
 #[inline]
 pub fn tex_shapes() -> &'static ffi::Texture2D {
     #[link(name = "raylib")]
@@ -1487,12 +1557,12 @@ pub fn tex_shapes() -> &'static ffi::Texture2D {
 }
 
 #[inline]
-pub fn tex_shapes_rec() -> Rectangle {
+pub fn tex_shapes_rec() -> ffi::Rectangle {
     #[link(name = "raylib")]
     unsafe extern "C" {
         static texShapesRec: ffi::Rectangle;
     }
-    unsafe { Rectangle::from(texShapesRec) }
+    unsafe { texShapesRec }
 }
 
 pub struct RlglSetTextureMode<'a, D: ?Sized>(&'a mut D);
@@ -1626,34 +1696,3 @@ pub trait RaylibRlglDraw {
 impl<D: ?Sized> RaylibRlglDraw for RaylibRlglLines<'_, D> {}
 impl<D: ?Sized> RaylibRlglDraw for RaylibRlglTriangles<'_, D> {}
 impl<D: ?Sized> RaylibRlglDraw for RaylibRlglQuads<'_, D> {}
-
-#[cfg(test)]
-mod tests {
-    use raylib::prelude::*;
-    use rltest::*;
-    use super::*;
-
-    #[test]
-    fn test0() {
-        rl_test("test0", 640, 480, 60, |rl| {
-            let texture = RaylibTestWrapper::load_texture_from_image(rl, &Image::gen_image_gradient_square(32, 32, 0.5, Color::RED, Color::BLUE))?;
-            rl.run(|rl| {
-                if rl.is_key_pressed(KeyboardKey::KEY_ENTER) {
-                    success!()
-                }
-                rl.begin_drawing(Color::BLACK, |d| {
-                    let mut d = d.rl_set_texture(texture.id());
-                    let mut d = d.rl_begin_quads();
-
-                    d.rl_color4ub(255, 255, 255, 255);
-                    d.rl_normal3f(0.0, 0.0, 1.0);
-
-                    d.rl_tex_coord2f(0.0, 0.0); d.rl_vertex2f( 0.0,  0.0);
-                    d.rl_tex_coord2f(0.0, 1.0); d.rl_vertex2f( 0.0, 32.0);
-                    d.rl_tex_coord2f(1.0, 1.0); d.rl_vertex2f(32.0, 32.0);
-                    d.rl_tex_coord2f(1.0, 0.0); d.rl_vertex2f(32.0,  0.0);
-                })
-            })
-        }).expect("rejected");
-    }
-}

@@ -195,14 +195,14 @@ impl<'c> Deref for RaylibTestHandle<'c> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0
     }
 }
 
 impl<'c> DerefMut for RaylibTestHandle<'c> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        self.0
     }
 }
 
@@ -225,20 +225,20 @@ impl<'c> RaylibTestHandle<'c> {
 
 pub struct RaylibTestDrawHandle<'e, 'f>(&'f mut RaylibDrawHandle<'e>);
 
-impl<'e, 'f> Deref for RaylibTestDrawHandle<'e, 'f> {
+impl<'e> Deref for RaylibTestDrawHandle<'e, '_> {
     type Target = RaylibDrawHandle<'e>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0
     }
 }
 
-impl<'e, 'f> DerefMut for RaylibTestDrawHandle<'e, 'f> {
+impl DerefMut for RaylibTestDrawHandle<'_, '_> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        self.0
     }
 }
 
-impl<'e, 'f> RaylibDraw for RaylibTestDrawHandle<'e, 'f> {}
+impl RaylibDraw for RaylibTestDrawHandle<'_, '_> {}

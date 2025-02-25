@@ -80,7 +80,7 @@ impl IVector2 {
 
     #[inline]
     pub const fn min_element(self) -> i32 {
-        if self.x <= self.y { self.y } else { self.y }
+        if self.x <= self.y { self.y } else { self.x }
     }
 
     #[inline]

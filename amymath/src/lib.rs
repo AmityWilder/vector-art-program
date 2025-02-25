@@ -20,7 +20,6 @@ pub mod rec;
 pub mod rect2;
 pub mod irect2;
 pub mod urect2;
-pub mod rlgl;
 
 pub mod prelude {
     pub use crate::{
@@ -35,7 +34,6 @@ pub mod prelude {
         rect2::*,
         irect2::*,
         urect2::*,
-        rlgl::*,
     };
 }
 

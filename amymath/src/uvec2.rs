@@ -80,7 +80,7 @@ impl UVector2 {
 
     #[inline]
     pub const fn min_element(self) -> u32 {
-        if self.x <= self.y { self.y } else { self.y }
+        if self.x <= self.y { self.y } else { self.x }
     }
 
     /// Returns an error if the result is larger than [`u32::MAX`]

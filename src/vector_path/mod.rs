@@ -1,6 +1,6 @@
 use amyvec::{curve::WidthProfile, path_point::{Ctrl, Ctrl1, Ctrl2}};
-use amymath::rlgl::*;
 use raylib::prelude::*;
+use raylib_rs::rlgl::*;
 use crate::{
     appearance::{Appearance, StyleItem},
     document::layer::{LayerSettings, LayerType},
@@ -75,7 +75,7 @@ impl LayerType for VectorPath {
             unsafe { ffi::EndTextureMode(); }
             let mut d = d.begin_blend_mode(self.appearance.blend.mode);
             {
-                let mut d = d.rl_set_texture(scratch_rtex.texture.id);
+                let mut d = d.rl_set_texture(scratch_rtex.texture.id());
                 {
                     let mut d = d.rl_begin_quads();
 
