@@ -1,4 +1,5 @@
-use std::{borrow::Cow, ffi::CStr, marker::PhantomData};
+use std::{cell::OnceCell, error::Error, ffi::CStr, fmt, marker::PhantomData, num::TryFromIntError};
+use sdl3_sys::error::*;
 
 /// A handle for ensuring the SDL error buffer doesn't get overwritten before this error is consumed.
 ///
@@ -16,7 +17,7 @@ impl !Sync for ErrorBuffer {}
 /// Get an [`ErrorBuffer`] local to the current thread.
 ///
 /// Returns [`None`] if called multiple times from the same thread.
-pub fn sdl_thread() -> Option<ErrorBuffer> {
+pub fn err_buf() -> Option<ErrorBuffer> {
     use std::cell::RefCell;
     thread_local! { static IS_NEW_THREAD: RefCell<bool> = const{RefCell::new(true)}; }
     IS_NEW_THREAD.with(|is_new_thread| {
@@ -59,7 +60,7 @@ impl ErrorBuffer {
     /// - [`ErrorBuffer::set`]
     pub fn get(&mut self) -> SdlError<'_> {
         SdlError {
-            msg: unsafe { CStr::from_ptr(sdl3_sys::error::SDL_GetError()) }.to_string_lossy(),
+            msg: OnceCell::new(),
             _unique: PhantomData,
         }
     }
@@ -75,7 +76,7 @@ impl ErrorBuffer {
     /// - [`ErrorBuffer::get`]
     /// - [`ErrorBuffer::set`]
     pub fn clear(&mut self) -> bool {
-        unsafe { sdl3_sys::error::SDL_ClearError() }
+        unsafe { SDL_ClearError() }
     }
 
     /// Set the SDL error message for the current thread.
@@ -99,7 +100,7 @@ impl ErrorBuffer {
     /// - [`ErrorBuffer::get`]
     /// - [`ErrorBuffer::set_v`]
     pub fn set(&mut self, msg: &CStr) -> bool {
-        unsafe { sdl3_sys::error::SDL_SetError(msg.as_ptr()) }
+        unsafe { SDL_SetError(msg.as_ptr()) }
     }
 
     /// Set the SDL error message for the current thread.
@@ -117,40 +118,85 @@ impl ErrorBuffer {
     /// - [`ErrorBuffer::set`]
     #[cfg(feature = "c_variadic")]
     pub fn set_v(&mut self, msg: &CStr, ap: sdl3_sys::ffi::VaList) -> bool {
-        unsafe { sdl3_sys::error::SDL_SetErrorV(msg.as_ptr(), ap) }
+        unsafe { SDL_SetErrorV(msg.as_ptr(), ap) }
+    }
+}
+
+pub trait ToSdlError {
+    type Success;
+    /// Transform [`Some`] into [`Ok`] and [`None`] into [`SdlError`]
+    fn sdl_err(self, err_buf: &mut ErrorBuffer) -> Result<Self::Success, SdlError<'_>>;
+}
+
+impl ToSdlError for bool {
+    type Success = ();
+
+    #[inline]
+    fn sdl_err(self, err_buf: &mut ErrorBuffer) -> Result<(), SdlError<'_>> {
+        if self { Ok(()) } else { Err(err_buf.get()) }
+    }
+}
+
+impl<T> ToSdlError for Option<T> {
+    type Success = T;
+
+    #[inline]
+    fn sdl_err(self, err_buf: &mut ErrorBuffer) -> Result<Self::Success, SdlError<'_>> {
+        if let Some(succ) = self { Ok(succ) } else { Err(err_buf.get()) }
+    }
+}
+
+pub trait ToSdlOrIntError {
+    type Success;
+    /// Transform [`Some`] into [`Ok`] and [`None`] into [`SdlOrIntError`]
+    fn sdl_erri(self, err_buf: &mut ErrorBuffer) -> Result<Self::Success, SdlOrIntError<'_>>;
+}
+
+impl<T: ToSdlError> ToSdlOrIntError for T {
+    type Success = <T as ToSdlError>::Success;
+
+    #[inline]
+    fn sdl_erri(self, err_buf: &mut ErrorBuffer) -> Result<Self::Success, SdlOrIntError<'_>> {
+        self.sdl_err(err_buf).map_err(|e| e.into())
     }
 }
 
 pub struct SdlError<'a> {
-    msg: Cow<'a, str>,
+    msg: OnceCell<&'a CStr>,
     /// Forbid storing lazy error that lives long enough for the error buffer to be overwritten
     _unique: PhantomData<&'a mut ErrorBuffer>,
 }
 
-impl std::fmt::Debug for SdlError<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<'a> SdlError<'a> {
+    #[inline]
+    pub fn msg(&self) -> &'a CStr {
+        // Safety: SDL_GetError will never return a nullptr. At worst it will return an empty string.
+        self.msg.get_or_init(|| unsafe { CStr::from_ptr(SDL_GetError()) })
+    }
+}
+
+impl fmt::Debug for SdlError<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SdlError")
-            .field("msg", &self.msg)
+            .field("msg", &self.msg())
             .finish()
     }
 }
 
-impl std::fmt::Display for SdlError<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.msg.fmt(f)
+impl fmt::Display for SdlError<'_> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.msg().to_string_lossy().fmt(f)
     }
 }
 
-impl std::error::Error for SdlError<'_> {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-}
+impl Error for SdlError<'_> {}
 
 impl SdlError<'_> {
+    #[inline]
     pub fn to_owned(self) -> OwnedSdlError {
         OwnedSdlError {
-            msg: self.msg.to_string(),
+            msg: self.msg().to_string_lossy().to_string(),
         }
     }
 }
@@ -160,27 +206,24 @@ pub struct OwnedSdlError {
     pub msg: String,
 }
 
-impl std::fmt::Display for OwnedSdlError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for OwnedSdlError {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.msg.fmt(f)
     }
 }
 
-impl std::error::Error for OwnedSdlError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-}
+impl Error for OwnedSdlError {}
 
 #[derive(Debug)]
 pub enum SdlOrIntError<'a> {
-    TryFromIntError(std::num::TryFromIntError),
+    TryFromIntError(TryFromIntError),
     OtherIntError,
     SdlError(SdlError<'a>),
 }
 
-impl std::fmt::Display for SdlOrIntError<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for SdlOrIntError<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::TryFromIntError(e) => write!(f, "integer conversion error: {e}"),
             Self::OtherIntError => write!(f, "other integer conversion error"),
@@ -189,24 +232,37 @@ impl std::fmt::Display for SdlOrIntError<'_> {
     }
 }
 
-impl std::error::Error for SdlOrIntError<'static> {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::TryFromIntError(e) => Some(e),
-            Self::OtherIntError => None,
-            Self::SdlError(e) => Some(e),
-        }
-    }
-}
+impl<'a> Error for SdlOrIntError<'a> {}
 
-impl From<std::num::TryFromIntError> for SdlOrIntError<'_> {
-    fn from(value: std::num::TryFromIntError) -> Self {
+impl From<TryFromIntError> for SdlOrIntError<'_> {
+    #[inline]
+    fn from(value: TryFromIntError) -> Self {
         Self::TryFromIntError(value)
     }
 }
 
 impl<'a> From<SdlError<'a>> for SdlOrIntError<'a> {
+    #[inline]
     fn from(value: SdlError<'a>) -> Self {
         Self::SdlError(value)
+    }
+}
+
+#[derive(Debug)]
+pub struct TimeoutError<'a>(pub SdlError<'a>);
+
+impl<'a> fmt::Display for TimeoutError<'a> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "the operation timed out")
+    }
+}
+
+impl<'a> Error for TimeoutError<'a> {}
+
+impl<'a> From<TimeoutError<'a>> for SdlError<'a> {
+    #[inline]
+    fn from(value: TimeoutError<'a>) -> Self {
+        value.0
     }
 }
