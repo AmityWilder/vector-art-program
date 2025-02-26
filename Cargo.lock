@@ -716,6 +716,7 @@ dependencies = [
 name = "sdl3_amity"
 version = "0.1.0"
 dependencies = [
+ "bitflags",
  "libc",
  "sdl3-sys",
 ]

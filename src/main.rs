@@ -99,8 +99,19 @@ mod tool;
 
 fn main() {
     #[cfg(feature = "use-sdl")] {
-        let err_buf = sdl3_amity::sdl_thread();
-        let sdl = sdl3_amity::init();
+        use sdl3_amity::*;
+        let mut err_buf = sdl_thread().unwrap();
+        let sdl = init(&mut err_buf, InitFlags::Video.union(InitFlags::Events)).unwrap();
+        let mut window = sdl.create_window(&mut err_buf, c"Amity Vector Art", 1280, 720,
+            WindowFlags::Opengl
+                .union(WindowFlags::InputFocus)
+                .union(WindowFlags::MouseFocus)
+                .union(WindowFlags::MouseCapture)
+                .union(WindowFlags::Resizable)
+                .union(WindowFlags::Maximized)
+        ).unwrap();
+        let gl_ctx = window.gl_create_context(&mut err_buf).unwrap();
+        gl_ctx.destroy(&mut err_buf).unwrap();
 
     } #[cfg(not(feature = "use-sdl"))] {
         let (mut rl, thread) = init()
