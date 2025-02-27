@@ -5,6 +5,8 @@ pub mod ffi {
     pub use sdl3_sys::*;
 }
 
+pub mod glad;
+pub mod amy_util;
 pub mod error;
 pub mod init;
 pub mod video;

@@ -32,7 +32,7 @@ bitflags! {
     }
 }
 
-/// Represents that SDL has been initialized. Quits SDL when dropped.
+/// Represents that SDL has been initialized and that this is the main thread. Quits SDL when dropped.
 pub struct Sdl(());
 
 impl !Send for Sdl {}
@@ -113,11 +113,9 @@ pub fn init(err_buf: &mut ErrorBuffer, flags: InitFlags) -> Result<Sdl, SdlError
 /// - [`Sdl::drop`]
 /// - [`Sdl::quit_subsystem`]
 pub fn init_subsystem<'err>(err_buf: &'err mut ErrorBuffer, flags: InitFlags) -> Result<Sdl, SdlError<'err>> {
-    if unsafe { SDL_InitSubSystem(flags.bits()) } {
-        Ok(Sdl(()))
-    } else {
-        Err(err_buf.get())
-    }
+    unsafe { SDL_InitSubSystem(flags.bits()) }
+        .sdl_err(err_buf)
+        .map(|()| Sdl(()))
 }
 
 impl Sdl {

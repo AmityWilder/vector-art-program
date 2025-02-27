@@ -24,5 +24,5 @@ copy_to_output = "2.2.0"
 glob = "0.3"
 
 [features]
-default = ["use-sdl"]
+default = []
 use-sdl = ["dep:sdl3_amity"]

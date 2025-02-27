@@ -1,19 +1,146 @@
-use std::{ffi::CStr, marker::PhantomData, mem::ManuallyDrop, ops::{Deref, DerefMut}};
-use sdl3_sys::video::*;
+use std::{ffi::CStr, marker::PhantomData, mem::ManuallyDrop, ops::{Deref, DerefMut}, ptr::{null, null_mut}};
+use sdl3_sys::{stdinc::{SDL_FunctionPointer, SDL_free}, video::*};
 use bitflags::bitflags;
-use crate::{error::*, init::Sdl, properties::SdlPropertiesID};
+use crate::{amy_util::{null_term_sdl_parray::NullTermSdlPArray, sdl_slice::SdlSlice}, error::*, init::Sdl, properties::SdlPropertiesID};
 
-pub struct SdlDisplayID(SDL_DisplayID);
+pub struct DisplayID(SDL_DisplayID);
 
-impl From<SDL_DisplayID> for SdlDisplayID {
+impl From<SDL_DisplayID> for DisplayID {
     fn from(value: SDL_DisplayID) -> Self {
         Self(value)
     }
 }
 
-impl SdlDisplayID {
+impl DisplayID {
     pub const fn get(&self) -> SDL_DisplayID {
         self.0
+    }
+}
+
+/// The structure that defines a display mode.
+///
+/// ### See also
+/// - [`DisplayMode::fullscreen_modes`]
+/// - [`DisplayMode::desktop`]
+/// - [`DisplayMode::current`]
+/// - [`Window::set_fullscreen_mode`]
+/// - [`Window::fullscreen_mode`]
+#[repr(transparent)]
+pub struct DisplayMode<'a>(&'a SDL_DisplayMode);
+
+impl <'a> DisplayMode<'a> {
+    /// the display this mode is associated with
+    pub fn display_id(&self) -> DisplayID {
+        DisplayID(self.0.displayID)
+    }
+
+    /// pixel format
+    pub fn format(&self) -> sdl3_sys::pixels::SDL_PixelFormat {
+        self.0.format
+    }
+
+    /// width
+    pub fn w(&self) -> Result<u32, std::num::TryFromIntError> {
+        self.0.w.try_into()
+    }
+
+    /// height
+    pub fn h(&self) -> Result<u32, std::num::TryFromIntError> {
+        self.0.h.try_into()
+    }
+
+    /// scale converting size to pixels (e.g. a 1920x1080 mode with 2.0 scale would have 3840x2160 pixels)
+    pub fn pixel_density(&self) -> f32 {
+
+    }
+
+    /// refresh rate (or 0.0f for unspecified)
+    pub fn refresh_rate(&self) -> f32 {
+
+    }
+
+    /// precise refresh rate numerator (or 0 for unspecified)
+    pub fn refresh_rate_numerator(&self) -> Result<Option<std::num::NonZeroU32>, std::num::TryFromIntError> {
+        self.0.refresh_rate_numerator.try_into()
+            .map(|n| std::num::NonZeroU32::new(n))
+    }
+
+    /// precise refresh rate denominator
+    pub fn refresh_rate_denominator(&self) -> Result<std::num::NonZeroU32, !> {
+        self.0.refresh_rate_denominator.try_into()
+            .map(|n| std::num::NonZeroU32::new(n))
+    }
+}
+
+/// The structure that defines a display mode.
+///
+/// ### See also
+/// - [`DisplayMode::fullscreen_modes`]
+/// - [`DisplayMode::desktop`]
+/// - [`DisplayMode::current`]
+/// - [`Window::set_fullscreen_mode`]
+/// - [`Window::fullscreen_mode`]
+#[repr(transparent)]
+pub struct DisplayModeMut<'a>(&'a mut SDL_DisplayMode);
+
+impl<'a> Deref for DisplayModeMut<'a> {
+    type Target = DisplayMode<'a>;
+    fn deref(&self) -> &Self::Target {
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+impl<'a> DisplayMode<'a> {
+    /// Get a list of fullscreen display modes available on a display.
+    ///
+    /// The display modes are sorted in this priority:
+    ///
+    /// - w -> largest to smallest
+    /// - h -> largest to smallest
+    /// - bits per pixel -> more colors to fewer colors
+    /// - packed pixel layout -> largest to smallest
+    /// - refresh rate -> highest to lowest
+    /// - pixel density -> lowest to highest
+    ///
+    /// ### See also
+    /// - [`SDL_GetDisplays`]
+    pub fn fullscreen_modes<'err>(_: &Sdl, err_buf: &'err mut ErrorBuffer, display_id: DisplayID) -> Result<SdlSlice<&'a mut SDL_DisplayMode>, SdlOrIntError<'err>> {
+        let mut count: i32 = -1;
+        let mem = unsafe { SDL_GetFullscreenDisplayModes(display_id.get(), &raw mut count) };
+        SdlSlice::try_from_raw_parts(mem.cast(), count.try_into()?)
+            .sdl_erri(err_buf)
+    }
+
+    /// Get information about the desktop's display mode.
+    ///
+    /// There's a difference between this function and [`DisplayMode::current()`]
+    /// when SDL runs fullscreen and has changed the resolution. In that case this
+    /// function will return the previous native display mode, and not the current
+    /// display mode.
+    ///
+    /// ### See also
+    /// - [`DisplayMode::current`]
+    /// - [`SDL_GetDisplays`]
+    pub fn desktop<'err>(_: &Sdl, err_buf: &'err mut ErrorBuffer, display_id: DisplayID) -> Result<DisplayMode<'a>, SdlError<'err>> {
+        unsafe { SDL_GetDesktopDisplayMode(display_id.get()).as_ref::<'a>() }
+            .map(|mode| Self(mode))
+            .sdl_err(err_buf)
+    }
+
+    /// Get information about the current display mode.
+    ///
+    /// There's a difference between this function and [`DisplayMode::desktop()`]
+    /// when SDL runs fullscreen and has changed the resolution. In that case this
+    /// function will return the current display mode, and not the previous native
+    /// display mode.
+    ///
+    /// ### See also
+    /// - [`DisplayMode::desktop`]
+    /// - [`SDL_GetDisplays`]
+    pub fn current<'err>(_: &Sdl, err_buf: &'err mut ErrorBuffer, display_id: DisplayID) -> Result<DisplayMode<'a>, SdlError<'err>> {
+        unsafe { SDL_GetCurrentDisplayMode(display_id.get()).as_ref::<'a>() }
+            .map(|mode| Self(mode))
+            .sdl_err(err_buf)
     }
 }
 
@@ -130,6 +257,37 @@ impl PopupConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i32)]
+pub enum WindowPos {
+    Value(i32),
+    Centered = SDL_WINDOWPOS_CENTERED,
+    Undefined = SDL_WINDOWPOS_UNDEFINED,
+}
+
+impl WindowPos {
+    #[inline]
+    pub const fn as_i32(self) -> i32 {
+        match self {
+            Self::Value(x) => {
+                debug_assert!(x != SDL_WINDOWPOS_CENTERED, "`WindowPos::Value(...)` cannot be `SDL_WINDOWPOS_CENTERED`, use `WindowPos::Centered` instead");
+                debug_assert!(x != SDL_WINDOWPOS_UNDEFINED, "`WindowPos::Value(...)` cannot be `SDL_WINDOWPOS_UNDEFINED`, use `WindowPos::Undefined` instead");
+                x
+            },
+            Self::Centered => SDL_WINDOWPOS_CENTERED,
+            Self::Undefined => SDL_WINDOWPOS_UNDEFINED,
+        }
+    }
+}
+
+
+/// The struct used as an opaque handle to a window.
+///
+/// Because a window can only be created from the main thread and cannot be passed between threads,
+/// all [`Window`] methods are assumed to be called from the main thread.
+///
+/// ### See also
+/// - [`Window::create`]
 pub struct Window<'a>(&'a mut SDL_Window);
 
 impl<'a> Window<'a> {
@@ -152,13 +310,10 @@ impl Drop for Window<'_> {
     /// from the screen until the SDL event loop is pumped again, even though the
     /// [`SDL_Window`] is no longer valid after this call.
     ///
-    /// ### Thread safety
-    /// This function should only be called on the main thread.
-    ///
     /// ### See also
-    /// - [`Window::create_popup_window`]
-    /// - [`SdlHandle::create_window`]
-    /// - [`SdlHandle::create_window_with_properties`]
+    /// - [`Window::create_popup`]
+    /// - [`Window::create`]
+    /// - [`Window::create_with_properties`]
     fn drop(&mut self) {
         unsafe { SDL_DestroyWindow(self.0); }
     }
@@ -170,9 +325,6 @@ impl<'a> Window<'a> {
     /// The window pixel size may differ from its window coordinate size if the
     /// window is on a high pixel density display. Use [`Window::size_in_pixels()`]
     /// or [`Renderer::get_output_size()`] to get the real client area size in pixels.
-    ///
-    /// ### Thread safety
-    /// This function should only be called on the main thread.
     ///
     /// ### See also
     /// - [`Renderer::get_output_size`]
@@ -187,9 +339,6 @@ impl<'a> Window<'a> {
     }
 
     /// Get the size of a window's client area, in pixels.
-    ///
-    /// ### Thread safety
-    /// This function should only be called on the main thread.
     ///
     /// ### See also
     /// - [`Window::create`]
@@ -222,9 +371,6 @@ impl<'a> Window<'a> {
     /// content area to remain within the usable desktop bounds). Additionally, as
     /// this is just a request, it can be denied by the windowing system.
     ///
-    /// ### Thread safety
-    /// This function should only be called on the main thread.
-    ///
     /// ### See also
     /// - [`Window::size`]
     /// - [`Window::set_fullscreen_mode`]
@@ -245,12 +391,6 @@ impl<'a> Window<'a> {
     ///
     /// On windowing systems where changes are immediate, this does nothing.
     ///
-    /// ### Thread safety
-    /// This function should only be called on the main thread.
-    ///
-    /// ### Availability
-    /// This function is available since SDL 3.2.0.
-    ///
     /// ### See also
     /// - [`Window::set_size`]
     /// - [`Window::set_position`]
@@ -265,9 +405,6 @@ impl<'a> Window<'a> {
 
     /// Show a window.
     ///
-    /// ### Thread safety
-    /// This function should only be called on the main thread.
-    ///
     /// ### See also
     /// - [`Window::hide`]
     /// - [`Window::raise`]
@@ -276,9 +413,6 @@ impl<'a> Window<'a> {
     }
 
     /// Hide a window.
-    ///
-    /// ### Thread safety
-    /// This function should only be called on the main thread.
     ///
     /// ### See also
     /// - [`Window::show`]
@@ -295,11 +429,211 @@ impl<'a> Window<'a> {
     /// from another application. If the window is successfully raised and gains
     /// input focus, an [`SDL_EVENT_WINDOW_FOCUS_GAINED`] event will be emitted, and
     /// the window will have the [`SDL_WINDOW_INPUT_FOCUS`] flag set.
+    pub fn raise<'err>(&mut self, err_buf: &'err mut ErrorBuffer) -> Result<(), SdlError<'err>> {
+        unsafe { SDL_RaiseWindow(self.raw()) }.sdl_err(err_buf)
+    }
+
+    /// Request that the window's position be set.
+    ///
+    /// If the window is in an exclusive fullscreen or maximized state, this
+    /// request has no effect.
+    ///
+    /// This can be used to reposition fullscreen-desktop windows onto a different
+    /// display, however, as exclusive fullscreen windows are locked to a specific
+    /// display, they can only be repositioned programmatically via
+    /// [`Window::set_fullscreen_mode()`].
+    ///
+    /// On some windowing systems this request is asynchronous and the new
+    /// coordinates may not have have been applied immediately upon the return of
+    /// this function. If an immediate change is required, call [`Window::sync()`] to
+    /// block until the changes have taken effect.
+    ///
+    /// When the window position changes, an [`SDL_EVENT_WINDOW_MOVED`] event will be
+    /// emitted with the window's new coordinates. Note that the new coordinates
+    /// may not match the exact coordinates requested, as some windowing systems
+    /// can restrict the position of the window in certain scenarios (e.g.
+    /// constraining the position so the window is always within desktop bounds).
+    /// Additionally, as this is just a request, it can be denied by the windowing
+    /// system.
+    ///
+    /// ### See also
+    /// - [`Window::position`]
+    /// - [`Window::sync`]
+    pub fn set_position<'err>(&mut self, err_buf: &'err mut ErrorBuffer, x: WindowPos, y: WindowPos) -> Result<(), SdlError<'err>> {
+        unsafe { SDL_SetWindowPosition(self.raw(), x.as_i32(), y.as_i32()) }
+            .sdl_err(err_buf)
+    }
+
+    /// Get the position of a window.
+    ///
+    /// This is the current position of the window as last reported by the
+    /// windowing system.
+    ///
+    /// If you do not need the value for one of the positions call [`Window::position_x`]
+    /// or [`Window::position_y`] instead
+    ///
+    /// ### See also
+    /// - [`Window::set_position`]
+    pub fn position<'err>(&self, err_buf: &'err mut ErrorBuffer) -> Result<(i32, i32), SdlError<'err>> {
+        let mut x = 0;
+        let mut y = 0;
+        unsafe { SDL_GetWindowPosition(self.raw(), &raw mut x, &raw mut y) }
+            .sdl_err(err_buf)
+            .map(|()| (x, y))
+    }
+
+    /// Get the x-position of a window.
+    ///
+    /// This is the current horizintal position of the window as last reported by the
+    /// windowing system.
+    ///
+    /// ### See also
+    /// - [`Window::position`]
+    /// - [`Window::position_y`]
+    /// - [`Window::set_position`]
+    pub fn position_x<'err>(&self, err_buf: &'err mut ErrorBuffer) -> Result<i32, SdlError<'err>> {
+        let mut x = 0;
+        unsafe { SDL_GetWindowPosition(self.raw(), &raw mut x, null_mut()) }
+            .sdl_err(err_buf)
+            .map(|()| x)
+    }
+
+    /// Get the y-position of a window.
+    ///
+    /// This is the current vertical position of the window as last reported by the
+    /// windowing system.
+    ///
+    /// ### See also
+    /// - [`Window::position`]
+    /// - [`Window::position_x`]
+    /// - [`Window::set_position`]
+    pub fn position_y<'err>(&self, err_buf: &'err mut ErrorBuffer) -> Result<i32, SdlError<'err>> {
+        let mut y = 0;
+        unsafe { SDL_GetWindowPosition(self.raw(), null_mut(), &raw mut y) }
+            .sdl_err(err_buf)
+            .map(|()| y)
+    }
+
+    /// Request that the window's fullscreen state be changed.
+    ///
+    /// By default a window in fullscreen state uses borderless fullscreen desktop
+    /// mode, but a specific exclusive display mode can be set using
+    /// [`Window::set_fullscreen_mode()`].
+    ///
+    /// On some windowing systems this request is asynchronous and the new
+    /// fullscreen state may not have have been applied immediately upon the return
+    /// of this function. If an immediate change is required, call [`Window::sync()`]
+    /// to block until the changes have taken effect.
+    ///
+    /// When the window state changes, an [`SDL_EVENT_WINDOW_ENTER_FULLSCREEN`] or
+    /// [`SDL_EVENT_WINDOW_LEAVE_FULLSCREEN`] event will be emitted. Note that, as this
+    /// is just a request, it can be denied by the windowing system.
     ///
     /// ### Thread safety
     /// This function should only be called on the main thread.
-    pub fn raise<'err>(&mut self, err_buf: &'err mut ErrorBuffer) -> Result<(), SdlError<'err>> {
-        unsafe { SDL_RaiseWindow(self.raw()) }.sdl_err(err_buf)
+    ///
+    /// ### See also
+    /// - [`Window::fullscreen_mode`]
+    /// - [`Window::set_fullscreen_mode`]
+    /// - [`Window::sync`]
+    /// - [`SDL_WINDOW_FULLSCREEN`]
+    pub fn set_fullscreen<'err>(&mut self, err_buf: &'err mut ErrorBuffer, fullscreen: bool) -> Result<(), SdlError<'err>> {
+        unsafe { SDL_SetWindowFullscreen(self.raw(), fullscreen) }
+            .sdl_err(err_buf)
+    }
+
+    /// Set the display mode to use when a window is visible and fullscreen.
+    ///
+    /// This only affects the display mode used when the window is fullscreen. To
+    /// change the window size when the window is not fullscreen, use
+    /// [`Window::set_size()`].
+    ///
+    /// If the window is currently in the fullscreen state, this request is
+    /// asynchronous on some windowing systems and the new mode dimensions may not
+    /// be applied immediately upon the return of this function. If an immediate
+    /// change is required, call [`Window::sync()`] to block until the changes have
+    /// taken effect.
+    ///
+    /// When the new mode takes effect, an [`SDL_EVENT_WINDOW_RESIZED`] and/or an
+    /// [`SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED`] event will be emitted with the new mode
+    /// dimensions.
+    ///
+    /// ### Parameters
+    /// - `mode`: a pointer to the display mode to use, which can be NULL for
+    ///   borderless fullscreen desktop mode, or one of the fullscreen
+    ///   modes returned by [`DisplayMode::fullscreen_modes()`] to set an
+    ///   exclusive fullscreen mode.
+    ///
+    /// ### See also
+    /// - [`Window::fullscreen_mode`]
+    /// - [`Window::set_fullscreen`]
+    /// - [`Window::sync`]
+    pub fn set_fullscreen_mode<'err>(&mut self, err_buf: &'err mut ErrorBuffer, mode: Option<DisplayMode>) -> Result<(), SdlError<'err>> {
+        unsafe { SDL_SetWindowFullscreenMode(self.raw(), mode.map_or_else(null, |mode| mode.0)) }
+            .sdl_err(err_buf)
+    }
+
+
+    /// Request that the window be minimized to an iconic representation.
+    ///
+    /// If the window is in a fullscreen state, this request has no direct effect.
+    /// It may alter the state the window is returned to when leaving fullscreen.
+    ///
+    /// On some windowing systems this request is asynchronous and the new window
+    /// state may not have been applied immediately upon the return of this
+    /// function. If an immediate change is required, call [`Window::sync()`] to
+    /// block until the changes have taken effect.
+    ///
+    /// When the window state changes, an [`SDL_EVENT_WINDOW_MINIMIZED`] event will be
+    /// emitted. Note that, as this is just a request, the windowing system can
+    /// deny the state change.
+    ///
+    /// ### Thread safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ### See also
+    /// - [`Window::maximize`]
+    /// - [`Window::restore`]
+    /// - [`Window::sync`]
+    pub fn minimize<'err>(&mut self, err_buf: &'err mut ErrorBuffer) -> Result<(), SdlError<'err>> {
+        unsafe { SDL_MinimizeWindow(self.raw()) }
+            .sdl_err(err_buf)
+    }
+
+    /// Request that the window be made as large as possible.
+    ///
+    /// Non-resizable windows can't be maximized. The window must have the
+    /// [`SDL_WINDOW_RESIZABLE`] flag set, or this will have no effect.
+    ///
+    /// On some windowing systems this request is asynchronous and the new window
+    /// state may not have have been applied immediately upon the return of this
+    /// function. If an immediate change is required, call [`Window::sync()`] to
+    /// block until the changes have taken effect.
+    ///
+    /// When the window state changes, an [`SDL_EVENT_WINDOW_MAXIMIZED`] event will be
+    /// emitted. Note that, as this is just a request, the windowing system can
+    /// deny the state change.
+    ///
+    /// When maximizing a window, whether the constraints set via
+    /// [`Window::set_maximum_size()`] are honored depends on the policy of the window
+    /// manager. Win32 and macOS enforce the constraints when maximizing, while X11
+    /// and Wayland window managers may vary.
+    ///
+    /// ### Thread safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ### See also
+    /// - [`Window::minimize`]
+    /// - [`Window::restore`]
+    /// - [`Window::sync`]
+    pub fn maximize<'err>(&mut self, err_buf: &'err mut ErrorBuffer) -> Result<(), SdlError<'err>> {
+        unsafe { SDL_MaximizeWindow(self.raw()) }
+            .sdl_err(err_buf)
+    }
+
+    pub fn restore<'err>(&mut self, err_buf: &'err mut ErrorBuffer) -> Result<(), SdlError<'err>> {
+        unsafe { SDL_RestoreWindow(self.raw()) }
+            .sdl_err(err_buf)
     }
 
     /// Create a window with the specified dimensions and flags.
@@ -636,5 +970,106 @@ impl<'a> GlContext<'a> {
         std::mem::forget(self);
         unsafe { SDL_GL_DestroyContext(inner) }
             .sdl_err(err_buf)
+    }
+}
+
+pub struct GlLibrary(());
+
+impl !Send for GlLibrary {}
+impl !Sync for GlLibrary {}
+
+impl Drop for GlLibrary {
+    /// Unload the OpenGL library previously loaded by [`GlLibrary::load()`].
+    ///
+    /// ### Thread safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ### Availability
+    /// This function is available since SDL 3.2.0.
+    ///
+    /// ### See also
+    /// - [`GlLibrary::load`]
+    fn drop(&mut self) {
+        unsafe { SDL_GL_UnloadLibrary() }
+    }
+}
+
+impl GlLibrary {
+    /// Dynamically load an OpenGL library.
+    ///
+    /// This should be done after initializing the video driver, but before
+    /// creating any OpenGL windows. If no OpenGL library is loaded, the default
+    /// library will be loaded upon creation of the first OpenGL window.
+    ///
+    /// If you do this, you need to retrieve all of the GL functions used in your
+    /// program from the dynamic library using [`GlLibrary::proc_address()`].
+    ///
+    /// ### Parameters
+    /// - `path`: the platform dependent OpenGL library name, or [`None`] to open the
+    ///   default OpenGL library.
+    ///
+    /// ### See also
+    /// - [`GlLibrary::proc_address`]
+    /// - [`GlLibrary::drop`]
+    pub fn load<'err>(&mut self, err_buf: &'err mut ErrorBuffer, path: Option<&CStr>) -> Result<Self, SdlError<'err>> {
+        unsafe { SDL_GL_LoadLibrary(path.map_or_else(null, |path| path.as_ptr())) }
+            .sdl_err(err_buf)
+            .map(|()| Self(()))
+    }
+
+    /// Get an OpenGL function by name.
+    ///
+    /// If the GL library is loaded at runtime with [`GlLibrary::load()`], then all
+    /// GL functions must be retrieved this way. Usually this is used to retrieve
+    /// function pointers to OpenGL extensions.
+    ///
+    /// There are some quirks to looking up OpenGL functions that require some
+    /// extra care from the application. If you code carefully, you can handle
+    /// these quirks without any platform-specific code, though:
+    ///
+    /// - On Windows, function pointers are specific to the current GL context;
+    ///   this means you need to have created a GL context and made it current
+    ///   before calling [`GlLibrary::proc_address()`]. If you recreate your context or
+    ///   create a second context, you should assume that any existing function
+    ///   pointers aren't valid to use with it. This is (currently) a
+    ///   Windows-specific limitation, and in practice lots of drivers don't suffer
+    ///   this limitation, but it is still the way the wgl API is documented to
+    ///   work and you should expect crashes if you don't respect it. Store a copy
+    ///   of the function pointers that comes and goes with context lifespan.
+    /// - On X11, function pointers returned by this function are valid for any
+    ///   context, and can even be looked up before a context is created at all.
+    ///   This means that, for at least some common OpenGL implementations, if you
+    ///   look up a function that doesn't exist, you'll get a non-NULL result that
+    ///   is _NOT_ safe to call. You must always make sure the function is actually
+    ///   available for a given GL context before calling it, by checking for the
+    ///   existence of the appropriate extension with [`SDL_GL_ExtensionSupported()`],
+    ///   or verifying that the version of OpenGL you're using offers the function
+    ///   as core functionality.
+    /// - Some OpenGL drivers, on all platforms, *will* return NULL if a function
+    ///   isn't supported, but you can't count on this behavior. Check for
+    ///   extensions you use, and if you get a NULL anyway, act as if that
+    ///   extension wasn't available. This is probably a bug in the driver, but you
+    ///   can code defensively for this scenario anyhow.
+    /// - Just because you're on Linux/Unix, don't assume you'll be using X11.
+    ///   Next-gen display servers are waiting to replace it, and may or may not
+    ///   make the same promises about function pointers.
+    /// - OpenGL function pointers must be declared `APIENTRY` as in the example
+    ///   code. This will ensure the proper calling convention is followed on
+    ///   platforms where this matters (Win32) thereby avoiding stack corruption.
+    ///
+    /// ### Parameters
+    /// - `proc`: the name of an OpenGL function.
+    ///
+    /// ### Return value
+    /// Returns a pointer to the named OpenGL function. The returned pointer
+    ///   should be cast to the appropriate function signature.
+    ///
+    /// ### See also
+    /// - [`SDL_GL_ExtensionSupported`]
+    /// - [`GlLibrary::load`]
+    /// - [`GlLibrary::drop`]
+    pub fn proc_address<F: From<unsafe extern "C" fn()>>(&mut self, proc: &CStr) -> Option<F> {
+        unsafe { SDL_GL_GetProcAddress(proc.as_ptr()) }
+        .map(|f| f.into())
     }
 }
