@@ -11,6 +11,7 @@ pub mod error;
 pub mod init;
 pub mod video;
 pub mod properties;
+pub mod filesystem;
 
 pub mod prelude {
     pub use crate::{

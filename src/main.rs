@@ -112,7 +112,7 @@ fn main() {
         ).unwrap();
         let gl_ctx = window.gl_create_context(&mut eb).unwrap();
 
-
+        let base_path = sdl.get_
 
         gl_ctx.destroy(&mut eb).unwrap();
 

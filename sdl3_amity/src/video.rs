@@ -35,8 +35,8 @@ impl <'a> DisplayMode<'a> {
     }
 
     /// pixel format
-    pub fn format(&self) -> sdl3_sys::pixels::SDL_PixelFormat {
-        self.0.format
+    pub fn format(&self) -> &sdl3_sys::pixels::SDL_PixelFormat {
+        &self.0.format
     }
 
     /// width
@@ -50,13 +50,13 @@ impl <'a> DisplayMode<'a> {
     }
 
     /// scale converting size to pixels (e.g. a 1920x1080 mode with 2.0 scale would have 3840x2160 pixels)
-    pub fn pixel_density(&self) -> f32 {
-
+    pub fn pixel_density(&self) -> &f32 {
+        &self.0.pixel_density
     }
 
     /// refresh rate (or 0.0f for unspecified)
-    pub fn refresh_rate(&self) -> f32 {
-
+    pub fn refresh_rate(&self) -> &f32 {
+        &self.0.refresh_rate
     }
 
     /// precise refresh rate numerator (or 0 for unspecified)
@@ -66,9 +66,21 @@ impl <'a> DisplayMode<'a> {
     }
 
     /// precise refresh rate denominator
-    pub fn refresh_rate_denominator(&self) -> Result<std::num::NonZeroU32, !> {
-        self.0.refresh_rate_denominator.try_into()
-            .map(|n| std::num::NonZeroU32::new(n))
+    pub fn refresh_rate_denominator(&self) -> Result<std::num::NonZeroU32, std::num::TryFromIntError> {
+        let denom = self.0.refresh_rate_denominator;
+        // we are fine with truncating negative max because any negative will error regardless
+        let n = denom.saturating_sub(1);
+        // confirm `denom - 1 >= 0` and return a TryFromIntError otherwise; which is equivalent to `denom >= 1`
+        _ = u32::try_from(n)?;
+        // this is safe because we already know `u32::MIN <= 1 (NonZeroU32::MIN) <= denom <= i32::MAX <= u32::MAX`, meeting the requirements of both u32 and NonZero
+        Ok({
+            #[cfg(not(debug_assertions))]
+            unsafe { std::num::NonZeroU32::new_unchecked(denom as u32) }
+            #[cfg(debug_assertions)]
+            std::num::NonZeroU32::new(denom.try_into()
+                .expect("refresh rate denominator should be positive"))
+                .expect("refresh rate denominator should be non-zero")
+        })
     }
 }
 

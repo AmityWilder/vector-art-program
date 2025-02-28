@@ -248,13 +248,14 @@ impl<'a> From<SdlError<'a>> for SdlOrIntError<'a> {
     }
 }
 
+/// An error which occurs when an operation times out without completing
 #[derive(Debug)]
 pub struct TimeoutError<'a>(pub SdlError<'a>);
 
 impl<'a> fmt::Display for TimeoutError<'a> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "the operation timed out")
+        write!(f, "the operation timed out: {}", self.0)
     }
 }
 
@@ -264,5 +265,44 @@ impl<'a> From<TimeoutError<'a>> for SdlError<'a> {
     #[inline]
     fn from(value: TimeoutError<'a>) -> Self {
         value.0
+    }
+}
+
+#[derive(Debug)]
+pub enum PlatformUnimplemented {
+    FilesystemBasePath,
+}
+
+impl fmt::Display for PlatformUnimplemented {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FilesystemBasePath => write!(f, "filesystem base path"),
+        }
+    }
+}
+
+/// An error which occurs when the current platform lacks support for the functionality
+#[derive(Debug)]
+pub struct PlatformUnimplFeatureError<'a>{
+    pub err: SdlError<'a>,
+    pub feature: PlatformUnimplemented,
+}
+
+impl<'a> fmt::Display for PlatformUnimplFeatureError<'a> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "the platform does not implement {} functionality: {}", self.feature, self.err)
+    }
+}
+
+impl<'a> Error for PlatformUnimplFeatureError<'a> {}
+
+impl<'a> PlatformUnimplFeatureError<'a> {
+    pub fn new(err: SdlError<'a>, feature: PlatformUnimplemented) -> Self {
+        Self { err, feature }
+    }
+
+    pub fn filesystem_base_path(err: SdlError<'a>) -> Self {
+        Self { err, feature: PlatformUnimplemented::FilesystemBasePath }
     }
 }
