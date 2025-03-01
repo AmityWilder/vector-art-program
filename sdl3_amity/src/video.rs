@@ -3,6 +3,8 @@ use sdl3_sys::{stdinc::{SDL_FunctionPointer, SDL_free}, video::*};
 use bitflags::bitflags;
 use crate::{amy_util::{null_term_sdl_parray::NullTermSdlPArray, sdl_slice::SdlSlice}, error::*, init::Sdl, properties::SdlPropertiesID};
 
+pub mod gl;
+
 pub struct DisplayID(SDL_DisplayID);
 
 impl From<SDL_DisplayID> for DisplayID {

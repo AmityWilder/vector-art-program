@@ -238,6 +238,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42703706b716c37f96a77aea830392ad231f44c9e9a67872fa5548707e11b11c"
 
 [[package]]
+name = "glad-gl"
+version = "2.0.8"
+
+[[package]]
 name = "glob"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -717,6 +721,7 @@ name = "sdl3_amity"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "glad-gl",
  "libc",
  "sdl3-sys",
 ]
