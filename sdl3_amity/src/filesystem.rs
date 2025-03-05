@@ -1,4 +1,4 @@
-use std::{ffi::{CStr, OsStr}, os::windows::prelude::OsStrExt, path::{Path, PathBuf}, ptr::NonNull};
+use std::{ffi::{CStr, OsStr}, path::PathBuf};
 use sdl3_sys::filesystem::*;
 use crate::error::*;
 

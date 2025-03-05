@@ -1,5 +1,5 @@
 [workspace]
-members = ["amygui", "amylib", "amymath", "amyvec", "rltest", "build_rs_macros", "raylib_rs", "sdl3_amity", "sdl3_amity/glad-gl"]
+members = ["amygui", "amylib", "amymath", "amyvec", "rltest", "build_rs_macros", "raylib_rs", "sdl3_amity", "sdl3_amity/glad-gl", "experiment"]
 
 [package]
 name = "vector-art-program"
@@ -17,6 +17,7 @@ amygui = { path = "amygui" }
 amyvec = { path = "amyvec", features = [] }
 rltest = { path = "rltest" }
 nalgebra = "0.33.2"
+parking_lot = "0.12.3"
 
 [build-dependencies]
 build_rs_macros = { path = "build_rs_macros" }

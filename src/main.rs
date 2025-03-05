@@ -84,7 +84,6 @@ use document::layer::Layer;
 use raylib::prelude::*;
 use editor::Editor;
 use engine::Engine;
-use raylib_rs::*;
 use self::document::{Document, layer};
 
 mod editor;
