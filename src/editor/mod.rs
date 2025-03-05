@@ -1,10 +1,11 @@
 use std::{path::Path, time::Instant};
 use amylib::prelude::DirectibleDoubleEndedIterator;
 use amymath::prelude::{*, Vector2};
+use amyvec::{curve::{Curve, WidthProfile}, path_point::PathPoint};
 use raylib::prelude::{*, Vector2 as RlVector2};
 use raylib_rs::rlgl::*;
 use undo_redo::{Action, EditHistory, RedoError, UndoError};
-use crate::{appearance::{Appearance, Blending, StyleItem}, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, raster::RasterTex, shaders::ShaderTable, tool::{raster_brush, Tool, ToolType}, vector_path::fill};
+use crate::{appearance::{Appearance, Blending, StyleItem}, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, raster::RasterTex, shaders::ShaderTable, tool::{raster_brush, Tool, ToolType}, vector_path::{fill, stroke}};
 
 #[allow(clippy::enum_glob_use, reason = "every frickin one of these is prefixed with its type name >:T")]
 use {KeyboardKey::*, MouseButton::*};
@@ -97,18 +98,18 @@ impl Editor {
                     pattern: fill::Pattern::Solid(Color::SLATEBLUE),
                     ..Default::default()
                 }),
-                // StyleItem::Stroke(stroke::Stroke {
-                //     pattern: stroke::Pattern::Solid(Color::BLACK),
-                //     thick: WidthProfile::Variable({
-                //         let mut c = Curve::new();
-                //         c.points.push_back(PathPoint { p: Vector2::new( 1.0,  5.0), c: None });
-                //         c.points.push_back(PathPoint { p: Vector2::new(10.0, 12.0), c: None });
-                //         c.points.push_back(PathPoint { p: Vector2::new( 5.0,  1.0), c: None });
-                //         c.points.push_back(PathPoint { p: Vector2::new( 0.0, 10.0), c: None });
-                //         c
-                //     }),
-                //     ..Default::default()
-                // }),
+                StyleItem::Stroke(stroke::Stroke {
+                    pattern: stroke::Pattern::Solid(Color::BLACK),
+                    thick: WidthProfile::Variable({
+                        let mut c = Curve::new();
+                        c.points.push_back(PathPoint { p: Vector2::new( 1.0,  5.0), c: None });
+                        c.points.push_back(PathPoint { p: Vector2::new(10.0, 12.0), c: None });
+                        c.points.push_back(PathPoint { p: Vector2::new( 5.0,  1.0), c: None });
+                        c.points.push_back(PathPoint { p: Vector2::new( 0.0, 10.0), c: None });
+                        c
+                    }),
+                    ..Default::default()
+                }),
             ],
         }
     }

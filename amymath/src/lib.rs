@@ -4,7 +4,6 @@
     const_ops,
     more_float_constants,
     maybe_uninit_array_assume_init,
-    maybe_uninit_uninit_array,
     core_intrinsics,
     trivial_bounds,
 )]

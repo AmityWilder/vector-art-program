@@ -226,7 +226,7 @@ impl<W: Write> WriteBytes for W {}
 #[allow(clippy::uninit_assumed_init)]
 pub trait ReadArr: ReadBytes {
     fn read_le_arr<T: AsBytes, const N: usize>(&mut self) -> io::Result<[T; N]> {
-        let mut output = MaybeUninit::uninit_array();
+        let mut output = std::array::from_fn(|_| MaybeUninit::uninit());
         for item in &mut output {
             item.write(self.read_le()?);
         }
@@ -234,7 +234,7 @@ pub trait ReadArr: ReadBytes {
     }
 
     fn read_be_arr<T: AsBytes, const N: usize>(&mut self) -> io::Result<[T; N]> {
-        let mut output = MaybeUninit::uninit_array();
+        let mut output = std::array::from_fn(|_| MaybeUninit::uninit());
         for item in &mut output {
             item.write(self.read_be()?);
         }
@@ -242,7 +242,7 @@ pub trait ReadArr: ReadBytes {
     }
 
     fn read_ne_arr<T: AsBytes, const N: usize>(&mut self) -> io::Result<[T; N]> {
-        let mut output = MaybeUninit::uninit_array();
+        let mut output = std::array::from_fn(|_| MaybeUninit::uninit());
         for item in &mut output {
             item.write(self.read_ne()?);
         }

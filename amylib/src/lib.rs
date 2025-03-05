@@ -1,4 +1,4 @@
-#![feature(maybe_uninit_uninit_array, maybe_uninit_array_assume_init, assert_matches)]
+#![feature(maybe_uninit_array_assume_init, assert_matches)]
 
 pub mod collections;
 pub mod iter;
