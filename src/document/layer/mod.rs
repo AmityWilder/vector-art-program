@@ -1,4 +1,6 @@
-use amylib::{collections::tree::{Recursive, Tree}, iter::directed::{CForward, CReverse}, rc::StrongMut};
+use std::{ops, path::PathBuf};
+
+use amylib::{collections::tree::{Recursive, Tree}, iter::directed::{CForward, CReverse}};
 use raylib::prelude::*;
 use crate::{raster::Raster, vector_path::VectorPath};
 
@@ -35,8 +37,8 @@ impl LayerSettings {
 
 pub enum LayerSettingsRef<'a> {
     Group(&'a Group),
-    Path(std::cell::Ref<'a, VectorPath>),
-    Raster(std::cell::Ref<'a, Raster>),
+    Path(&'a VectorPath),
+    Raster(&'a Raster),
 }
 
 impl std::ops::Deref for LayerSettingsRef<'_> {
@@ -53,8 +55,8 @@ impl std::ops::Deref for LayerSettingsRef<'_> {
 
 pub enum LayerSettingsRefMut<'a> {
     Group(&'a mut Group),
-    Path(std::cell::RefMut<'a, VectorPath>),
-    Raster(std::cell::RefMut<'a, Raster>),
+    Path(&'a mut VectorPath),
+    Raster(&'a mut Raster),
 }
 
 impl std::ops::Deref for LayerSettingsRefMut<'_> {
@@ -81,25 +83,101 @@ impl std::ops::DerefMut for LayerSettingsRefMut<'_> {
 
 pub enum Layer {
     Group(Group),
-    Path(StrongMut<VectorPath>),
-    Raster(StrongMut<Raster>),
+    Path(VectorPath),
+    Raster(Raster),
 }
 
 impl Layer {
-    pub fn settings(&self) -> LayerSettingsRef<'_> {
+    pub fn settings(&self) -> &LayerSettings {
         match self {
-            Layer::Group(group) => LayerSettingsRef::Group(group),
-            Layer::Path(path) => LayerSettingsRef::Path(path.read()),
-            Layer::Raster(raster) => LayerSettingsRef::Raster(raster.read()),
+            Layer::Group(group) => &group.settings,
+            Layer::Path(path) => &path.settings,
+            Layer::Raster(raster) => &raster.settings,
         }
     }
 
-    pub fn settings_mut(&mut self) -> LayerSettingsRefMut<'_> {
+    pub fn settings_mut(&mut self) -> & mut LayerSettings {
         match self {
-            Layer::Group(group) => LayerSettingsRefMut::Group(group),
-            Layer::Path(path) => LayerSettingsRefMut::Path(path.write()),
-            Layer::Raster(raster) => LayerSettingsRefMut::Raster(raster.write()),
+            Layer::Group(group) => &mut group.settings,
+            Layer::Path(path) => &mut path.settings,
+            Layer::Raster(raster) => &mut raster.settings,
         }
+    }
+}
+
+pub struct LayerPath {
+    inner: [u16],
+}
+
+impl LayerPath {
+    pub fn new<S: AsRef<[u16]> + ?Sized>(s: &S) -> &LayerPath {
+        unsafe { &*(s.as_ref() as *const [u16] as *const LayerPath) }
+    }
+
+    #[inline]
+    pub fn as_slice(&self) -> &[u16] {
+        &self.inner
+    }
+
+    #[inline]
+    pub fn as_slice_mut(&mut self) -> &mut [u16] {
+        &mut self.inner
+    }
+}
+
+impl<'a> IntoIterator for &'a LayerPath {
+    type Item = usize;
+    type IntoIter = std::iter::Map<std::iter::Copied<std::slice::Iter<'a, u16>>, fn(u16) -> usize>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter().copied().map(move |n| n as usize)
+    }
+}
+
+#[derive(Clone)]
+pub struct LayerPathBuf {
+    inner: Vec<u16>,
+}
+
+impl ops::Deref for LayerPathBuf {
+    type Target = LayerPath;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        LayerPath::new(self.inner.as_slice())
+    }
+}
+
+impl AsRef<LayerPath> for LayerPathBuf {
+    #[inline]
+    fn as_ref(&self) -> &LayerPath {
+        self
+    }
+}
+
+impl From<Box<LayerPath>> for LayerPathBuf {
+    /// This conversion does not allocate or copy memory.
+    #[inline]
+    fn from(boxed: Box<LayerPath>) -> LayerPathBuf {
+        let rw = Box::into_raw(boxed) as *mut [u16];
+        let inner = unsafe { Box::from_raw(rw) };
+        LayerPathBuf { inner: inner.to_vec() }
+    }
+}
+
+impl From<LayerPathBuf> for Box<LayerPath> {
+    /// This conversion currently should not allocate memory,
+    /// but this behavior is not guaranteed on all platforms or in all future versions.
+    #[inline]
+    fn from(p: LayerPathBuf) -> Box<LayerPath> {
+        let rw = Box::into_raw(p.inner.into_boxed_slice()) as *mut [u16];
+        let rw = Box::into_raw(unsafe { Box::from_raw(rw) }) as *mut LayerPath;
+        unsafe { Box::from_raw(rw) }
+    }
+}
+
+impl LayerPathBuf {
+    pub fn push(&mut self, value: u16) {
+        self.inner.push(value);
     }
 }
 
@@ -116,8 +194,8 @@ impl LayerType for Layer {
         if !self.settings().is_hidden {
             match self {
                 Layer::Group(group) => group.draw_rendered(d, camera, scratch_rtex),
-                Layer::Path(path) => path.read().draw_rendered(d, camera, scratch_rtex),
-                Layer::Raster(raster) => raster.read().draw_rendered(d, camera, scratch_rtex),
+                Layer::Path(path) => path.draw_rendered(d, camera, scratch_rtex),
+                Layer::Raster(raster) => raster.draw_rendered(d, camera, scratch_rtex),
             }
         }
     }
@@ -126,8 +204,8 @@ impl LayerType for Layer {
         if !self.settings().is_hidden {
             match self {
                 Layer::Group(group) => group.draw_selected(d, px_world_size),
-                Layer::Path(path) => path.read().draw_selected(d, px_world_size),
-                Layer::Raster(raster) => raster.read().draw_selected(d, px_world_size),
+                Layer::Path(path) => path.draw_selected(d, px_world_size),
+                Layer::Raster(raster) => raster.draw_selected(d, px_world_size),
             }
         }
     }

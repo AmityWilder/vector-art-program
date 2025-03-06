@@ -67,7 +67,6 @@
     slice_pattern,
     exhaustive_patterns,
     unwrap_infallible,
-    unsigned_is_multiple_of,
     slice_take,
     slice_as_chunks,
     slice_range,
@@ -158,7 +157,6 @@ fn main() {
                         let mut d = d.begin_mode2D(editor.document.camera);
                         for layer in editor.document.layers.dfs_iter(|_| true) {
                             if let Layer::Path(path) = layer {
-                                let path = path.read();
                                 if let Some(bounds) = path.curve.bounds() {
                                     d.draw_rectangle_lines_rect2(&bounds, Color::MAGENTA);
                                 }

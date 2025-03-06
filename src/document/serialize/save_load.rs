@@ -2,7 +2,7 @@ use std::{collections::VecDeque, fs::File, io::{self, BufRead, BufReader, BufWri
 use amymath::prelude::{*, Vector2};
 use amyvec::curve::{Curve, WidthProfile};
 use raylib::prelude::{*, Vector2 as RlVector2};
-use amylib::{collections::Tree, io::{ReadArr, ReadBytes, WriteArr, WriteBytes}, rc::prelude::*};
+use amylib::{collections::Tree, io::{ReadArr, ReadBytes, WriteArr, WriteBytes}};
 use crate::{
     appearance::{Appearance, Blending, StyleItem}, document::{
         artboard::ArtBoard,
@@ -213,8 +213,8 @@ fn save_layer_settings(writer: &mut impl Write, layer: &mut Layer) -> io::Result
         is_group,
     } = match layer {
         Layer::Group(group) => &mut group.settings,
-        Layer::Path(path) => &mut path.write().settings,
-        Layer::Raster(raster) => &mut raster.write().settings,
+        Layer::Path(path) => &mut path.settings,
+        Layer::Raster(raster) => &mut raster.settings,
     };
 
     name.retain(is_sterile);
@@ -541,8 +541,7 @@ fn read_path_points(reader: &mut impl Read, is_closed: bool) -> io::Result<Curve
     Ok(Curve { points, is_closed })
 }
 
-fn save_vector_path(writer: &mut impl Write, path: &mut StrongMut<VectorPath>) -> io::Result<()> {
-    let path = &mut *path.write();
+fn save_vector_path(writer: &mut impl Write, path: &mut VectorPath) -> io::Result<()> {
     writer.write_all(&[b'p', u8::from(path.curve.is_closed)])?; // todo: an entire byte for one bit? :c
 
     save_appearance(writer, &mut path.appearance)?;
@@ -551,23 +550,23 @@ fn save_vector_path(writer: &mut impl Write, path: &mut StrongMut<VectorPath>) -
     Ok(())
 }
 
-fn read_vector_path(reader: &mut impl Read, settings: LayerSettings) -> io::Result<StrongMut<VectorPath>> {
+fn read_vector_path(reader: &mut impl Read, settings: LayerSettings) -> io::Result<VectorPath> {
     let is_closed = reader.read_le()?;
     let appearance = read_appearance(reader)?;
     let curve = read_path_points(reader, is_closed)?;
-    Ok(StrongMut::new(VectorPath {
+    Ok(VectorPath {
         settings,
         curve,
         appearance,
-    }))
+    })
 }
 
-fn save_raster(writer: &mut impl Write, _raster: &mut StrongMut<Raster>) -> io::Result<()> {
+fn save_raster(writer: &mut impl Write, _raster: &mut Raster) -> io::Result<()> {
     writer.write_le(b'r')?;
     unimplemented!("not doing until supported")
 }
 
-fn read_raster(_reader: &mut impl Read, _settings: LayerSettings) -> io::Result<StrongMut<Raster>> {
+fn read_raster(_reader: &mut impl Read, _settings: LayerSettings) -> io::Result<Raster> {
     unimplemented!("not doing until supported")
 }
 

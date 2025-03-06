@@ -5,7 +5,7 @@ use amyvec::{curve::{Curve, WidthProfile}, path_point::PathPoint};
 use raylib::prelude::{*, Vector2 as RlVector2};
 use raylib_rs::rlgl::*;
 use undo_redo::{Action, EditHistory, RedoError, UndoError};
-use crate::{appearance::{Appearance, Blending, StyleItem}, document::{layer::{BackToFore, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, raster::RasterTex, shaders::ShaderTable, tool::{raster_brush, Tool, ToolType}, vector_path::{fill, stroke}};
+use crate::{appearance::{Appearance, Blending, StyleItem}, document::{layer::{BackToFore, Layer, LayerType}, serialize::render_png::DownscaleAlgorithm, Document}, engine::{Config, Engine}, raster::RasterTex, shaders::ShaderTable, tool::{raster_brush, Tool, ToolType}, vector_path::{fill, stroke}};
 
 #[allow(clippy::enum_glob_use, reason = "every frickin one of these is prefixed with its type name >:T")]
 use {KeyboardKey::*, MouseButton::*};
@@ -78,14 +78,14 @@ const fn serialization_key(key: Option<KeyboardKey>) -> Option<SerializationKind
     }
 }
 
-pub struct Editor {
+pub struct Editor<'a> where Document: 'a {
     pub document: Document,
     history: EditHistory,
-    pub current_tool: Tool,
+    pub current_tool: Tool<'a>,
     pub current_appearance: Appearance,
 }
 
-impl Editor {
+impl<'a> Editor<'a> {
     #[inline(always)]
     fn default_appearance() -> Appearance {
         Appearance {
@@ -146,8 +146,8 @@ impl Editor {
         None
     }
 
-    pub fn tick(
-        &mut self,
+    pub fn tick<'b: 'a>(
+        &'b mut self,
         engine_config: &Config,
         rl: &mut RaylibHandle,
         thread: &RaylibThread,
@@ -202,11 +202,13 @@ impl Editor {
             if is_shift_down {
                 let raster = RasterTex::new(rl, thread, 480, 480, Rectangle::new(0.0, 0.0, 480.0, 480.0)).unwrap();
                 let shader = rl.load_shader_from_memory(thread, None, Some(include_str!("../shaders/blur.frag")));
+                self.document.create_raster(None, None, raster);
+                let Some(Layer::Raster(raster_layer)) = self.document.layers.last_mut() else { panic!("should have just added a raster layer") };
                 self.current_tool.switch_to_raster_brush(
                     rl,
                     thread,
                     Some(shader),
-                    self.document.create_raster(None, None, raster),
+                    raster_layer,
                     raster_brush::Stroke {
                         blend: Blending::default(),
                         pattern: raster_brush::Pattern::Solid(Color::BLACK),
@@ -279,7 +281,7 @@ impl Editor {
         }
     }
 
-    pub fn draw_rendered<'a: 'b, 'b: 'c, 'c>(&self, d: &'c mut RaylibTextureMode<'b, RaylibDrawHandle<'a>>, scratch_rtex: &mut [RenderTexture2D]) {
+    pub fn draw_rendered<'b: 'c, 'c: 'd, 'd>(&self, d: &'d mut RaylibTextureMode<'c, RaylibDrawHandle<'b>>, scratch_rtex: &mut [RenderTexture2D]) {
         d.clear_background(Color::BLANK);
         {
             let mut d = d.begin_mode2D(self.document.camera);

@@ -43,7 +43,7 @@ pub enum ToolIcon {
     RasterBrush,
 }
 
-impl PartialEq<Tool> for ToolIcon {
+impl PartialEq<Tool<'_>> for ToolIcon {
     fn eq(&self, other: &Tool) -> bool {
         matches!((self, other),
             | (ToolIcon::PointSelection, Tool::PointSelection(_))
@@ -199,9 +199,8 @@ impl ToolPanel {
                         }
                     }
                 };
-                if let Some(mut target_path) = editor.current_tool.target_path_mut() {
-                    let mut target_borrow = target_path.write();
-                    handle_mini_palette_click(&mut target_borrow.appearance);
+                if let Some(target_path) = editor.current_tool.target_path_mut() {
+                    handle_mini_palette_click(&mut target_path.appearance);
                 } else {
                     handle_mini_palette_click(&mut editor.current_appearance);
                 }
@@ -266,8 +265,7 @@ impl ToolPanel {
                 fill_pattern.draw_preview_rec(&mut d, &fill_rec);
             };
             if let Some(target_path) = editor.current_tool.target_path() {
-                let target_borrow = target_path.read();
-                draw_mini_palette(&target_borrow.appearance);
+                draw_mini_palette(&target_path.appearance);
             } else {
                 draw_mini_palette(&editor.current_appearance);
             }

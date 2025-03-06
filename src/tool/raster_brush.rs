@@ -1,4 +1,4 @@
-use amylib::{prelude::RoundToInt, rc::prelude::*};
+use amylib::prelude::RoundToInt;
 use amymath::prelude::{*, Vector2};
 use raylib::prelude::*;
 use crate::{appearance::{Appearance, Blending}, document::Document, editor::Editor, shaders::ShaderTable, tool::ToolType};
@@ -22,29 +22,29 @@ pub struct Stroke {
     pub thick: f32,
 }
 
-pub struct RasterBrush {
+pub struct RasterBrush<'a> {
     /// Flushes to target when stroke finishes.
     ///
     /// This is not a performance optimization.
     /// This is to hide the discrete nature of brush stroke ticks.
     buffer: RenderTexture2D,
     pub shader: Option<Shader>,
-    target: StrongMut<Raster>,
+    target: &'a mut Raster,
     mouse_prev: Option<Vector2>,
     mouse_curr: Vector2,
     pub stroke: Stroke,
 }
 
-impl RasterBrush {
+impl<'a> RasterBrush<'a> {
     pub fn new(
         rl: &mut RaylibHandle,
         thread: &RaylibThread,
         shader: Option<Shader>,
-        target: StrongMut<Raster>,
+        target: &'a mut Raster,
         stroke: Stroke,
     ) -> Result<Self, String> {
         let (width, height) = {
-            let texture = &target.read().texture.rtex;
+            let texture = &target.texture.rtex;
             (texture.width() as u32, texture.height() as u32)
         };
         let buffer = rl.load_render_texture(thread, width, height)?;
@@ -107,7 +107,7 @@ impl RasterBrush {
     }
 
     fn end_stroke(&mut self, mut rl: &mut RaylibHandle, thread: &RaylibThread, _mouse_world_pos: Vector2) {
-        let mut raster = self.target.write();
+        let raster = &mut *self.target;
         let (src_rec, dest_rec) = (raster.texture.src_rec, raster.texture.dest_rec);
         {
             let mut d = raster.texture.begin_texture_mode(&mut rl, thread);
@@ -121,13 +121,13 @@ impl RasterBrush {
     }
 }
 
-impl ToolType for RasterBrush {
-    fn tick(
+impl<'a> ToolType<'a> for RasterBrush<'a> {
+    fn tick<'b: 'a>(
         &mut self,
         rl: &mut RaylibHandle,
         thread: &RaylibThread,
         _current_appearance: &mut Appearance,
-        _document: &mut Document,
+        _document: &'b mut Document,
         _scratch_rtex: &mut Vec<RenderTexture2D>,
         mouse_world_pos: Vector2,
         _px_world_size: f32,
@@ -145,7 +145,7 @@ impl ToolType for RasterBrush {
     }
 
     fn draw(&self, d: &mut impl RaylibDraw, _editor: &Editor, _shader_table: &ShaderTable, px_world_size: f32, _viewport: &Rect2, #[cfg(dev)] _mouse_world_pos: Vector2) {
-        let raster = self.target.read();
+        let raster = &*self.target;
         let (src_rec, dest_rec) = (raster.texture.src_rec.flipped(), raster.texture.dest_rec);
         Self::draw_buffer(d, &self.buffer, self.shader.as_ref(), src_rec, dest_rec, &self.stroke);
         d.draw_ring(self.mouse_curr, (self.stroke.thick - px_world_size) * 0.5, (self.stroke.thick + px_world_size) * 0.5, 0.0, 360.0, 72, Color::WHITE);

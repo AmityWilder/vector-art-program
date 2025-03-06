@@ -152,6 +152,50 @@ impl<T: Recursive> Tree<T> {
     pub fn bfs_iter<P: Fn(&T::Node) -> bool>(&self, delve: P) -> BreadthFirstIter<T, P> {
         BreadthFirstIter::new(self.0.iter(), delve)
     }
+
+    #[inline]
+    pub fn get(&self, index: usize) -> Option<&T> {
+        self.0.get(index)
+    }
+
+    #[inline]
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
+        self.0.get_mut(index)
+    }
+
+    #[inline]
+    pub fn get_recursive<I: IntoIterator<IntoIter: ExactSizeIterator<Item = usize>>>(&self, index: I) -> Option<&T> {
+        let index = index.into_iter();
+        let len = index.len();
+        let mut node = self;
+        for (n, i) in index.enumerate() {
+            if let Some(item) = node.get(i as usize) {
+                if n == len - 1 {
+                    return Some(item);
+                } else if let Some(item_node) = item.if_node() {
+                    node = Recursive::children(item_node);
+                } else { break; }
+            } else { break; }
+        }
+        None
+    }
+
+    #[inline]
+    pub fn get_recursive_mut<I: IntoIterator<IntoIter: ExactSizeIterator<Item = usize>>>(&mut self, index: I) -> Option<&mut T> {
+        let index = index.into_iter();
+        let len = index.len();
+        let mut node = self;
+        for (n, i) in index.enumerate() {
+            if let Some(item) = node.get_mut(i as usize) {
+                if n == len - 1 {
+                    return Some(item);
+                } else if let Some(item_node) = item.if_node_mut() {
+                    node = Recursive::children_mut(item_node);
+                } else { break; }
+            } else { break; }
+        }
+        None
+    }
 }
 
 pub trait RecursiveIterator: Iterator {

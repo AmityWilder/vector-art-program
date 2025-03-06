@@ -1,19 +1,18 @@
 use amyvec::{curve::PathPointIdx, path_point::PathPoint};
 use raylib::prelude::*;
 use amymath::prelude::Vector2;
-use amylib::rc::prelude::*;
 use crate::{layer::LayerType, shaders::ShaderTable, vector_path::{path_point::{Ctrl1, Ctrl2, PPPart}, VectorPath, DrawPathPoint}};
 use super::{HOVER_RADIUS, SNAP_VERT_RADIUS, SNAP_VERT_RADIUS_SQR};
 
 /// Allows manipulating velocity controls on one point
-pub struct SingleSelect {
-    pub target: StrongMut<VectorPath>,
+pub struct SingleSelect<'a> {
+    pub target: &'a mut VectorPath,
     pub point: Option<PathPointIdx>,
 }
 
-impl SingleSelect {
+impl<'a> SingleSelect<'a> {
     pub fn drag(&mut self, delta: Vector2) {
-        let mut path = self.target.write();
+        let path = &mut *self.target;
         if let Some(idx) = self.point {
             let pp = &mut path.curve.points[idx.point];
             match &idx.part {
@@ -22,7 +21,7 @@ impl SingleSelect {
                 }
 
                 PPPart::Ctrl(side) => {
-                    let Ctrl1 { c1: (ref c1_side, c1), c2 } = pp.c.as_mut().expect("should not select corner");
+                    let Ctrl1 { c1: (c1_side, c1), c2 } = pp.c.as_mut().expect("should not select corner");
                     if c1_side == side {
                         *c1 += delta;
                     } else {
@@ -42,7 +41,7 @@ impl SingleSelect {
     }
 
     pub fn end_dragging(&mut self, px_world_size: f32) {
-        let mut path = self.target.write();
+        let path = &mut *self.target;
         if let Some(idx) = self.point {
             let pp = &mut path.curve.points[idx.point];
             let snap_vert_radius_sqr = SNAP_VERT_RADIUS_SQR * px_world_size * px_world_size;
@@ -90,7 +89,7 @@ impl SingleSelect {
         let hover_radius = HOVER_RADIUS * px_world_size;
         let hover_radius_sqr = hover_radius * hover_radius;
 
-        let path = self.target.read();
+        let path = &*self.target;
         let mut items = [None, None, None];
         if let Some(idx) = self.point {
             let pp = &path.curve.points[idx.point];
@@ -116,7 +115,7 @@ impl SingleSelect {
     }
 
     pub fn draw(&self, d: &mut impl RaylibDraw, px_world_size: f32, _shader_table: &ShaderTable) {
-        let path = self.target.read();
+        let path = &*self.target;
         if let Some(idx) = self.point {
             path.draw_selected(d, px_world_size);
             let pp = &path.curve.points[idx.point];

@@ -1,7 +1,7 @@
 use amymath::prelude::{*, Vector2};
 use amyvec::{curve::PathPointIdx, path_point::{Ctrl, Ctrl1, Ctrl2}};
 use raylib::prelude::*;
-use amylib::{iter::directed::DirectibleDoubleEndedIterator, prelude::{Strong, StrongMut}};
+use amylib::iter::directed::DirectibleDoubleEndedIterator;
 use crate::{appearance::Appearance, document::{layer::Layer, Document}, editor::Editor, layer::{BackToFore, ForeToBack, LayerType}, shaders::ShaderTable, vector_path::{path_point::PPPart, DrawPathPoint, VectorPath, ANCHOR_EXTENT_OUTER}};
 use super::ToolType;
 
@@ -20,17 +20,17 @@ use singular::SingleSelect;
 use multiple::{MultiSelect, SelectionPiece};
 
 /// Pieces should be ordered by unique target layer [`TreeIterDir::BackToFore`]. Points should be ordered by index.
-enum Selection {
-    Singular(SingleSelect),
-    Multiple(MultiSelect),
+enum Selection<'a> {
+    Singular(SingleSelect<'a>),
+    Multiple(MultiSelect<'a>),
 }
 
-struct SelectionState {
-    pub selection: Selection,
+struct SelectionState<'a> {
+    pub selection: Selection<'a>,
     pub drag: Option<(Vector2, Vector2)>, // (start, cumulative)
 }
 
-impl SelectionState {
+impl<'a> SelectionState<'a> {
     pub fn drag(&mut self, delta: Vector2) {
         match &mut self.selection {
             Selection::Singular(x) => x.drag(delta),
@@ -39,12 +39,12 @@ impl SelectionState {
     }
 }
 
-pub struct PointSelection {
-    state: Option<SelectionState>,
+pub struct PointSelection<'a> {
+    state: Option<SelectionState<'a>>,
     selection_points: Option<(Vector2, Vector2)>,
 }
 
-impl PointSelection {
+impl<'a> PointSelection<'a> {
     pub const fn new() -> Self {
         Self {
             state: None,
@@ -53,26 +53,26 @@ impl PointSelection {
     }
 
     /// Returns the target only if there is exactly one path selected
-    pub fn only_target(&self) -> Option<Strong<VectorPath>> {
+    pub fn only_target(&self) -> Option<&VectorPath> {
         if let Some(SelectionState { selection: Selection::Singular(single_select), .. }) = &self.state {
-            return Some(single_select.target.clone_ref());
+            return Some(single_select.target);
         }
         None
     }
 
     /// Returns the target only if there is exactly one path selected
-    pub fn only_target_mut(&mut self) -> Option<StrongMut<VectorPath>> {
-        if let Some(SelectionState { selection: Selection::Singular(single_select), .. }) = &self.state {
-            return Some(single_select.target.clone_mut());
+    pub fn only_target_mut(&mut self) -> Option<&mut VectorPath> {
+        if let Some(SelectionState { selection: Selection::Singular(single_select), .. }) = &mut self.state {
+            return Some(single_select.target);
         }
         None
     }
 
-    pub fn with_target(target: &StrongMut<VectorPath>) -> Self {
+    pub fn with_target(target: &'a mut VectorPath) -> Self {
         Self {
             state: Some(SelectionState {
                 selection: Selection::Singular(SingleSelect {
-                    target: target.clone_mut(),
+                    target,
                     point: None,
                 }),
                 drag: None,
@@ -81,7 +81,7 @@ impl PointSelection {
         }
     }
 
-    fn begin_dragging(&mut self, rl: &mut RaylibHandle, document: &mut Document, mouse_world_pos: Vector2, px_world_size: f32) {
+    fn begin_dragging(&mut self, rl: &mut RaylibHandle, document: &'a mut Document, mouse_world_pos: Vector2, px_world_size: f32) {
         let hover_radius = HOVER_RADIUS * px_world_size;
         let hover_radius_sqr = hover_radius * hover_radius;
         let drag = Some((mouse_world_pos, mouse_world_pos));
@@ -93,7 +93,7 @@ impl PointSelection {
                 Selection::Singular(x) => {
                     if let Some(mut idx) = x.get_selected(mouse_world_pos, px_world_size) {
                         if matches!(idx.part, PPPart::Anchor) && rl.is_key_down(KeyboardKey::KEY_LEFT_ALT) {
-                            let mut path = x.target.write();
+                            let path = &mut *x.target;
                             let c = &mut path.curve.points[idx.point].c;
                             if let Some(Ctrl1 { c1: (c1_side, _), c2: c2 @ None }) = c {
                                 *c2 = Some(Ctrl2::Exact(mouse_world_pos));
@@ -124,10 +124,9 @@ impl PointSelection {
         let hovered_point = document.layers
             .shallow_iter_mut()
             .cdir::<ForeToBack>()
-            .filter_map(|layer| if let Layer::Path(ref path) = layer { Some(path) } else { None })
+            .filter_map(|layer| if let Layer::Path(path) = layer { Some(path) } else { None })
             .find_map(|path| {
-                let path_borrow = path.read();
-                let curve = &path_borrow.curve;
+                let curve = &path.curve;
 
                 if !curve.max_bounds().is_some_and(|bounds| bounds.grow(hover_radius).contains_v(&mouse_world_pos)) {
                     return None;
@@ -143,13 +142,11 @@ impl PointSelection {
                     .map(|(i, _)| i);
 
                 if let Some(idx) = idx {
-                    drop(path_borrow);
                     Some((path, Some(PathPointIdx::new_anchor(idx))))
                 } else if curve.slices().any(|bez| bez
                     .estimate_time_at(mouse_world_pos)
                     .is_some_and(|(_, p)| p.distance_sqr(mouse_world_pos) <= hover_radius_sqr)
                 ) {
-                    drop(path_borrow);
                     Some((path, None))
                 } else {
                     None
@@ -159,7 +156,7 @@ impl PointSelection {
         if let Some((hovered_target, hovered_idx)) = hovered_point {
             self.state = Some(SelectionState {
                 selection: Selection::Singular(SingleSelect {
-                    target: hovered_target.clone_mut(),
+                    target: hovered_target,
                     point: hovered_idx,
                 }),
                 drag,
@@ -170,7 +167,7 @@ impl PointSelection {
         }
     }
 
-    fn end_dragging(&mut self, document: &mut Document, mouse_world_pos: Vector2) {
+    fn end_dragging(&mut self, document: &'a mut Document, mouse_world_pos: Vector2) {
         if let Some(state) = self.state.as_mut() {
             match &mut state.selection {
                 Selection::Singular(single_select) => single_select.end_dragging(document.camera.zoom.recip()),
@@ -183,11 +180,11 @@ impl PointSelection {
         if let Some((selection_start, _)) = self.selection_points.take() {
             let selection_rec = Rect2::from_minmax(selection_start, mouse_world_pos);
 
-            let selected = document.layers
+            let mut selected = document.layers
                 .shallow_iter_mut()
                 .filter_map(|layer| {
                     if let Layer::Path(path) = layer {
-                        let points = path.read().curve.points.iter()
+                        let points = path.curve.points.iter()
                             .enumerate()
                             .filter_map(|(idx, pp)|
                                 selection_rec.contains_v(&pp.p)
@@ -195,7 +192,7 @@ impl PointSelection {
                             .collect::<Vec<usize>>();
 
                         if !points.is_empty() {
-                            return Some(SelectionPiece { target: path.clone_mut(), points, });
+                            return Some(SelectionPiece { target: path, points, });
                         }
                     }
                     None
@@ -205,15 +202,16 @@ impl PointSelection {
             self.state = (!selected.is_empty())
                 .then(|| {
                     SelectionState {
-                        selection: match &selected[..] {
-                            [SelectionPiece { target, points }] if points.len() == 1
-                                => Selection::Singular(SingleSelect {
-                                    target: target.clone_mut(),
+                        selection: (|| {
+                            if selected.len() == 1 {
+                                let SelectionPiece { target, points, } = selected.remove(0);
+                                return Selection::Singular(SingleSelect {
+                                    target,
                                     point: Some(PathPointIdx::new(points[0], PPPart::Anchor)),
-                                }),
-                            [..]
-                                => Selection::Multiple(MultiSelect { pieces: selected }),
-                        },
+                                });
+                            }
+                            Selection::Multiple(MultiSelect { pieces: selected })
+                        })(),
                         drag: None,
                     }
                 });
@@ -221,13 +219,13 @@ impl PointSelection {
     }
 }
 
-impl ToolType for PointSelection {
-    fn tick(
+impl<'a> ToolType<'a> for PointSelection<'a> {
+    fn tick<'b: 'a>(
         &mut self,
         rl: &mut RaylibHandle,
         _thread: &RaylibThread,
         _current_appearance: &mut Appearance,
-        document: &mut Document,
+        document: &'b mut Document,
         _scratch_rtex: &mut Vec<RenderTexture2D>,
         mouse_world_pos: Vector2,
         px_world_size: f32,
@@ -255,7 +253,7 @@ impl ToolType for PointSelection {
         {
             match &mut selection_state.selection {
                 Selection::Singular(single_select) => {
-                    let mut path = single_select.target.write();
+                    let path = &mut *single_select.target;
                     if let Some(idx) = single_select.point {
                         path.curve.points.remove(idx.point)
                             .expect("should not select a point that is not within the curve");
@@ -265,7 +263,7 @@ impl ToolType for PointSelection {
                 }
                 Selection::Multiple(multi_select) => {
                     for piece in &mut multi_select.pieces {
-                        let mut path = piece.target.write();
+                        let path = &mut *piece.target;
                         let mut remove = piece.points.iter().peekable();
                         let mut keep = (0..path.curve.points.len()).map(|i| remove.next_if_eq(&&i).is_none());
                         path.curve.points.retain(|_| keep.next().expect("should visit 0..len elements"));
@@ -298,7 +296,6 @@ impl ToolType for PointSelection {
                 // draw selection options
                 for layer in editor.document.layers.shallow_iter().cdir::<BackToFore>() {
                     if let Layer::Path(path) = layer {
-                        let path = path.read();
                         if path.curve.bounds().is_some_and(|bounds| viewport.overlaps(&bounds)) {
                             path.draw_selected(d, px_world_size);
                             for pp in &path.curve.points {

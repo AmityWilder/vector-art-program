@@ -3,7 +3,6 @@ use amygui::panel::Panel;
 use amymath::prelude::{*, Vector2};
 use layer::{Layer, LayerTree};
 use crate::{appearance::{Appearance, Blending}, raster::{Raster, RasterTex}, vector_path::VectorPath};
-use amylib::rc::prelude::*;
 use raylib::prelude::{*, Vector2 as RlVector2};
 
 pub mod layer;
@@ -100,31 +99,19 @@ impl Document {
         LayerSettings::new(name, color)
     }
 
-    pub fn create_path(&mut self, name: Option<String>, color: Option<Color>, appearance: Appearance) -> &mut StrongMut<VectorPath> {
+    pub fn create_path(&mut self, name: Option<String>, color: Option<Color>, appearance: Appearance) {
         let settings = self.gen_layer_settings(name, color);
-        self.layers.push(Layer::Path(StrongMut::new(VectorPath::new(settings, appearance))));
-        match self.layers.last_mut() {
-            Some(Layer::Path(path)) => path,
-            _ => unreachable!("vector path layer should exist when one is pushed"),
-        }
+        self.layers.push(Layer::Path(VectorPath::new(settings, appearance)));
     }
 
-    pub fn create_raster(&mut self, name: Option<String>, color: Option<Color>, texture: RasterTex) -> &mut StrongMut<Raster> {
+    pub fn create_raster(&mut self, name: Option<String>, color: Option<Color>, texture: RasterTex) {
         let settings = self.gen_layer_settings(name, color);
-        self.layers.push(Layer::Raster(StrongMut::new(Raster::new(settings, texture))));
-        match self.layers.last_mut() {
-            Some(Layer::Raster(raster)) => raster,
-            _ => unreachable!("raster layer should exist when one is pushed"),
-        }
+        self.layers.push(Layer::Raster(Raster::new(settings, texture)));
     }
 
-    pub fn create_group(&mut self, name: Option<String>, color: Option<Color>) -> &mut Group {
+    pub fn create_group(&mut self, name: Option<String>, color: Option<Color>) {
         let settings = self.gen_layer_settings(name, color);
         self.layers.push(Layer::Group(Group::new(settings, Blending::default())));
-        match self.layers.last_mut() {
-            Some(Layer::Group(group)) => group,
-            _ => unreachable!("group layer should exist when one is pushed"),
-        }
     }
 
     /// Assumes `update_layer_tree_recs` is up to date
@@ -137,8 +124,8 @@ impl Document {
         for (layer, recs) in self.ui_iter(panel_rec, panel_rec.min.y) {
             let name = match layer {
                 Layer::Group(group) => &group.settings.name,
-                Layer::Path(path) => &path.read().settings.name,
-                Layer::Raster(raster) => &raster.read().settings.name,
+                Layer::Path(path) => &path.settings.name,
+                Layer::Raster(raster) => &raster.settings.name,
             };
             let color = layer.settings().color;
             d.draw_rectangle_irect2(&recs.slot, SLOT_COLOR);

@@ -38,17 +38,17 @@ impl Config {
     }
 }
 
-pub struct Engine {
+pub struct Engine<'a> {
     pub config: Config,
     pub is_trim_view: bool,
     shader_table: ShaderTable,
     layers_panel: LayersPanel,
     tool_panel: ToolPanel,
-    editors: Vec<Editor>,
+    editors: Vec<Editor<'a>>,
     active_editor: Option<usize>,
 }
 
-impl Engine {
+impl<'a> Engine<'a> {
     pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
         const LAYER_PANEL_BACKGROUND: Color = Color::new(24,24,24,255);
         let (screen_width, screen_height) = (rl.get_screen_width(), rl.get_screen_height());
@@ -96,7 +96,7 @@ impl Engine {
     }
 
     /// Automatically makes the new layer active and visible
-    pub fn create_editor(&mut self, editor: Editor) -> usize {
+    pub fn create_editor(&mut self, editor: Editor<'a>) -> usize {
         let idx = self.editors.len();
         self.editors.push(editor);
         self.active_editor = Some(idx);
@@ -107,7 +107,7 @@ impl Engine {
         &self.editors
     }
 
-    pub fn editors_mut(&mut self) -> &mut [Editor] {
+    pub fn editors_mut(&mut self) -> &mut [Editor<'a>] {
         &mut self.editors
     }
 
@@ -123,15 +123,15 @@ impl Engine {
         } else { None }
     }
 
-    pub fn get_active_editor_mut(&mut self) -> Option<&mut Editor> {
+    pub fn get_active_editor_mut(&mut self) -> Option<&mut Editor<'a>> {
         if let Some(idx) = self.active_editor.as_ref().copied() {
             assert!(idx < self.editors.len(), "active_editor should be a valid editor index");
             Some(&mut self.editors[idx])
         } else { None }
     }
 
-    pub fn tick(
-        &mut self,
+    pub fn tick<'b: 'a>(
+        &'b mut self,
         rl: &mut RaylibHandle,
         thread: &RaylibThread,
         is_window_resized: bool,

@@ -1,4 +1,3 @@
-use amylib::prelude::{Strong, StrongMut};
 use amymath::prelude::{Rect2, Vector2};
 use raylib::prelude::*;
 use crate::{appearance::Appearance, document::Document, editor::Editor, raster::Raster, shaders::ShaderTable, vector_path::VectorPath};
@@ -15,13 +14,13 @@ use self::{
     raster_brush::RasterBrush,
 };
 
-pub trait ToolType {
-    fn tick(
+pub trait ToolType<'a> {
+    fn tick<'b: 'a>(
         &mut self,
         rl: &mut RaylibHandle,
         thread: &RaylibThread,
         current_appearance: &mut Appearance,
-        document: &mut Document,
+        document: &'b mut Document,
         scratch_rtex: &mut Vec<RenderTexture2D>,
         mouse_world_pos: Vector2,
         px_world_size: f32,
@@ -40,22 +39,22 @@ pub trait ToolType {
     );
 }
 
-pub enum Tool {
-    PointSelection(PointSelection),
-    Pen(Pen),
-    VectorBrush(VectorBrush),
-    RasterBrush(RasterBrush),
+pub enum Tool<'a> {
+    PointSelection(PointSelection<'a>),
+    Pen(Pen<'a>),
+    VectorBrush(VectorBrush<'a>),
+    RasterBrush(RasterBrush<'a>),
 }
 
-impl Default for Tool {
+impl Default for Tool<'_> {
     fn default() -> Self {
         Self::PointSelection(PointSelection::new())
     }
 }
 
 // todo: have direct selection set pen/brush target
-impl Tool {
-    pub fn target_path(&self) -> Option<Strong<VectorPath>> {
+impl<'a> Tool<'a> {
+    pub fn target_path(&self) -> Option<&VectorPath> {
         match self {
             Tool::PointSelection(point_selection) => point_selection.only_target(),
             Tool::Pen(pen) => pen.target(),
@@ -64,7 +63,7 @@ impl Tool {
         }
     }
 
-    pub fn target_path_mut(&mut self) -> Option<StrongMut<VectorPath>> {
+    pub fn target_path_mut(&mut self) -> Option<&mut VectorPath> {
         match self {
             Tool::PointSelection(point_selection) => point_selection.only_target_mut(),
             Tool::Pen(pen) => pen.target_mut(),
@@ -113,22 +112,22 @@ impl Tool {
         rl: &mut RaylibHandle,
         thread: &RaylibThread,
         shader: Option<Shader>,
-        target: &StrongMut<Raster>,
+        target: &'a mut Raster,
         stroke: raster_brush::Stroke,
     ) -> Result<(), String> {
         println!("switched to raster brush");
-        *self = Self::RasterBrush(RasterBrush::new(rl, thread, shader, target.clone_mut(), stroke)?);
+        *self = Self::RasterBrush(RasterBrush::new(rl, thread, shader, target, stroke)?);
         Ok(())
     }
 }
 
-impl ToolType for Tool {
-    fn tick(
+impl<'a> ToolType<'a> for Tool<'a> {
+    fn tick<'b: 'a>(
         &mut self,
         rl: &mut RaylibHandle,
         thread: &RaylibThread,
         current_appearance: &mut Appearance,
-        document: &mut Document,
+        document: &'b mut Document,
         scratch_rtex: &mut Vec<RenderTexture2D>,
         mouse_world_pos: Vector2,
         px_world_size: f32,

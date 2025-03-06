@@ -1,23 +1,24 @@
 use raylib::prelude::*;
-use amylib::rc::prelude::*;
 use amymath::prelude::{*, Vector2};
-use crate::{appearance::Appearance, document::Document, editor::Editor, layer::LayerType, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, DrawPathPoint, VectorPath}};
+use crate::{appearance::Appearance, document::{layer::Layer, Document}, editor::Editor, layer::LayerType, shaders::ShaderTable, vector_path::{path_point::{Ctrl, Ctrl1, Ctrl2, PathPoint}, DrawPathPoint, VectorPath}};
 use super::{point_selection::SNAP_VERT_RADIUS_SQR, ToolType};
 
 use MouseButton::MOUSE_BUTTON_LEFT;
 
-pub struct InactiveVectorBrush(pub(super) Option<StrongMut<VectorPath>>);
+pub struct InactiveVectorBrush<'a>(pub(super) Option<&'a mut VectorPath>);
 
-impl InactiveVectorBrush {
-    fn tick(
+impl<'a> InactiveVectorBrush<'a> {
+    fn tick<'b: 'a>(
         rl: &mut RaylibHandle,
         current_appearance: &Appearance,
-        document: &mut Document,
-    ) -> Option<ActiveVectorBrush> {
+        document: &'b mut Document,
+    ) -> Option<ActiveVectorBrush<'a>> {
         if rl.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) {
             // create a new path
+            document.create_path(None, None, current_appearance.clone());
+            let Some(Layer::Path(target)) = document.layers.last_mut() else { panic!("should have just pushed a path") };
             return Some(ActiveVectorBrush {
-                target: document.create_path(None, None, current_appearance.clone()).clone_mut(),
+                target,
                 signal: PathSignal::default(),
             })
         }
@@ -25,8 +26,8 @@ impl InactiveVectorBrush {
     }
 }
 
-pub struct ActiveVectorBrush {
-    pub(super) target: StrongMut<VectorPath>,
+pub struct ActiveVectorBrush<'a> {
+    pub(super) target: &'a mut VectorPath,
 
     signal: PathSignal,
 }
@@ -104,7 +105,7 @@ impl PathSignal {
     }
 }
 
-impl ActiveVectorBrush {
+impl<'a> ActiveVectorBrush<'a> {
     fn begin_path(
         &mut self,
         rl: &mut RaylibHandle,
@@ -114,7 +115,7 @@ impl ActiveVectorBrush {
             self.signal.last_changed  = mouse_world_pos;
             self.signal.last_straight = mouse_world_pos;
             self.signal.last_curved   = mouse_world_pos;
-            let mut path = self.target.write();
+            let path = &mut *self.target;
             for _ in 0..2 {
                 path.curve.points.push_back(PathPoint { p: mouse_world_pos, c: None });
             }
@@ -185,19 +186,19 @@ impl ActiveVectorBrush {
 
         let change_type = self.signal.test(new_pos);
 
-        Self::update_path(&mut self.target.write(), new_pos);
+        Self::update_path(self.target, new_pos);
 
         if matches!(change_type, ChangeType::Curvature) {
-            self.target.write().curve.points.push_back(PathPoint { p: self.signal.last_curved, c: None });
+            self.target.curve.points.push_back(PathPoint { p: self.signal.last_curved, c: None });
         }
     }
 
     fn finish_path(
         &mut self,
         mouse_world_pos: Vector2,
-    ) -> InactiveVectorBrush {
+    ) {
         {
-            let mut path = self.target.write();
+            let path = &mut *self.target;
             path.curve.points.push_back(PathPoint { p: mouse_world_pos, c: None });
             if path.curve.points.len() >= 2 {
                 let first = path.curve.points.front().expect("len >= 2 should guarantee 2 points").p;
@@ -207,15 +208,14 @@ impl ActiveVectorBrush {
                 }
             }
         }
-        InactiveVectorBrush(Some(self.target.clone_mut()))
     }
 
-    /// Returns true if still active, false if finished
+    /// Returns true if finished, false if still active
     fn tick(
         &mut self,
         rl: &mut RaylibHandle,
         mouse_world_pos: Vector2,
-    ) -> Option<InactiveVectorBrush> {
+    ) -> bool {
         if rl.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) {
             self.begin_path(rl, mouse_world_pos);
         }
@@ -226,13 +226,16 @@ impl ActiveVectorBrush {
 
         // stroke complete
         if rl.is_mouse_button_released(MOUSE_BUTTON_LEFT) {
-            Some(self.finish_path(mouse_world_pos))
-        } else { None }
+            self.finish_path(mouse_world_pos);
+            return true;
+        }
+
+        false
     }
 
     fn draw(&self, d: &mut impl RaylibDraw, editor: &Editor, _shader_table: &ShaderTable) {
         let px_world_size = editor.document.camera.zoom.recip();
-        let path = self.target.read();
+        let path = &*self.target;
         path.draw_selected(d, px_world_size);
         let color = path.settings.color;
         for pp in &path.curve.points {
@@ -241,38 +244,44 @@ impl ActiveVectorBrush {
     }
 }
 
-pub enum VectorBrush {
-    Inactive(InactiveVectorBrush),
-    Active(ActiveVectorBrush),
+pub enum VectorBrush<'a> {
+    Inactive(InactiveVectorBrush<'a>),
+    Active(ActiveVectorBrush<'a>),
 }
 
-impl VectorBrush {
+impl Default for VectorBrush<'_> {
+    fn default() -> Self {
+        Self::Inactive(InactiveVectorBrush(None))
+    }
+}
+
+impl<'a> VectorBrush<'a> {
     pub fn new() -> Self {
         Self::Inactive(InactiveVectorBrush(None))
     }
 
-    pub fn target(&self) -> Option<Strong<VectorPath>> {
+    pub fn target(&self) -> Option<&VectorPath> {
         if let Self::Inactive(InactiveVectorBrush(Some(target))) | Self::Active(ActiveVectorBrush { target, .. }) = self {
-            return Some(target.clone_ref());
+            return Some(&*target);
         }
         None
     }
 
-    pub fn target_mut(&mut self) -> Option<StrongMut<VectorPath>> {
+    pub fn target_mut(&mut self) -> Option<&mut VectorPath> {
         if let Self::Inactive(InactiveVectorBrush(Some(target))) | Self::Active(ActiveVectorBrush { target, .. }) = self {
-            return Some(target.clone_mut());
+            return Some(target);
         }
         None
     }
 }
 
-impl ToolType for VectorBrush {
-    fn tick(
+impl<'a> ToolType<'a> for VectorBrush<'a> {
+    fn tick<'b: 'a>(
         &mut self,
         rl: &mut RaylibHandle,
         _thread: &RaylibThread,
         current_appearance: &mut Appearance,
-        document: &mut Document,
+        document: &'b mut Document,
         _scratch_rtex: &mut Vec<RenderTexture2D>,
         mouse_world_pos: Vector2,
         _px_world_size: f32,
@@ -286,8 +295,11 @@ impl ToolType for VectorBrush {
         }
 
         if let VectorBrush::Active(brush) = self {
-            if let Some(inactive_brush) = brush.tick(rl, mouse_world_pos) {
-                *self = Self::Inactive(inactive_brush);
+            let is_finished = brush.tick(rl, mouse_world_pos);
+            if is_finished {
+                let temp = std::mem::take(self);
+                let VectorBrush::Active(ActiveVectorBrush { target, .. }) = temp else { unreachable!("could not have gotten here if self was inactive") };
+                *self = Self::Inactive(InactiveVectorBrush(Some(target)));
             }
         }
     }
